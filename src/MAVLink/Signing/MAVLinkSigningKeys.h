@@ -7,9 +7,11 @@
 #include <QtCore/QObject>
 #include <QtCore/QTimer>
 #include <QtQmlIntegration/QtQmlIntegration>
+#include <memory>
 #include <optional>
 
 #include "MAVLinkSigning.h"
+#include "MAVLinkSigningKeyStore.h"
 
 class QmlObjectListModel;
 class SigningController;
@@ -58,6 +60,14 @@ class MAVLinkSigningKeys : public QObject
 
 public:
     static MAVLinkSigningKeys* instance();
+
+    /// Install the persistence backend for key material. Intended to be called once during startup,
+    /// before any key is loaded or saved (e.g. from QGCCorePlugin::init()). Passing nullptr restores
+    /// the default QSettings backend. Ownership transfers here.
+    static void setKeyStore(std::unique_ptr<MAVLinkSigningKeyStore> store);
+
+    /// The active backend. Never nullptr — defaults to the QSettings backend on first use.
+    static MAVLinkSigningKeyStore* keyStore();
 
     explicit MAVLinkSigningKeys(QObject* parent = nullptr);
     ~MAVLinkSigningKeys() override;
@@ -128,9 +138,10 @@ private:
     int _keyUsageRevision = 0;
     QTimer* _timestampFlushTimer = nullptr;
 
-    static constexpr QLatin1StringView kSettingsGroup = QLatin1StringView("MAVLinkSigningKeys");
+    /// Shared with the key store so both agree on one group. Key bytes themselves live behind
+    /// MAVLinkSigningKeyStore; only the non-secret manifest and timestamps are written here.
+    static constexpr QLatin1StringView kSettingsGroup = MAVLinkSigningKeyStore::kSettingsGroup;
     static constexpr QLatin1StringView kManifestKey = QLatin1StringView("manifest");  // key names list (no secrets)
-    static constexpr QLatin1StringView kKeySubgroup = QLatin1StringView("keys");  // <kSettingsGroup>/keys/<name> = key bytes
     static constexpr QLatin1StringView kTimestampSubgroup = QLatin1StringView("timestamps");  // <kSettingsGroup>/timestamps/<name> = quint64
     static constexpr int kTimestampFlushIntervalMs = 5000;
 
@@ -154,4 +165,6 @@ private:
         return _pbkdf2IterationsOverride > 0 ? _pbkdf2IterationsOverride : kPbkdf2Iterations;
     }
     static inline int _pbkdf2IterationsOverride = 0;
+
+    static std::unique_ptr<MAVLinkSigningKeyStore> _keyStore;
 };

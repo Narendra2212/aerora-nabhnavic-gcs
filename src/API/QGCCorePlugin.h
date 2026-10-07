@@ -135,6 +135,26 @@ public:
     /// @return true: Allow vehicle to continue processing, false: Vehicle should not process message
     virtual bool mavlinkMessage(Vehicle *vehicle, LinkInterface *link, const mavlink_message_t &message) { Q_UNUSED(vehicle); Q_UNUSED(link); Q_UNUSED(message); return true; }
 
+    /// Allows the plugin to authorize an outgoing MAV_CMD. This is the outgoing counterpart to mavlinkMessage().
+    ///
+    /// Called from MavCommandQueue::sendWorker() at enqueue time, before the command is appended to the send
+    /// queue. Refusing here means the command is never queued, so it cannot be retried by the response timer
+    /// and cannot be reported to the operator as an unresponsive vehicle.
+    ///
+    /// Implementations must not send messages or mutate vehicle state: this is a decision hook, not an action hook.
+    ///
+    /// @c command is the MAV_CMD value, passed as int to keep this header free of MAVLink includes.
+    /// @return true: Allow the command to be queued and sent, false: Refuse the command
+    virtual bool authorizeMavCommand(Vehicle *vehicle, int targetCompId, int command, bool commandInt,
+                                     float param1, float param2, float param3, float param4,
+                                     double param5, double param6, float param7)
+    {
+        Q_UNUSED(vehicle); Q_UNUSED(targetCompId); Q_UNUSED(command); Q_UNUSED(commandInt);
+        Q_UNUSED(param1); Q_UNUSED(param2); Q_UNUSED(param3); Q_UNUSED(param4);
+        Q_UNUSED(param5); Q_UNUSED(param6); Q_UNUSED(param7);
+        return true;
+    }
+
     /// Allows custom builds to add custom items to the FlightMap. Objects put into QmlObjectListModel should derive from QmlComponentInfo and set the url property.
     virtual const QmlObjectListModel *customMapItems();
 

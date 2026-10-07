@@ -113,6 +113,14 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
     friend class RetryableRequestMessageStateTest;  // Unit test
 #endif
     friend class GimbalController;                  // Allow GimbalController to call _addFactGroup
+    // Allow AeroraVehicleFactGroupRegistrar to call _addFactGroup per vehicle - Q4-002, ADR-016.
+    // Follows the same pattern as the two friends above, which upstream grants for this exact
+    // purpose. The class is defined in the Aerora overlay, so in a stock build this names a class
+    // that is never defined, which is legal and has no effect. The registrar's privileged call is
+    // additionally gated on AERORA_VEHICLE_FACTGROUP_FRIENDSHIP, which is deliberately NOT defined
+    // yet: until Aerora facts and metadata exist there is nothing to register, so the registrar
+    // refuses and reports why rather than registering empty groups.
+    friend class AeroraVehicleFactGroupRegistrar;
 
 public:
     Vehicle(LinkInterface*          link,

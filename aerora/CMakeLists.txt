@@ -1,0 +1,288 @@
+# ============================================================================
+# Aerora Universal GCS - overlay build aggregation (M-Plugin / Tab 1)
+#
+# This file is the single aggregation point for the Aerora overlay. Domain modules export
+# variables from their own <Module>.cmake manifests and this file flattens them into the
+# CUSTOM_* variables that src/CMakeLists.txt consumes (verified at src/CMakeLists.txt:203-222:
+# CUSTOM_QT_COMPONENTS, CUSTOM_SOURCES, CUSTOM_LIBRARIES, CUSTOM_INCLUDE_DIRECTORIES and
+# CUSTOM_DEFINITIONS, each guarded by if(QGC_CUSTOM_BUILD)).
+#
+# Ownership: domain modules own their manifests; this file owns only the aggregation. Adding a
+# module here must stay a small, reviewable change - see each manifest's integration comment.
+#
+# Integration convention, established independently by aerora/src/Telemetry/Telemetry.cmake and
+# aerora/src/Vehicle/Vehicle.cmake and adopted unchanged:
+#
+#   - a manifest sets variables only: no targets, no add_test(), nothing in PARENT_SCOPE
+#   - it exports AERORA_<MODULE>_SOURCES / _INCLUDE_DIRECTORIES / _LIBRARIES
+#   - and AERORA_<MODULE>_TEST_SOURCES / _TEST_INCLUDE_DIRECTORIES / _TEST_NAMES
+#   - this file includes it, appends to local lists, and performs one PARENT_SCOPE set at the end
+#
+# The local-list-then-single-set shape is deliberate: both manifests warn that a plain
+# list(APPEND) does not propagate to the parent scope, so every append happens before the
+# PARENT_SCOPE sets at the bottom of this file.
+#
+# Sources reach the application target directly rather than a static library. That is required,
+# not incidental: AeroraFirmwarePluginFactory registers itself through a non-local static object,
+# and a linker may discard such an object from a static archive if no symbol references it. The
+# failure mode is silent - the build succeeds, the application starts, and no Aerora plugin is
+# ever registered.
+#
+# All five domain manifests are aggregated. src/Supervisory/ is covered by PayloadPower.cmake: it
+# is not a sixth module but the single type M-Payload and M-Power share, held in its own directory
+# so neither depends on the other for it. Whether it is absorbed into M-Telemetry is recorded OPEN
+# and assigned to Tab 1 - see 29-integration-status.md.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Domain manifests
+#
+# Vehicle is included before Mission because the mission module has a hard dependency on it:
+# AeroraMissionBridge.cc includes "AeroraVehicleServices.h". Mission.cmake deliberately does not
+# re-export the vehicle include directory, so that dropping the vehicle module fails the build at
+# the missing header rather than silently yielding a mission module that never attaches.
+# ----------------------------------------------------------------------------
+
+# PayloadPower is included after Telemetry and Vehicle because it consumes their headers
+# (AeroraTelemetryState/StateValue/Source/Freshness and AeroraVehicleCapabilities) and deliberately
+# does not re-export their include directories, so the aggregation order stays visible here.
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Security/Security.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Telemetry/Telemetry.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Vehicle/Vehicle.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Mission/Mission.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/PayloadPower.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/UI/Ui.cmake)
+
+# ----------------------------------------------------------------------------
+# Cross-module dependency assertion
+#
+# AeroraFirmwarePlugin::initializeVehicle() is the per-vehicle composition root and references four
+# sibling modules by header and by symbol, so AERORA_VEHICLE_SOURCES no longer links standalone.
+# Vehicle.cmake declares AERORA_VEHICLE_REQUIRED_MODULES precisely so this point can assert the set
+# instead of discovering an omission from a link error.
+#
+# Module names do not map one-to-one onto manifest variable prefixes: Payload, Power and
+# Supervisory are all carried by src/PayloadPower.cmake, because Payload and Power share
+# AeroraReportedValue and splitting the manifest would duplicate it. The mapping is therefore
+# explicit rather than derived from the name.
+# ----------------------------------------------------------------------------
+
+set(_aerora_module_sentinel_Telemetry   AERORA_TELEMETRY_SOURCES)
+set(_aerora_module_sentinel_Mission     AERORA_MISSION_SOURCES)
+set(_aerora_module_sentinel_Payload     AERORA_PAYLOAD_POWER_SOURCES)
+set(_aerora_module_sentinel_Power       AERORA_PAYLOAD_POWER_SOURCES)
+set(_aerora_module_sentinel_Supervisory AERORA_PAYLOAD_POWER_SOURCES)
+
+foreach(_required_module IN LISTS AERORA_VEHICLE_REQUIRED_MODULES)
+    set(_sentinel_name "${_aerora_module_sentinel_${_required_module}}")
+
+    if(NOT _sentinel_name)
+        message(FATAL_ERROR
+            "Aerora overlay: M-Vehicle requires module '${_required_module}', but this aggregation "
+            "point has no sentinel mapping for it. Add one above, or correct "
+            "AERORA_VEHICLE_REQUIRED_MODULES in aerora/src/Vehicle/Vehicle.cmake.")
+    endif()
+
+    if(NOT ${_sentinel_name})
+        message(FATAL_ERROR
+            "Aerora overlay: M-Vehicle requires module '${_required_module}', whose manifest was "
+            "not included or exported no sources (expected ${_sentinel_name} to be set). "
+            "AeroraFirmwarePlugin::initializeVehicle() composes that module into every vehicle, so "
+            "building without it would either fail to link or silently attach an incomplete set of "
+            "per-vehicle services.")
+    endif()
+endforeach()
+
+unset(_required_module)
+unset(_sentinel_name)
+unset(_aerora_module_sentinel_Telemetry)
+unset(_aerora_module_sentinel_Mission)
+unset(_aerora_module_sentinel_Payload)
+unset(_aerora_module_sentinel_Power)
+unset(_aerora_module_sentinel_Supervisory)
+
+# ----------------------------------------------------------------------------
+# Aerora plugin sources
+#
+# M-Plugin owns only AeroraCorePlugin.*, which binds the Aerora security foundation to QGC's
+# extension points. Every domain module, security included, now exports its own manifest, so
+# nothing else is listed inline here.
+# ----------------------------------------------------------------------------
+
+set(_aerora_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.h
+)
+
+set(_aerora_include_directories
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+set(_aerora_libraries "")
+
+# ----------------------------------------------------------------------------
+# Aggregate the domain modules
+# ----------------------------------------------------------------------------
+
+list(APPEND _aerora_sources
+    ${AERORA_SECURITY_SOURCES}
+    ${AERORA_TELEMETRY_SOURCES}
+    ${AERORA_VEHICLE_SOURCES}
+    ${AERORA_MISSION_SOURCES}
+    ${AERORA_PAYLOAD_POWER_SOURCES}
+    ${AERORA_UI_SOURCES}
+)
+
+list(APPEND _aerora_include_directories
+    ${AERORA_SECURITY_INCLUDE_DIRECTORIES}
+    ${AERORA_TELEMETRY_INCLUDE_DIRECTORIES}
+    ${AERORA_VEHICLE_INCLUDE_DIRECTORIES}
+    ${AERORA_MISSION_INCLUDE_DIRECTORIES}
+    ${AERORA_PAYLOAD_POWER_INCLUDE_DIRECTORIES}
+    ${AERORA_UI_INCLUDE_DIRECTORIES}
+)
+
+# ----------------------------------------------------------------------------
+# Aerora QML module (B2)
+#
+# M-Ui exports the URI and the file list; creating the target belongs here because a manifest
+# declares no targets. Follows the custom-example pattern verbatim
+# (custom-example/CMakeLists.txt:143-172): qt_add_library STATIC, qgc_configure_target, then
+# qt_add_qml_module with NO_PLUGIN, and the resulting target appended to CUSTOM_LIBRARIES.
+#
+# Unlike custom-example this sets no QT_RESOURCE_ALIAS. Those aliases exist so overlay QML can
+# shadow stock QGroundControl files by basename; Aerora.Controls is a new URI that shadows nothing,
+# so aliasing would be inappropriate here rather than merely redundant.
+#
+# The URI comes from AERORA_UI_QML_MODULE_URI - Tab 7 owns it and it is not restated here.
+# ----------------------------------------------------------------------------
+
+if(AERORA_UI_QML_FILES)
+    qt_add_library(AeroraControlsModule STATIC)
+    qgc_configure_target(AeroraControlsModule)
+
+    qt_add_qml_module(AeroraControlsModule
+        URI ${AERORA_UI_QML_MODULE_URI}
+        VERSION 1.0
+        RESOURCE_PREFIX /qml
+        QML_FILES ${AERORA_UI_QML_FILES}
+        NO_PLUGIN
+    )
+
+    list(APPEND _aerora_libraries AeroraControlsModule)
+endif()
+
+# ----------------------------------------------------------------------------
+# OUTSTANDING Tab 1 work for M-Ui
+#
+# Handoff HO-TAB7-02: AeroraQmlOverrides must be installed on the QML engine by overriding two
+# public virtuals on AeroraCorePlugin, which M-Plugin owns. Recorded in
+# .kiro/specs/04-ui-implementation/01-ui-foundation-closure.md and tracked in
+# 29-integration-status.md. Not done here: this pass is reproducibility and build-entry closure,
+# and that change alters runtime engine setup rather than the build graph.
+# ----------------------------------------------------------------------------
+
+list(APPEND _aerora_libraries
+    ${AERORA_TELEMETRY_LIBRARIES}
+    ${AERORA_MISSION_LIBRARIES}
+    ${AERORA_PAYLOAD_POWER_LIBRARIES}
+)
+
+# ----------------------------------------------------------------------------
+# Test sources and CTest registration
+#
+# Gated on QGC_BUILD_TESTING so no mock or test translation unit can reach a shipped binary
+# through the overlay. AeroraVehicleMock additionally fails the build with #error unless
+# QGC_UNITTEST_BUILD is defined, so both guards must be defeated together.
+#
+# include(QGCTest) is used rather than cmake_language(DEFER ...) for consistency with the
+# snippet both manifests document. Two consequences, both known and accepted:
+#   - QGCTest.cmake carries include_guard(GLOBAL) and defines the check / check-unit targets, so
+#     including it here moves those convenience targets into this directory. They are global by
+#     name, so `ninja check` still resolves.
+#   - the overlay is configured before test/ (root CMakeLists.txt adds the custom directory at
+#     :403 and test/ at :445), so the sanitizer timeout escalation applied inside
+#     test/CMakeLists.txt does not reach tests registered here. Pass an explicit TIMEOUT to
+#     add_qgc_test if a sanitizer lane needs one.
+# ----------------------------------------------------------------------------
+
+if(QGC_BUILD_TESTING)
+    list(APPEND _aerora_sources
+        ${AERORA_SECURITY_TEST_SOURCES}
+        ${AERORA_TELEMETRY_TEST_SOURCES}
+        ${AERORA_VEHICLE_TEST_SOURCES}
+        ${AERORA_MISSION_TEST_SOURCES}
+        ${AERORA_PAYLOAD_POWER_TEST_SOURCES}
+        ${AERORA_UI_TEST_SOURCES}
+    )
+
+    list(APPEND _aerora_include_directories
+        ${AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_TELEMETRY_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_MISSION_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_PAYLOAD_POWER_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_UI_TEST_INCLUDE_DIRECTORIES}
+    )
+
+    include(QGCTest)
+
+    add_qgc_test(AeroraCalibrationAuthorizationTest LABELS Unit)
+    add_qgc_test(AeroraCalibrationEnforcementTest LABELS Integration Vehicle)
+    add_qgc_test(AeroraReportedValueTest LABELS Unit)
+    add_qgc_test(AeroraSigningKeyStoreTest LABELS Unit)
+    add_qgc_test(AeroraTelemetryAttachmentTest LABELS Unit)
+    add_qgc_test(AeroraUiFoundationTest LABELS Unit)
+    add_qgc_test(AeroraUiSafetyTest LABELS Unit)
+    add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
+    add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
+    add_qgc_test(AeroraVehicleLifecycleTest LABELS Integration Vehicle)
+    add_qgc_test(AeroraMissionTest LABELS Unit MissionManager)
+    add_qgc_test(AeroraMissionSyncTest LABELS Integration Vehicle MissionManager)
+    add_qgc_test(AeroraPayloadModelTest LABELS Unit)
+    add_qgc_test(AeroraPowerModelTest LABELS Unit)
+endif()
+
+# A source listed twice would be compiled twice; de-duplicate after aggregation rather than
+# relying on every manifest being disjoint.
+list(REMOVE_DUPLICATES _aerora_sources)
+list(REMOVE_DUPLICATES _aerora_include_directories)
+if(_aerora_libraries)
+    list(REMOVE_DUPLICATES _aerora_libraries)
+endif()
+
+# ----------------------------------------------------------------------------
+# Export to the overlay build contract
+#
+# Single PARENT_SCOPE set per variable, after every append above.
+# ----------------------------------------------------------------------------
+
+set(CUSTOM_SOURCES ${_aerora_sources} PARENT_SCOPE)
+set(CUSTOM_INCLUDE_DIRECTORIES ${_aerora_include_directories} PARENT_SCOPE)
+set(CUSTOM_LIBRARIES ${_aerora_libraries} PARENT_SCOPE)
+
+# ----------------------------------------------------------------------------
+# Custom build identification
+#
+# QGC_CUSTOM_BUILD routes QGCCorePlugin::instance() through CUSTOMCLASS::instance()
+# (src/API/QGCCorePlugin.cc), which is how the Aerora authorization gate is bound to the core
+# send path. Without it the overlay compiles but the gate is never consulted. See ADR-012.
+# ----------------------------------------------------------------------------
+
+# AERORA_VEHICLE_FACTGROUP_FRIENDSHIP enables the single privileged statement in
+# AeroraVehicleFactGroupRegistrar, which calls the protected FactGroup::_addFactGroup() on a
+# Vehicle. It is a compile definition, not a runtime feature flag, and it pairs with
+# `friend class AeroraVehicleFactGroupRegistrar;` in src/Vehicle/Vehicle.h. Both halves are now
+# applied; defining this without the friend declaration would be a compile error. See ADR-016.
+set(CUSTOM_DEFINITIONS
+    QGC_CUSTOM_BUILD
+    CUSTOMHEADER="AeroraCorePlugin.h"
+    CUSTOMCLASS=AeroraCorePlugin
+    AERORA_VEHICLE_FACTGROUP_FRIENDSHIP
+    PARENT_SCOPE
+)
+
+set(CUSTOM_QT_COMPONENTS
+    Core
+    PARENT_SCOPE
+)

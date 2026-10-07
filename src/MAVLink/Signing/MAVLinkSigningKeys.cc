@@ -36,6 +36,25 @@ MAVLinkSigningKey::~MAVLinkSigningKey()
 
 Q_APPLICATION_STATIC(MAVLinkSigningKeys, _mavlinkSigningKeysInstance);
 
+std::unique_ptr<MAVLinkSigningKeyStore> MAVLinkSigningKeys::_keyStore;
+
+void MAVLinkSigningKeys::setKeyStore(std::unique_ptr<MAVLinkSigningKeyStore> store)
+{
+    _keyStore = std::move(store);
+    if (_keyStore) {
+        qCDebug(MAVLinkSigningKeysLog) << "backend:" << _keyStore->backendName()
+                                       << "protectsAtRest:" << _keyStore->protectsAtRest();
+    }
+}
+
+MAVLinkSigningKeyStore* MAVLinkSigningKeys::keyStore()
+{
+    if (!_keyStore) {
+        _keyStore = std::make_unique<MAVLinkSigningKeyStoreQSettings>();
+    }
+    return _keyStore.get();
+}
+
 MAVLinkSigningKeys* MAVLinkSigningKeys::instance()
 {
     return _mavlinkSigningKeysInstance();
@@ -248,6 +267,8 @@ void MAVLinkSigningKeys::removeAllKeys()
 void MAVLinkSigningKeys::_save()
 {
     // No cross-process lock: RunGuard enforces single-instance, so the keystore has no concurrent writer.
+    MAVLinkSigningKeyStore* const store = keyStore();
+
     QSettings settings;
     settings.beginGroup(kSettingsGroup);
     const QStringList previousNames = settings.value(kManifestKey).toStringList();
@@ -257,15 +278,23 @@ void MAVLinkSigningKeys::_save()
         const auto* key = _keys->value<MAVLinkSigningKey*>(i);
         const auto& bytes = key->keyBytes();
         QByteArray serialized(reinterpret_cast<const char*>(bytes.data()), static_cast<qsizetype>(bytes.size()));
-        settings.setValue(QString("%1/%2").arg(kKeySubgroup, key->name()), serialized);
+        const MAVLinkSigningKeyStoreResult result = store->storeKey(key->name(), serialized);
         QGC::secureZero(serialized);
+        if (result != MAVLinkSigningKeyStoreResult::Success) {
+            // Do not list a key the backend did not persist: the manifest must not claim material
+            // that cannot be read back.
+            qCWarning(MAVLinkSigningKeysLog) << "Backend failed to persist key:" << key->name()
+                                             << "backend:" << store->backendName()
+                                             << "result:" << MAVLinkSigningKeyStore::resultToString(result);
+            continue;
+        }
         manifestNames.append(key->name());
     }
 
     const QSet<QString> liveNameSet(manifestNames.constBegin(), manifestNames.constEnd());
     for (const QString& oldName : previousNames) {
         if (!liveNameSet.contains(oldName)) {
-            settings.remove(QString("%1/%2").arg(kKeySubgroup, oldName));
+            (void) store->removeKey(oldName);
             settings.remove(QString("%1/%2").arg(kTimestampSubgroup, oldName));
         }
     }
@@ -274,6 +303,7 @@ void MAVLinkSigningKeys::_save()
     settings.endGroup();
     // Explicit sync: persist before a crash between here and QSettings destruction.
     settings.sync();
+    (void) store->flush();
 }
 
 uint64_t MAVLinkSigningKeys::lastTimestamp(const QString& name) const
@@ -401,11 +431,19 @@ void MAVLinkSigningKeys::_load()
     _keys->clearAndDeleteContents();
     _keyIndex.clear();
 
+    MAVLinkSigningKeyStore* const store = keyStore();
+
     QSettings settings;
     settings.beginGroup(kSettingsGroup);
     const QStringList manifest = settings.value(kManifestKey).toStringList();
     for (const QString& name : manifest) {
-        QByteArray keyBytes = settings.value(QString("%1/%2").arg(kKeySubgroup, name)).toByteArray();
+        QByteArray keyBytes;
+        if (const MAVLinkSigningKeyStoreResult result = store->loadKey(name, keyBytes);
+            result != MAVLinkSigningKeyStoreResult::Success && result != MAVLinkSigningKeyStoreResult::NotFound) {
+            qCWarning(MAVLinkSigningKeysLog) << "Backend failed to read key:" << name
+                                             << "backend:" << store->backendName()
+                                             << "result:" << MAVLinkSigningKeyStore::resultToString(result);
+        }
         if (const auto key = MAVLinkSigning::makeSigningKey(keyBytes); !name.isEmpty() && key) {
             auto* inserted = _insertKey(name, *key);
             const uint64_t ts = settings.value(QString("%1/%2").arg(kTimestampSubgroup, name)).toULongLong();

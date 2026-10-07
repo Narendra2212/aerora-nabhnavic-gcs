@@ -1,0 +1,71 @@
+{
+  "version": 6,
+  "include": ["common.json", "Linux.json", "Windows.json"],
+  "configurePresets": [
+    {
+      "name": "aerora-overlay",
+      "hidden": true,
+      "cacheVariables": {
+        "QGC_CUSTOM_DIR": "aerora"
+      }
+    },
+    {
+      "name": "Aerora-Windows-debug",
+      "displayName": "Aerora Windows x64 Debug (overlay + tests)",
+      "inherits": ["aerora-overlay", "Windows-debug"],
+      "binaryDir": "${sourceDir}/build/Aerora-Windows-debug"
+    },
+    {
+      "name": "Aerora-Linux-debug",
+      "displayName": "Aerora Linux x64 Debug (overlay + tests)",
+      "inherits": ["aerora-overlay", "Linux-debug"],
+      "binaryDir": "${sourceDir}/build/Aerora-Linux-debug"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Aerora-Windows-debug",
+      "configurePreset": "Aerora-Windows-debug",
+      "configuration": "Debug",
+      "inherits": ["build-defaults"]
+    },
+    {
+      "name": "Aerora-Linux-debug",
+      "configurePreset": "Aerora-Linux-debug",
+      "configuration": "Debug",
+      "inherits": ["build-defaults"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "Aerora-Windows-debug",
+      "configurePreset": "Aerora-Windows-debug",
+      "configuration": "Debug",
+      "inherits": ["test-defaults"]
+    },
+    {
+      "name": "Aerora-Linux-debug",
+      "configurePreset": "Aerora-Linux-debug",
+      "configuration": "Debug",
+      "inherits": ["test-defaults"]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "Aerora-Windows-debug",
+      "steps": [
+        { "type": "configure", "name": "Aerora-Windows-debug" },
+        { "type": "build", "name": "Aerora-Windows-debug" },
+        { "type": "test", "name": "Aerora-Windows-debug" }
+      ]
+    },
+    {
+      "name": "Aerora-Linux-debug",
+      "steps": [
+        { "type": "configure", "name": "Aerora-Linux-debug" },
+        { "type": "build", "name": "Aerora-Linux-debug" },
+        { "type": "test", "name": "Aerora-Linux-debug" }
+      ]
+    }
+  ]
+}

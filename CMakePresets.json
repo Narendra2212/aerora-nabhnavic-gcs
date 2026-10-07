@@ -11,6 +11,7 @@
     "cmake/presets/iOS.json",
     "cmake/presets/Linux.json",
     "cmake/presets/macOS.json",
-    "cmake/presets/Windows.json"
+    "cmake/presets/Windows.json",
+    "cmake/presets/Aerora.json"
   ]
 }

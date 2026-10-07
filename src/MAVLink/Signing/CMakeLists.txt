@@ -4,6 +4,8 @@ target_sources(
             MAVLinkSigning.h
             MAVLinkSigningKeys.cc
             MAVLinkSigningKeys.h
+            MAVLinkSigningKeyStore.cc
+            MAVLinkSigningKeyStore.h
             SigningChannel.cc
             SigningChannel.h
             SigningController.cc

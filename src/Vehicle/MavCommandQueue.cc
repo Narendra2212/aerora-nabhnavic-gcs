@@ -7,6 +7,7 @@
 #include "MAVLinkProtocol.h"
 #include "MissionCommandTree.h"
 #include "AppMessages.h"
+#include "QGCCorePlugin.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
 #include "VehicleLinkManager.h"
@@ -286,6 +287,30 @@ void MavCommandQueue::sendWorker(bool commandInt, bool showError,
         return;
     }
 
+    // Authorization gate. Deliberately the first check after _stopped so no validation path can bypass it,
+    // and deliberately before _list.append() below so a refused command never becomes a queue entry. That
+    // placement is what keeps a refusal from being retried by _responseTimeoutCheck() or surfacing later as
+    // MavCmdResultFailureNoResponseToCommand. See ADR-012. Base implementation allows everything.
+    if (!QGCCorePlugin::instance()->authorizeMavCommand(_vehicle, targetCompId, command, commandInt,
+                                                        param1, param2, param3, param4, param5, param6, param7)) {
+        qCWarning(MavCommandQueueLog) << "Command not authorized, not queued:" << _formatCommand(command, param1)
+                                      << "targetCompId:" << targetCompId;
+
+        if (ackHandlerInfo && ackHandlerInfo->resultHandler) {
+            mavlink_command_ack_t ack = {};
+            ack.command = command;
+            ack.result = MAV_RESULT_DENIED;
+            (*ackHandlerInfo->resultHandler)(ackHandlerInfo->resultHandlerData, targetCompId, ack, MavCmdResultFailureAuthorizationDenied);
+        } else {
+            emit commandResult(_vehicle->id(), targetCompId, command, MAV_RESULT_DENIED, MavCmdResultFailureAuthorizationDenied);
+        }
+
+        if (showError) {
+            QGC::showAppMessage(tr("Command not authorized: %1.").arg(_formatCommand(command, param1)));
+        }
+        return;
+    }
+
     // We can't send commands to compIdAll using this method. The reason being that we would get responses back possibly from multiple components
     // which this code can't handle.
     // We also can't send the majority of commands again if we are already waiting for a response from that same command. If we did that we would not be able to discern
@@ -550,6 +575,8 @@ QString MavCommandQueue::failureCodeToString(MavCmdResultFailureCode_t failureCo
         return QStringLiteral("No Response To Command");
     case MavCmdResultFailureDuplicateCommand:
         return QStringLiteral("Duplicate Command");
+    case MavCmdResultFailureAuthorizationDenied:
+        return QStringLiteral("Authorization Denied");
     default:
         return QStringLiteral("Unknown (%1)").arg(failureCode);
     }

@@ -2390,6 +2390,20 @@ void Vehicle::startCalibration(QGCMAVLink::CalibrationType calType)
         break;
     }
 
+    // Authorization gate for this direct-send path. MAV_CMD_PREFLIGHT_CALIBRATION deliberately
+    // bypasses MavCommandQueue (see the comment below), so the gate sendWorker() applies to queued
+    // commands never sees it. Evaluated here, after the switch and before the pack: the calibration
+    // type is carried entirely in param1-7, and two variants can turn motors - ESC calibration
+    // (param7) and APM CompassMot (param6) - so a decision taken without the parameters could not
+    // tell those from a gyro calibration. Refusing before the pack means nothing is transmitted.
+    // See ADR-015.
+    if (!QGCCorePlugin::instance()->authorizeMavCommand(this, defaultComponentId(), MAV_CMD_PREFLIGHT_CALIBRATION, false,
+                                                        param1, param2, param3, param4, param5, param6, param7)) {
+        qCWarning(VehicleLog) << "startCalibration not authorized, calType:" << calType;
+        QGC::showAppMessage(tr("Calibration not authorized."));
+        return;
+    }
+
     // We can't use sendMavCommand here since we have no idea how long it will be before the command returns a result. This in turn
     // causes the retry logic to break down.
     mavlink_message_t msg;

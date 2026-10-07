@@ -18,6 +18,7 @@ struct VehicleTypes
         MavCmdResultCommandResultOnly,          ///< commandResult specifies full success/fail info
         MavCmdResultFailureNoResponseToCommand, ///< No response from vehicle to command
         MavCmdResultFailureDuplicateCommand,    ///< Unable to send command since duplicate is already being waited on for response
+        MavCmdResultFailureAuthorizationDenied, ///< Refused by QGCCorePlugin::authorizeMavCommand before queuing; never reached the vehicle
     } MavCmdResultFailureCode_t;
 
     typedef enum {
