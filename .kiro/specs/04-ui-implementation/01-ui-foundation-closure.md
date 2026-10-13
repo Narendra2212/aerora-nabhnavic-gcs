@@ -262,15 +262,16 @@ actuates nothing.
 | Fact-group registration | **Unreachable** | `registerGroup` / `registerFactGroup` are plain C++ |
 | The service map | **Unreachable** | `service()` / `serviceNames()` stay private to `AeroraVehicleUiContext` |
 
-### The one deviation found
+### The one deviation found, now closed
 
 | | |
 | --- | --- |
 | **Property** | `AeroraStateValue::capability` |
-| **Declaration** | `Q_PROPERTY(Capability capability READ capability WRITE setCapability NOTIFY stateChanged)` (`AeroraStateValue.h:111`) |
-| **Why it matters** | `CapabilityAbsent` is the only input that produces `UNAVAILABLE`. A QML write could manufacture an `UNAVAILABLE` the vehicle never reported — the derivation `AERORA-GCS-REQ-029` prohibits, and the one `IF-UIS-005` exists to prevent |
-| **Reachability today** | Not reachable from `AeroraUi`: no property returns an `AeroraStateValue`. It becomes reachable when `AeroraValueDisplay` is bound to one |
-| **Disposition** | Filed as HO-TAB7-01. Not worked around. `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` asserts the writable set is **exactly** this one entry, so a second cannot appear while the first is outstanding |
+| **Declaration then** | `Q_PROPERTY(Capability capability READ capability WRITE setCapability NOTIFY stateChanged)` |
+| **Declaration now** | `Q_PROPERTY(Capability capability READ capability NOTIFY stateChanged)` — U3, `a7b317f89` |
+| **Why it mattered** | `CapabilityAbsent` is the only input that produces `UNAVAILABLE`. A QML write could have manufactured an `UNAVAILABLE` the vehicle never reported — the derivation `AERORA-GCS-REQ-029` prohibits, and the one `IF-UIS-005` exists to prevent |
+| **Reachability** | Never reachable from `AeroraUi`: no property returns an `AeroraStateValue`. It would have become reachable when `AeroraValueDisplay` was bound to one, which is why it was fixed before that binding exists |
+| **Disposition** | **Closed.** `setCapability()` remains public C++ for the capability model. `recordedWritablePropertyDeviations()` is empty and the assertion is set equality, so `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` now requires **zero** writable properties — stricter than when it permitted one |
 
 `AeroraReportedValue`, the primitive payload and power actually use, declares `capability` correctly
 as `READ`-only with `setCapability` as plain C++. The deviation is in the Fact-backed type only.
@@ -282,6 +283,52 @@ properties. That is upstream QGroundControl and is how parameter editing works. 
 widening: every Fact in the application has had that surface since before Aerora existed, no Aerora
 Fact exists, and no Aerora UI control writes one. The authority question for `PARAM_SET` is
 `src/FactSystem` ownership, which remains **`OPEN — UNASSIGNED`** and is not M-Ui's.
+
+`Fact` now does one more job here. `_onlyTheRecordedPropertyDeviationIsWritable` passes by finding
+nothing, so a detector that quietly stopped detecting would pass it just as well. The same detector
+is pointed at `Fact::staticMetaObject` and must find `value` and `rawValue` — the assertion that
+keeps the empty result meaningful, using a type that genuinely has writable properties rather than a
+fixture, which would itself put a `Q_PROPERTY(… WRITE …)` into `aerora/`.
+
+### How the audit is derived, and what it still cannot see — `D-UI-07`
+
+`HO-TAB1-03` was not that two types were unsafe; it was that `auditedTypes()` is a hand-written list
+guarding against hand-written mistakes. **A hand-maintained audit list fails the same way as the
+surface it audits.** So the question `D-UI-07` asks is whether the set can be derived instead.
+
+Partly. Two of the three ways the list can be wrong are now mechanical:
+
+| Check | What it derives | Catches |
+| --- | --- | --- |
+| `_everyAuditedTypeIsQmlRegistered` | Reads the `QML.Element` class info that `QML_ELEMENT` / `QML_NAMED_ELEMENT` emit, which is what `qmltyperegistrar` itself reads | An audited entry that is not actually QML-visible, so the suite cannot overstate its own coverage |
+| `_theQmlReachableClosureIsFullyAudited` | Walks declared property types and invokable return types out from the `AeroraUi` singleton, transitively | A new `Q_PROPERTY` or `Q_INVOKABLE` handing QML an Aerora object nobody added to the list |
+
+The third is **not** closed, and this is the documented limitation. A registered type that is not
+reachable from the root — an independent singleton, or a type only ever handed out by C++ — cannot
+be enumerated at runtime, because **Qt publishes no public API for listing the types registered into
+a QML module**. That is exactly the shape of the two types that were missing: `AeroraFreshness` is
+constructed by the telemetry module and `AeroraSecurityStatus` is its own singleton, so no walk from
+`AeroraUi` would ever have found either.
+
+Two ways to close it, neither taken yet:
+
+| Option | Cost |
+| --- | --- |
+| `QQmlMetaType::qmlTypes()` | **Private Qt API.** Needs a `Qt6::QmlPrivate` link, which is a Tab 1 build edit, and puts the safety ratchet on an interface Qt may change without notice — `R7-14`'s failure mode in the one test that must not drift |
+| Generate the list at configure time from the `QML_ELEMENT` grep | **Build-system dependency.** Only re-derives when CMake re-runs, so a type added without a reconfigure is still missed, and it moves part of a safety assertion out of the test and into the build |
+
+Recommendation: keep the hand-list as the backstop for non-reachable types and keep it *small and
+visible*, because the derived checks now cover the paths that actually grow. Revisit if a third
+non-reachable registered type appears — that would make the residue a pattern rather than two
+singletons.
+
+The walk is keyed on the **declared type name**, not on `QMetaProperty::metaType().metaObject()`.
+`AeroraVehicleUiContext` forward-declares its five service types and carries no `Q_MOC_INCLUDE`, so
+a pointer-to-incomplete-class meta-type can carry no meta-object; a meta-type walk could therefore
+find nothing and pass. Whether that is actually the case here is **unverified** — it needs a
+compiler — so the walk avoids depending on it either way. Worth confirming at first build, because
+if those meta-types are incomplete it is a latent issue in the production header rather than in the
+test.
 
 ## Tier discipline
 
@@ -310,16 +357,18 @@ undeclared. The mistake is unrepresentable rather than merely reviewable.
 
 ## Handoffs
 
-### HO-TAB7-01 — `AeroraStateValue::capability` is QML-writable
+### HO-TAB7-01 — `AeroraStateValue::capability` was QML-writable — **CLOSED**
 
 | Field | Detail |
 | --- | --- |
-| **Owner** | **Tab 4 (M-Telemetry)**, `aerora/src/Telemetry/AeroraStateValue.h:111` |
-| **Severity** | Medium, **latent** — not reachable from the current Aerora UI surface |
+| **Owner** | **Tab 4 (M-Telemetry)**, `aerora/src/Telemetry/AeroraStateValue.h` |
+| **Severity** | Medium, **latent** — was never reachable from the Aerora UI surface |
 | **Invariant at risk** | `AERORA-GCS-REQ-029`, `IF-UIS-005`: `UNAVAILABLE` is produced only by a vehicle capability report |
 | **Change requested** | Drop `WRITE setCapability` from the `Q_PROPERTY`. Keep `setCapability()` as a public C++ method — the capability model needs it, and `AeroraReportedValue` already has exactly this shape |
-| **Impact** | None known. No Aerora code sets capability yet (Q3-009 / F3.1-05), and no QML reads or writes it |
-| **Tracked by** | `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable`. **Remove the entry from `recordedWritablePropertyDeviations()` when the fix lands**, or the test will fail on the now-absent deviation |
+| **Change applied** | Exactly that, as U3 in `a7b317f89`. The property is `READ`-only and notifying; `setCapability()` is unchanged public C++ and no call site moved |
+| **Impact** | None observed. No Aerora code sets capability yet (Q3-009 / F3.1-05), and no QML reads or writes it |
+| **Tracked by** | `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable`. The entry was removed from `recordedWritablePropertyDeviations()` in the same change, so the expected set is empty and the assertion is now "zero writable properties" |
+| **Status** | `IMPLEMENTED-UNCOMPILED`. Not compiled, and that test has not been executed |
 
 ### HO-TAB7-02 — install the override interceptor
 
@@ -432,7 +481,8 @@ with this pass's instruction not to expose arbitrary service lookup to QML.
 | Overlay manifest consistency | **Checked, 0 problems** | `.kiro/tools/aerora-manifest-check.ps1`: 109 declared entries all resolve; 109 sources on disk all declared; every `_TEST_NAMES` entry and every `UT_REGISTER_TEST` has an `add_qgc_test` entry, and conversely |
 | Upstream seam signatures | **Source-verified** | `QGCCorePlugin.{h,cc}`, `QGCOptions.h`, `QGCApplication.cc`, `MultiVehicleManager.h`, `QmlControls/CMakeLists.txt`, root and `src/CMakeLists.txt`, `custom-example/{CMakeLists.txt,src/CustomPlugin.cc}`, `test/UnitTestFramework/QmlTesting/CMakeLists.txt` |
 | Aerora contract signatures | **Source-verified** | `AeroraVehicleServices.h`, `AeroraPayloadModel.h`, `AeroraPowerModel.h`, `AeroraMissionObserver.h`, `AeroraReportedValue.h`, `AeroraStateValue.h`, `AeroraTelemetryState.h`, `AeroraVehicleCapabilities.h`, `AeroraVehicleIdentity.h` |
-| QML-reachable surface | **Source-enumerated** | Every `aerora/src/**/*.h` grepped for `Q_PROPERTY … WRITE`, `Q_INVOKABLE` and `slots:`. One writable property found, recorded as HO-TAB7-01 |
+| QML-reachable surface | **Source-enumerated** | Every `aerora/src/**/*.h` grepped for `Q_PROPERTY … WRITE`, `Q_INVOKABLE` and `slots:`. One writable property found, recorded as HO-TAB7-01 and **closed by U3**; re-grepped after U3 and no `Q_PROPERTY` carrying `WRITE` or `MEMBER` remains anywhere in `aerora/` |
+| Audit coverage of that surface | **Was incomplete** | The enumeration above found the right answer; `AeroraUiSafetyTest::auditedTypes()` then listed only **10 of the 12** QML-registered types. `AeroraFreshness` (registered since Phase 6) and `AeroraSecurityStatus` (arrived with WP2-B) were never audited — `HO-TAB1-03`, now fixed. Neither exposed anything, which is the audit's result and not a reason to have skipped it |
 
 **No claim is made that any of this compiles, lints, loads or passes a test.** The QML in particular
 has had no tooling applied to it of any kind.

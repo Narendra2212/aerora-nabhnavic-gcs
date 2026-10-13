@@ -61,10 +61,12 @@ class Vehicle;
 ///     comparison of two snapshots that sends nothing.
 /// \li Every `report*()` / `clear*()` mutator on every reached type is plain C++.
 ///
-/// The one exception found is recorded, not worked around: `AeroraStateValue::capability` carries a
-/// `WRITE setCapability`, so QML could manufacture an `UNAVAILABLE` the vehicle never reported.
-/// That is an M-Telemetry property and is filed as a handoff; nothing in M-Ui writes it, and a test
-/// ratchets the writable-property set so a second one cannot appear quietly.
+/// The one exception found was recorded rather than worked around, and is now closed:
+/// `AeroraStateValue::capability` carried a `WRITE setCapability`, so QML could have manufactured
+/// an `UNAVAILABLE` the vehicle never reported. U3 removed the `WRITE` (handoff HO-TAB7-01);
+/// `setCapability()` stays public C++ for the capability model. `AeroraUiSafetyTest` now requires
+/// the writable-property set across every QML-registered Aerora type to be **empty**, so the
+/// ratchet fails on the first writable property to appear rather than on the second.
 ///
 /// \section telemetry Why there is no telemetry property
 ///
