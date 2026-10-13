@@ -458,7 +458,7 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | Invariant at risk | `AERORA-GCS-REQ-025`, `P7-SEC-004`. Both suites self-register via `UT_REGISTER_TEST` and compile, so they are reachable with `--unittest:<name>`, but `ctest -L Unit` would not see them |
 | Blocks | Execution of all 25 test functions once a build host exists |
 | Tracked by | `.kiro/tools/aerora-manifest-check.ps1` checks 4 and 5. `AERORA_SECURITY_TEST_NAMES` in `aerora/src/Security/Security.cmake` is the request |
-| Status | **Applied by Tab 1 during this pass**, in Tab 1's working tree. Both lines are present and the manifest check is clean. Tab 2 did not edit `aerora/CMakeLists.txt` and the change is **not** part of Tab 2's commit — it is Tab 1's to commit |
+| Status | **CLOSED.** Applied and committed by Tab 1 in `47c15feee`, together with Tab 3's two. Tab 2 did not edit `aerora/CMakeLists.txt`, and the change is not part of Tab 2's commit |
 | Still true | Registration is not execution. Both suites remain **written and never run** (`D-006`) |
 
 ### `HO-TAB2-02` — add `AeroraSecurityStatus` to the audited type set
