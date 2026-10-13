@@ -42,11 +42,26 @@
 /// cannot change a role, a permission, a policy, an enforcement decision or any security setting
 /// through this interface, because there is nothing here to call.
 ///
-/// That is asserted rather than stated. `AeroraSecurityStatusTest` reads this class's meta-object
-/// and fails if a writable property, an invokable or a slot appears - the same technique
-/// `AeroraUiSafetyTest` applies to the ten types reachable from `AeroraUi`. The ratchet lives in
-/// the Security suite because `AeroraUiSafetyTest.cc` belongs to another workstream and carries a
-/// cross-boundary edit this phase; registering this type in its audited set is filed as a handoff.
+/// That is asserted rather than stated, and in two places.
+///
+/// \li `AeroraUiSafetyTest` is the project-wide ratchet. It audits every Aerora type carrying a
+///     QML registration macro - **twelve**, this one among them, added in `67f7137d0` which
+///     closed the handoff that had requested it. Its `reviewedMethodsFor()` entry for this class
+///     is the empty list, so any non-signal method appearing here fails it.
+/// \li `AeroraSecurityStatusTest` audits this class on its own, and is retained after the above
+///     landed because it is **stricter**, not because it is still the only cover. It requires the
+///     writable-property set and the declared-method set to be empty outright, and it is the only
+///     one of the two that asserts **no property may be a pointer type** - the check that makes a
+///     type exposure unrepresentable rather than merely reviewed.
+///
+/// The earlier note here said the audited set was ten types reachable from `AeroraUi`, that this
+/// type's registration in it was an open handoff, and that the Security suite held the ratchet
+/// because the UI suite's file belonged to another workstream. All three are now wrong: the set is
+/// the QML-registered types rather than the root-reachable ones, reachability is a separate derived
+/// check in that suite, and the handoff is closed.
+///
+/// Neither suite has been executed. Both are `IMPLEMENTED-UNCOMPILED` on this host (`D-006`), so
+/// what is written down is the assertion, not a passing result.
 ///
 /// \section honesty The three distinctions this type refuses to collapse
 ///
