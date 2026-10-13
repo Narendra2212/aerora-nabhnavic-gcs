@@ -21,6 +21,22 @@ public:
 
     void init() override;
 
+    /// Installs the Aerora QML override interceptor on the engine the base implementation creates.
+    ///
+    /// The interceptor is the only reason an Aerora QML override file is ever loaded: without it an
+    /// overlay override is compiled into a resource and never requested, with no error of any kind
+    /// (R-019, IF-UIS-014). See aerora/src/UI/AeroraQmlOverrides.h for the seam and the allow-list.
+    ///
+    /// Installs *after* the base call, so the base keeps ownership of engine construction and its
+    /// qrc:/qml import path is unchanged. No addImportPath() call is made here.
+    QQmlApplicationEngine *createQmlApplicationEngine(QObject *parent) override;
+
+    /// Releases the interceptor *before* the base implementation destroys the engine.
+    ///
+    /// Order is load-bearing in both directions: the interceptor is owned by this class, not by the
+    /// engine, so it must be removed and deleted while the engine is still alive.
+    void destroyQmlApplicationEngine(QQmlApplicationEngine *qmlEngine) override;
+
     /// Delegates to AeroraCommandAuthorizer when an authorization policy is configured.
     ///
     /// While no policy is configured (Q-029 is OPEN) this returns true and warns once. That is a

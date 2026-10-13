@@ -2,8 +2,10 @@
 
 #include <QtCore/QMetaMethod>
 #include <QtCore/QMetaObject>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QStringList>
 #include <QtCore/QUrl>
+#include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraQmlOverrides.h"
 #include "AeroraVehicleUiContext.h"
@@ -18,6 +20,11 @@ constexpr const char *kCustomMapItemsPath = "/qml/QGroundControl/FlightMap/MapIt
 /// A stock seam path Aerora has pre-approved but has not declared. Used to assert that approval is
 /// not the same thing as declaration: an undeclared path is never intercepted.
 constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml";
+
+/// Exact logging category of AeroraQmlOverrides, from AeroraUiLog.cc. expectLogMessage() matches
+/// the category string literally, so a mismatch here is a silent test failure rather than a
+/// compile error - which is why it is a named constant checked against the production definition.
+constexpr const char *kUiLogCategory = "Aerora.Ui";
 
 } // namespace
 
@@ -179,6 +186,100 @@ void AeroraUiFoundationTest::_uiContextDoesNotExposeTheVehicleOrTheServiceMap()
           "classification", "productProfileId"}) {
         QVERIFY2(meta->indexOfProperty(expected) != -1, expected);
     }
+}
+
+void AeroraUiFoundationTest::_interceptorIsNotInstalledBeforeInstall()
+{
+    // Asserted rather than assumed, because every test below depends on it and because it records
+    // the real property: nothing installs the interceptor implicitly. It reaches an engine only
+    // through AeroraCorePlugin::createQmlApplicationEngine(), which a unit-test run never calls.
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_installOnNullEngineDoesNotInstall()
+{
+    expectLogMessage(kUiLogCategory, QtWarningMsg, QRegularExpression(QStringLiteral("null engine")));
+    AeroraQmlOverrides::installOn(nullptr);
+    verifyExpectedLogMessage();
+
+    // The interesting half: a refused install must leave no interceptor behind, or the next
+    // install would be refused as a duplicate and the real engine would never get one.
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_installThenReleaseTracksInstallationState()
+{
+    QQmlApplicationEngine engine;
+
+    AeroraQmlOverrides::installOn(&engine);
+    QVERIFY2(AeroraQmlOverrides::isInstalled(), "install must be observable through isInstalled()");
+
+    AeroraQmlOverrides::releaseFrom(&engine);
+    QVERIFY2(!AeroraQmlOverrides::isInstalled(), "release must clear the installed state");
+
+    // Install is not single-shot. The engine is created once per application run today, but the
+    // hook is a virtual the base may call again, and a release that poisoned the state would turn
+    // that into silently missing Aerora UI.
+    AeroraQmlOverrides::installOn(&engine);
+    QVERIFY(AeroraQmlOverrides::isInstalled());
+    AeroraQmlOverrides::releaseFrom(&engine);
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_secondInstallIsRefusedAndLeavesTheFirstInstalled()
+{
+    QQmlApplicationEngine firstEngine;
+    QQmlApplicationEngine secondEngine;
+
+    AeroraQmlOverrides::installOn(&firstEngine);
+    QVERIFY(AeroraQmlOverrides::isInstalled());
+
+    expectLogMessage(kUiLogCategory, QtWarningMsg, QRegularExpression(QStringLiteral("already installed")));
+    AeroraQmlOverrides::installOn(&secondEngine);
+    verifyExpectedLogMessage();
+
+    // Refusing is only half the contract. The first engine must keep its interceptor, so a stray
+    // second install cannot strip Aerora UI from the engine that is actually displaying it.
+    QVERIFY(AeroraQmlOverrides::isInstalled());
+
+    // And the refused engine must not have acquired ownership of it: releasing the engine that was
+    // turned away is a no-op.
+    AeroraQmlOverrides::releaseFrom(&secondEngine);
+    QVERIFY2(AeroraQmlOverrides::isInstalled(),
+             "releasing a refused engine must not release the first engine's interceptor");
+
+    AeroraQmlOverrides::releaseFrom(&firstEngine);
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_releaseFromAnUnrelatedEngineIsANoOp()
+{
+    QQmlApplicationEngine installedEngine;
+    QQmlApplicationEngine unrelatedEngine;
+
+    AeroraQmlOverrides::installOn(&installedEngine);
+
+    // The out-of-order teardown property. QGCApplication routes destruction through the destroy
+    // hook (src/QGCApplication.cc:705-710) precisely so parent-based teardown cannot bypass it; if
+    // release matched on anything looser than engine identity, an unrelated engine's teardown
+    // would delete this engine's interceptor while it was still in use.
+    AeroraQmlOverrides::releaseFrom(&unrelatedEngine);
+    QVERIFY(AeroraQmlOverrides::isInstalled());
+
+    AeroraQmlOverrides::releaseFrom(&installedEngine);
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_releaseWithNothingInstalledIsANoOp()
+{
+    QQmlApplicationEngine engine;
+
+    // Silent, not warned: a release with nothing installed is the normal shutdown path for any
+    // build where AERORA_UI_SOURCES is absent, and warning there would be noise rather than news.
+    AeroraQmlOverrides::releaseFrom(&engine);
+    AeroraQmlOverrides::releaseFrom(nullptr);
+
+    QVERIFY(!AeroraQmlOverrides::isInstalled());
 }
 
 UT_REGISTER_TEST(AeroraUiFoundationTest, TestLabel::Unit)

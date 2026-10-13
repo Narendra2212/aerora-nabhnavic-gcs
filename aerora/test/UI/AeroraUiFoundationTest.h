@@ -6,9 +6,20 @@
 /// (Q7-003) and the typed read-only route from QML to the active vehicle's Aerora services
 /// (Q7-002).
 ///
-/// Every test here is pure in-memory logic. None needs a vehicle, a link, a QML engine, a clock or
-/// a dialect, which is deliberate: the UI foundation has to be testable before any Aerora telemetry
-/// exists, because the state-class contract is the part that is expensive to retrofit.
+/// Most tests here are pure in-memory logic. None needs a vehicle, a link, a clock or a dialect,
+/// which is deliberate: the UI foundation has to be testable before any Aerora telemetry exists,
+/// because the state-class contract is the part that is expensive to retrofit.
+///
+/// The installation-state group is the one exception: `installOn()` calls
+/// `QQmlApplicationEngine::addUrlInterceptor()`, so those tests construct a bare engine. They never
+/// call `load()`, so no window and no scene graph is created. This is safe in a unit-test run
+/// because `QGCApplication::init()` takes neither the boot-test nor the normal-boot branch when
+/// `_runningUnitTests` is set (`src/QGCApplication.cc:244-251`), so no engine exists and no
+/// interceptor is installed when these tests start.
+///
+/// \note The interceptor is tracked in file-static state in `AeroraQmlOverrides.cc`, shared by the
+///       whole process. Every test below releases what it installs, so test order cannot leak an
+///       installed interceptor into `AeroraUiSafetyTest` or into a later run of this fixture.
 ///
 /// Four of these are prohibition tests and they name the regression they catch:
 ///
@@ -35,6 +46,17 @@ private slots:
     void _undeclaredResourceUrlIsNeverIntercepted_data();
     void _undeclaredResourceUrlIsNeverIntercepted();
     void _selfCheckPassesWhenNothingIsDeclared();
+
+    // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
+    // startup self-check reads, so an interface quietly missing its Aerora layer is detectable
+    // rather than merely wrong. These are the tests that fail if the AeroraCorePlugin overrides
+    // are ever removed and the interceptor stops being installed.
+    void _interceptorIsNotInstalledBeforeInstall();
+    void _installOnNullEngineDoesNotInstall();
+    void _installThenReleaseTracksInstallationState();
+    void _secondInstallIsRefusedAndLeavesTheFirstInstalled();
+    void _releaseFromAnUnrelatedEngineIsANoOp();
+    void _releaseWithNothingInstalledIsANoOp();
 
     // Q7-002 - the QML route to per-vehicle services, with no vehicle connected. This is the state
     // the interface is in for most of its life and every accessor must survive it.

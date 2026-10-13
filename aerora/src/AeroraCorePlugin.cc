@@ -1,9 +1,11 @@
 #include "AeroraCorePlugin.h"
 
 #include <QtCore/QApplicationStatic>
+#include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraCommandAuthorizer.h"
 #include "AeroraPlatformKeyProtector.h"
+#include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
 #include "MAVLinkSigningKeys.h"
 #include "QGCLoggingCategory.h"
@@ -41,6 +43,42 @@ void AeroraCorePlugin::init()
             << "The enforcement point is present in the command send path, but no decisions are made"
             << "until an approved operator role policy exists (Q-029).";
     }
+}
+
+QQmlApplicationEngine *AeroraCorePlugin::createQmlApplicationEngine(QObject *parent)
+{
+    QQmlApplicationEngine *const qmlEngine = QGCCorePlugin::createQmlApplicationEngine(parent);
+
+    // Returned unchanged rather than warning: a null engine is the base's failure to report, and
+    // installOn() would only restate it. Nothing downstream here can proceed either way.
+    if (!qmlEngine) {
+        return qmlEngine;
+    }
+
+    AeroraQmlOverrides::installOn(qmlEngine);
+
+    // The allow-list is empty in this build, so this passes trivially. It is called anyway because
+    // the condition it catches - a declared override whose mirrored resource is absent - is
+    // otherwise silent, and the first populated entry is exactly when nobody will remember to add
+    // the call.
+    const AeroraQmlOverrides::SelfCheckResult selfCheck = AeroraQmlOverrides::verify();
+    if (!selfCheck.passed) {
+        qCWarning(AeroraCorePluginLog)
+            << "QML override self-check failed: declared overrides have no mirrored resource and"
+            << "silently did not take effect. missing:" << selfCheck.missingMirroredResources;
+    }
+
+    return qmlEngine;
+}
+
+void AeroraCorePlugin::destroyQmlApplicationEngine(QQmlApplicationEngine *qmlEngine)
+{
+    // Before the base call, which deletes the engine. releaseFrom() is a no-op for an engine this
+    // class did not install on, so an out-of-order teardown cannot delete another engine's
+    // interceptor.
+    AeroraQmlOverrides::releaseFrom(qmlEngine);
+
+    QGCCorePlugin::destroyQmlApplicationEngine(qmlEngine);
 }
 
 void AeroraCorePlugin::_installSigningKeyStore()
