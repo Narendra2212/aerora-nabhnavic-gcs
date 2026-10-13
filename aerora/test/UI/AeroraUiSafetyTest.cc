@@ -76,10 +76,16 @@ QStringList reviewedMethodsFor(const QString &typeName)
     return reviewed.value(typeName);
 }
 
-/// The one QML-writable property across every audited type. See HO-TAB7-01.
+/// The reviewed QML-writable properties across every audited type. Empty, and read as a result
+/// rather than as an omission.
+///
+/// `AeroraStateValue.capability` was the one entry, recorded as HO-TAB7-01. U3 dropped its
+/// `WRITE setCapability`, so the corrected property surface has no writable member on any audited
+/// type and the assertion below is correspondingly stricter: it now fails on the first writable
+/// property to appear, with no sanctioned exception to hide behind.
 QStringList recordedWritablePropertyDeviations()
 {
-    return {QStringLiteral("AeroraStateValue.capability")};
+    return {};
 }
 
 /// Names that must never become QML-reachable on an audited type.

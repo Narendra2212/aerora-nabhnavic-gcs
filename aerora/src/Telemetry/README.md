@@ -506,6 +506,38 @@ The interface consumes `AeroraStateValue` and reads only. Everything needed to r
 `ageMs()` is deliberately a function rather than a notifying property: age advances continuously with
 no event to signal, so a consumer displaying it must re-read it.
 
+### The interface cannot write the capability
+
+`capability` carried `WRITE setCapability` until U3 / HO-TAB7-01, so "reads only" above was the
+intent and not the shape. `CapabilityAbsent` is the only input producing `UNAVAILABLE`, so a binding
+expression could have presented a reported-absent capability as available, or manufactured an
+`UNAVAILABLE` the vehicle never reported — the derivation `AERORA-GCS-REQ-029` and `IF-UIS-005`
+prohibit. Latent rather than live, because no `AeroraUi` property returns an `AeroraStateValue` yet;
+live the moment one does.
+
+The `WRITE` is gone and the property stays readable. `setCapability()` remains public C++ — the
+capability model needs it, and `AeroraTelemetryStateTest` is its only caller today — so no call site
+changed. `AeroraReportedValue::setCapability()` is a separate method on a separate class and is
+untouched; it already had this shape, which is why it was the reference.
+
+The defence is now the same one the declared kind uses: not a rule a screen must remember, but an
+API that does not exist. No replacement `WRITE`, writable property or `Q_INVOKABLE` was added.
+`AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` expects an empty writable set, so
+the ratchet is stricter than before rather than relaxed. Status: `IMPLEMENTED-UNCOMPILED` — the
+change has not been compiled and that test has not been executed.
+
+#### Handoffs this leaves open
+
+Prose in files this module does not own still describes the deviation as live. All three are
+documentation only; no behaviour depends on them. Filed rather than edited, per the handoff protocol
+in [07 §7](../../../.kiro/specs/05-product-completion/07-phase-7-work-packages-and-ownership.md#7-handoff-protocol).
+
+| ID | Owner | File | Change needed |
+| --- | --- | --- | --- |
+| `HO-TAB4-01` | Tab 7 | `aerora/test/UI/AeroraUiSafetyTest.h`, `\section known` | Describes one live recorded deviation; the set is now empty. The `.cc` half was Tab 4's sanctioned edit, the header is not |
+| `HO-TAB4-02` | Tab 7 | `aerora/src/UI/AeroraVehicleUiContext.h:64-68`, and `04-ui-implementation/01-ui-foundation-closure.md` HO-TAB7-01 | "carries a `WRITE setCapability`" is no longer true; the handoff is closed |
+| `HO-TAB4-03` | Tab 1 | `05-product-completion/` 00, 03, 04 §3, 05 §5, 06 §5, 07 §7, 08 | Close `D-UI-03` / HO-TAB7-01 at `IMPLEMENTED-UNCOMPILED`; `R7-13` no longer applies |
+
 This module chooses no colour, icon, label or layout. `classToString()` and `kindToString()` return
 stable machine-readable identifiers for logs and records, not operator-facing text — visual design is
 Q-040 and `AeroraValueDisplay` is `M-Ui`'s artefact.

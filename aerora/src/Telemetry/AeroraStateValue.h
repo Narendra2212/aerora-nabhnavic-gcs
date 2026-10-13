@@ -108,7 +108,7 @@ class AeroraStateValue : public QObject
     Q_PROPERTY(bool observed READ isObserved NOTIFY stateChanged)
     Q_PROPERTY(quint64 receiveTimeUs READ receiveTimeUs NOTIFY stateChanged)
     Q_PROPERTY(AeroraTelemetrySource source READ source NOTIFY stateChanged)
-    Q_PROPERTY(Capability capability READ capability WRITE setCapability NOTIFY stateChanged)
+    Q_PROPERTY(Capability capability READ capability NOTIFY stateChanged)
 
 public:
     /// Whether the aircraft has the capability this item depends on.
@@ -185,7 +185,15 @@ public:
 
     [[nodiscard]] Capability capability() const { return _capability; }
 
-    /// Set by the capability model. Not inferred from telemetry arriving or failing to arrive.
+    /// Set by the capability model from a vehicle report. Not inferred from telemetry arriving or
+    /// failing to arrive.
+    ///
+    /// C++ only. The \c capability property is readable from QML and carries no \c WRITE, matching
+    /// \c AeroraReportedValue: an interface write could present a reported-absent capability as
+    /// available, or manufacture the \c CapabilityAbsent that is the only input producing
+    /// \c UNAVAILABLE — the derivation \c AERORA-GCS-REQ-029 and \c IF-UIS-005 prohibit. The
+    /// classification is the vehicle's to report, not a screen's to choose, so there is deliberately
+    /// no QML path to it: no \c WRITE, no second writable property, no \c Q_INVOKABLE.
     void setCapability(Capability capability);
 
     /// Records that a message carrying this item was observed. Called at parse, before the Fact's
