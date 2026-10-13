@@ -264,7 +264,7 @@ Normative. A violation is a defect, not a style preference.
 | `UI-ST-09` | A panel with no data says which state applies to the whole panel; it does not render empty |
 
 `UI-ST-07` had the one outstanding defect behind it, and it is now closed:
-[HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-is-qml-writable)
+[HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-was-qml-writable--closed)
 — `AeroraStateValue::capability` carried `WRITE setCapability`, so QML could have written the
 classification. U3 (`a7b317f89`) removed the `WRITE`; the property stays readable and
 `setCapability()` remains public C++ for the capability model.

@@ -11,7 +11,7 @@ and the current source disagree, the source wins and the difference is recorded 
 
 | Item | Status |
 | --- | --- |
-| QGC complex-item architecture | `VERIFIED` — read at `7e41a529e`, cited throughout |
+| QGC complex-item architecture | `SOURCE-INSPECTED` — read at `7e41a529e`, cited throughout |
 | Integration approach for a coverage item | `DESIGNED` — this document |
 | Aerora coverage complex item | `CONTRACT-ONLY` — `Q-021` selects the items, `Q-023` the commands |
 | Coverage geometry, parameters and units | `OPEN / NOT-EVIDENCED` — **nothing chosen here** |
@@ -20,9 +20,10 @@ and the current source disagree, the source wins and the difference is recorded 
 | Operating limits used by validation | **NONE** — no threshold is approved, and none is invented |
 | Mission ↔ payload boundary | `DESIGNED` — this document, agreed shape with the payload workstream pending |
 | `includedResumeCommands` | **NOT MODIFIED** |
-| `MISSION_ITEM_REACHED` | `NOT-EVIDENCED` — handled nowhere in `src/`, re-verified this pass |
+| `MISSION_ITEM_REACHED` | `NOT-EVIDENCED` — handled nowhere in `src/`, re-grepped this pass |
 
-**Nothing here has been compiled.** No build host exists.
+**Nothing here has been compiled, linked, linted or executed, and no test has run.** No build host
+exists (`D-006`). Every status above is `SOURCE-INSPECTED` or weaker; `VERIFIED` is not claimed.
 
 ## 1. What a coverage mission has to cover
 
@@ -461,8 +462,18 @@ workstream's file.
 
 ## 10. Status vocabulary
 
-`CONTRACT-ONLY`, `DESIGNED`, `IMPLEMENTED`, `IMPLEMENTED-UNCOMPILED`, `VERIFIED`, `BLOCKED`,
-`OPEN`, `NOT-EVIDENCED`.
+`CONTRACT-ONLY`, `DESIGNED`, `IMPLEMENTED`, `IMPLEMENTED-UNCOMPILED`, `SOURCE-INSPECTED`,
+`BLOCKED`, `OPEN`, `NOT-EVIDENCED`.
 
-`VERIFIED` is used only for facts read directly from source at `7e41a529e`. It is not used for
-anything about this subtree's behaviour, because nothing here has run.
+Defined programme-wide in
+[05-product-completion/00-README.md](../../../.kiro/specs/05-product-completion/00-README.md#status-vocabulary).
+This document does not redefine any of them.
+
+`SOURCE-INSPECTED` is the status for a fact about existing source established at `7e41a529e` by
+reading, grepping or mechanical comparison. It says nothing about behaviour.
+
+**`VERIFIED` is deliberately absent from the list above.** Programme-wide it means built, executed
+and observed, and nothing in this subtree has been built or run. An earlier revision of this
+document used `VERIFIED` for source reading and scoped it locally; that collided with the programme
+definition, so the weaker class now has its own name rather than borrowing the stronger one. Build,
+link, lint and test results here are **`NOT RUN`**.

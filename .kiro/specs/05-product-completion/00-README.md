@@ -52,6 +52,7 @@ Used uniformly across all eight documents. A status is a claim about evidence, n
 | Status | Means | Evidence required |
 | --- | --- | --- |
 | `VERIFIED` | Built, executed and observed to behave as specified | A build, a test run, or hardware observation. **Not claimed anywhere in Phase 7** |
+| `SOURCE-INSPECTED` | A fact about existing source, established without building or executing anything | Reading, grepping, or mechanical comparison of source at a named commit. Says nothing about behaviour |
 | `IMPLEMENTED-UNCOMPILED` | Code is written and complete in source; never compiled | Source exists, is declared in a manifest, and reads as complete |
 | `CONTRACT-ONLY` | Types, signatures and semantics exist; no behaviour behind them | Header exists; implementation is absent, empty, or an explicit `kâ€¦Implemented = false` |
 | `DESIGNED` | Specified to the point of being implementable; no code | A specification naming the seam, the owner and the acceptance criteria |
@@ -59,6 +60,21 @@ Used uniformly across all eight documents. A status is a claim about evidence, n
 | `BLOCKED` | Cannot proceed until a named dependency resolves | The blocking item's ID |
 | `OPEN` | A decision is required from a named owner | The decision, the owner, and what it blocks |
 | `FORBIDDEN` | Deliberately not built, with the reason recorded | The prohibiting requirement |
+
+### Why `SOURCE-INSPECTED` exists, and what it is not
+
+Most of what this programme knows, it knows by reading the checkout. That is real evidence and it
+deserves a name — but it is not `VERIFIED`, because nothing was built and nothing ran.
+
+Two module documents had independently adopted `VERIFIED` for exactly this, each scoping it locally
+to "facts read directly from source". Internally consistent, and a collision with the programme
+definition above: a reader grepping for `VERIFIED` would find claims that look like execution
+evidence and are not. `SOURCE-INSPECTED` resolves it by naming the weaker class instead of
+overloading the stronger one. **The definition of `VERIFIED` is unchanged.**
+
+`SOURCE-INSPECTED` covers reading a declaration, grepping for the absence of a symbol, and
+comparing two source constructs mechanically. It does **not** cover compiling, linking, linting,
+loading or executing — those remain `NOT RUN` until a build host exists (`D-006`).
 
 ### Why `IMPLEMENTED-UNCOMPILED` is kept distinct
 
@@ -85,7 +101,7 @@ every layer including the UI; collapsing any pair is a defect.
 
 `UNAVAILABLE` is producible **only** from a vehicle capability report
 (`AERORA-GCS-REQ-029`, `IF-UIS-005`). A UI or service that manufactures it is a defect, which is why
-[HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-is-qml-writable)
+[HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-was-qml-writable--closed)
 was tracked rather than tolerated, and is now closed by U3 (`a7b317f89`): QML reads the capability
 classification and cannot write it.
 
