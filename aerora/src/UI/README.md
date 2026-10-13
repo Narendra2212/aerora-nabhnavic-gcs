@@ -24,7 +24,13 @@ Full design records, evidence and handoffs:
 | `Controls/AeroraAgeLabel.qml` | Age, with "currency unverified" while no freshness threshold exists (Q-036) |
 | `Controls/AeroraTokenDisplay.qml` | One `AeroraReportedValue`: name, token, class label, age |
 | `Controls/AeroraValueDisplay.qml` | One `AeroraStateValue`: Fact value, units, class label, age |
+| `Controls/AeroraSelfReportRow.qml` | One self-report line. Carries three outcomes, so "not checked" cannot render as a finding |
+| `Screens/AeroraOperationsHub.qml` | `SCR-SHL-01`. The overlay's honest self-report: services attached, enforcement state, audit posture |
 | `Ui.cmake` | Source manifest, and the integration instructions for `aerora/CMakeLists.txt` |
+
+`Screens/` and `Controls/` are a source-tree split only. The resource alias flattens every QML file
+to `qrc:/qml/Aerora/Controls/<Name>.qml` in one module, which is why the hub needs no import to
+reach `AeroraSelfReportRow` and why its registration URL carries no `Screens/` segment.
 
 ## What is deliberately not here
 
@@ -40,6 +46,18 @@ command submission, power switching, mission commanding, command authorization o
 
 | Handoff | Owner | Effect while open |
 | --- | --- | --- |
-| HO-TAB7-02 | Tab 1 — install the interceptor on the QML engine | No QML override takes effect |
-| HO-TAB7-03 | Tab 1 — create the `Aerora.Controls` QML module target | The four controls are not registered |
-| HO-TAB7-01 | Tab 4 — make `AeroraStateValue::capability` read-only in QML | Latent; not reachable from the current surface |
+| HO-TAB7-05 | Tab 1 — override `analyzePages()` to register the Operations Hub | `SCR-SHL-01` is compiled into the resource and unreachable: no menu entry opens it |
+
+### Closed
+
+Recorded rather than deleted, because each row describes a gap that was real and the commit that
+closed it is the evidence. Three of these were still listed above as open after they had landed,
+which is the staleness `HO-TAB1-04` was raised against — the rows were corrected together because
+leaving two of three would reproduce the same defect.
+
+| Handoff | Owner | Closed by |
+| --- | --- | --- |
+| HO-TAB7-01 | Tab 4 — make `AeroraStateValue::capability` read-only in QML | U3, `a7b317f89`. The `WRITE` is gone; `setCapability()` stays public C++ |
+| HO-TAB7-02 | Tab 1 — install the interceptor on the QML engine | U1, `84bbb3a6e` |
+| HO-TAB7-03 | Tab 1 — create the `Aerora.Controls` QML module target | U2, `a73699796`, including the two load-bearing lines (`IMPORTS QGC`, resource alias) |
+| HO-TAB1-03 | Tab 7 — audit the two unaudited QML-registered types | `67f7137d0`. `AeroraFreshness` and `AeroraSecurityStatus` are audited; the closure is now derived |

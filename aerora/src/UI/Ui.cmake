@@ -134,10 +134,33 @@ set(AERORA_UI_QML_MODULE_URI "Aerora.Controls")
 
 set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraAgeLabel.qml
+    ${AERORA_UI_DIR}/Controls/AeroraSelfReportRow.qml
     ${AERORA_UI_DIR}/Controls/AeroraStateText.qml
     ${AERORA_UI_DIR}/Controls/AeroraTokenDisplay.qml
     ${AERORA_UI_DIR}/Controls/AeroraValueDisplay.qml
+    ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
 )
+
+# ----------------------------------------------------------------------------
+# Source layout versus resource layout
+#
+# Screens/ and Controls/ are a source-tree distinction only. qgc_set_qt_resource_alias() aliases
+# every entry above to its bare name, so all of them land flat at
+# qrc:/qml/Aerora/Controls/<Name>.qml in one module, Aerora.Controls. Two consequences worth
+# stating because neither is guessable from this list:
+#
+#   * a file here must not import Aerora.Controls - that would be the module importing itself.
+#     Types in one QML module are mutually visible, which is how AeroraOperationsHub.qml reaches
+#     AeroraSelfReportRow without an import.
+#
+#   * the URL to register a screen with is qrc:/qml/Aerora/Controls/<Name>.qml regardless of its
+#     source directory. For the hub that is
+#     qrc:/qml/Aerora/Controls/AeroraOperationsHub.qml, which is the string HO-TAB7-05 asks Tab 1
+#     to put in analyzePages().
+#
+# Splitting the module per surface was considered and declined: the URI is the module boundary and
+# a second URI would need its own qt_add_qml_module target in Tab 1's file, for one screen.
+# ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
 # Test sources

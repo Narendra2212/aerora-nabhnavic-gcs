@@ -528,9 +528,10 @@ visibility test and should be followed rather than replaced with a new harness.
 | --- | --- | --- | --- |
 | ~~`Q7-002`~~ | **`CLOSED`.** `AeroraVehicleUiContext` reaches the services through public C++ and exposes typed read-only properties. No vehicle-layer change needed; the Tab 3 handoff is withdrawn | — | — |
 | ~~`Q7-001`~~ | **`CLOSED`.** The ordering is the same one `src/QmlControls/CMakeLists.txt:6-75` uses for 38 upstream types including the `QGroundControl` singleton. Aerora types register under URI `QGC`, reached via `IMPORTS QGC` | — | — |
-| ~~`Q7-003`~~ | **`IMPLEMENTED-UNCOMPILED`.** Both hooks are public virtuals; the allow-listed interceptor is written. Installation is handoff HO-TAB7-02 to **Tab 1** | Tab 1 | Every tier-2 and tier-3 QML override until HO-TAB7-02 lands |
-| HO-TAB7-03 | The `Aerora.Controls` QML module target is not created, so the four Aerora controls are not registered | **Tab 1** | Any QML that imports `Aerora.Controls` |
-| HO-TAB7-01 | `AeroraStateValue::capability` is QML-writable, so QML could manufacture an `UNAVAILABLE` | **Tab 4** | Nothing today — latent until `AeroraValueDisplay` is bound |
+| ~~`Q7-003`~~ | **`CLOSED`.** Both hooks are public virtuals and the allow-listed interceptor is installed on the engine — U1, `84bbb3a6e`. The allow-list is still empty, so nothing is overridden yet; the seam works | — | — |
+| ~~HO-TAB7-03~~ | **`CLOSED`.** The `Aerora.Controls` module target exists with `IMPORTS QGC` and the resource alias — U2, `a73699796`. Six QML files are registered, not four | — | — |
+| ~~HO-TAB7-01~~ | **`CLOSED`.** `AeroraStateValue::capability` is read-only in QML — U3, `a7b317f89`. `setCapability()` remains public C++ for the capability model | — | — |
+| HO-TAB7-05 | `analyzePages()` is not overridden, so `SCR-SHL-01` is compiled into the resource and no menu entry reaches it | **Tab 1** | The Operations Hub, and every Aerora screen that would be reached from it |
 | `D-006` | **No build environment.** `cmake`, `ninja`, `qmllint`, `qmlformat`, `pre-commit`, `just`, Qt, and a C++ compiler are all absent; `C:\Qt` does not exist | User / Tab 8 | Every compile, lint, test and runtime claim |
 | `Q-029` | Operator role set | Product + operations | Area 7 beyond placeholders |
 | ADR-014 | Outbound authorization scope | Architecture | Any claim that an operator action is authorised |

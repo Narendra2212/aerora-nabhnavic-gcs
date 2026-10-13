@@ -22,6 +22,8 @@ $targets = @(
     'aerora/src/UI/Controls/AeroraAgeLabel.qml'
     'aerora/src/UI/Controls/AeroraTokenDisplay.qml'
     'aerora/src/UI/Controls/AeroraValueDisplay.qml'
+    'aerora/src/UI/Controls/AeroraSelfReportRow.qml'
+    'aerora/src/UI/Screens/AeroraOperationsHub.qml'
     'aerora/test/UI/AeroraUiFoundationTest.h'
     'aerora/test/UI/AeroraUiFoundationTest.cc'
     'aerora/test/UI/AeroraUiSafetyTest.h'
