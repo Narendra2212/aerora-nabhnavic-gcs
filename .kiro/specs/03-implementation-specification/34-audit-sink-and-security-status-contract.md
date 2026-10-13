@@ -456,7 +456,7 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | File | `aerora/CMakeLists.txt`, the `if(QGC_BUILD_TESTING)` block |
 | Change | `add_qgc_test(AeroraAuditSinkTest LABELS Unit)` and `add_qgc_test(AeroraSecurityStatusTest LABELS Unit)` |
 | Invariant at risk | `AERORA-GCS-REQ-025`, `P7-SEC-004`. Both suites self-register via `UT_REGISTER_TEST` and compile, so they are reachable with `--unittest:<name>`, but `ctest -L Unit` would not see them |
-| Blocks | Execution of all 25 test functions once a build host exists |
+| Blocks | Execution of all 24 test functions - 26 cases, counting the three data rows - once a build host exists |
 | Tracked by | `.kiro/tools/aerora-manifest-check.ps1` checks 4 and 5. `AERORA_SECURITY_TEST_NAMES` in `aerora/src/Security/Security.cmake` is the request |
 | Status | **CLOSED.** Applied and committed by Tab 1 in `47c15feee`, together with Tab 3's two. Tab 2 did not edit `aerora/CMakeLists.txt`, and the change is not part of Tab 2's commit |
 | Still true | Registration is not execution. Both suites remain **written and never run** (`D-006`) |
@@ -522,3 +522,16 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | Editing `AeroraCorePlugin.*`, `aerora/CMakeLists.txt`, `AeroraUiSafetyTest.cc`, or any GUI file | Other tabs own them. Three handoffs filed instead |
 | Modifying `includedResumeCommands` | Prohibited |
 | Any payload, power, stabilization or failsafe surface on the status type | Prohibited. It is a status reader |
+
+## 10. Test inventory
+
+Counted mechanically from the two headers, because "registered" and "covered" are different claims
+and honesty risk 9 is specifically about conflating them.
+
+| Suite | Test functions | Data providers | Executable cases |
+| --- | --- | --- | --- |
+| `AeroraAuditSinkTest` | 14 | 1 | 16 — `_eachFailureOutcomeIsCountedAsALoss` has 3 rows |
+| `AeroraSecurityStatusTest` | 10 | 0 | 10 |
+| **Total** | **24** | **1** | **26** |
+
+**Executed: 0.** Registered with CTest by Tab 1 in `47c15feee`, which makes them runnable, not run.
