@@ -113,7 +113,7 @@ interfaces with nothing behind them. `Q-029` is why.
 | Item | File | QML | Status |
 | --- | --- | --- | --- |
 | `AeroraTelemetryState` | `Telemetry/AeroraTelemetryState.{h,cc}` | `QML_ELEMENT` + `QML_SINGLETON` | `IMPLEMENTED-UNCOMPILED` — 7 static `Q_INVOKABLE` classifiers |
-| `AeroraStateValue` | `Telemetry/AeroraStateValue.{h,cc}` | `QML_ELEMENT` + `QML_UNCREATABLE` | `IMPLEMENTED-UNCOMPILED` — **one writable property, HO-TAB7-01** |
+| `AeroraStateValue` | `Telemetry/AeroraStateValue.{h,cc}` | `QML_ELEMENT` + `QML_UNCREATABLE` | `IMPLEMENTED-UNCOMPILED` — no writable property; HO-TAB7-01 closed by U3 |
 | `AeroraFreshness` | `Telemetry/AeroraFreshness.{h,cc}` | `QML_ELEMENT` + `QML_UNCREATABLE` | `IMPLEMENTED-UNCOMPILED` — mechanism only; **no budget values (`Q-036`)** |
 | `AeroraFactGroupBase` | `Telemetry/AeroraFactGroupBase.{h,cc}` | none (derives `FactGroup`) | `IMPLEMENTED-UNCOMPILED` |
 | The six Aerora fact groups | — | — | **`CONTRACT-ONLY`** — none has a message to parse |
@@ -220,16 +220,23 @@ asserted by `AeroraUiSafetyTest::_uiContextDoesNotExposeTheVehicleOrTheServiceMa
 
 ## 3. QML-reachable surface
 
-Ten types are reachable from `AeroraUi`. The surface is enumerated because a method becomes
-QML-callable by acquiring `Q_INVOKABLE` or by being a slot, and a property becomes writable by
-acquiring a `WRITE` accessor — each a one-line change in another workstream's header with no compiler
-warning and no UI diff.
+The surface is enumerated because a method becomes QML-callable by acquiring `Q_INVOKABLE` or by
+being a slot, and a property becomes writable by acquiring a `WRITE` accessor — each a one-line change
+in another workstream's header with no compiler warning and no UI diff.
+
+> **The overlay registers 12 QML-reachable types; `AeroraUiSafetyTest::auditedTypes()` covers 10.**
+> `AeroraSecurityStatus` (new with Tab 2's WP2-B) and `AeroraFreshness` (unaudited since Phase 6) are
+> outside the ratchet. Neither is a live defect — an independent sweep confirms no `Q_PROPERTY`
+> carrying `WRITE` or `MEMBER` exists anywhere in `aerora/src/**` — but `P7-AUTH-004`'s guarantee
+> currently covers ten of twelve types rather than all of them. Filed as `HO-TAB1-03` to Tab 7.
+
+The ten audited types, reachable from `AeroraUi`:
 
 | Type | QML macro | `Q_INVOKABLE` | Writable properties |
 | --- | --- | --- | --- |
 | `AeroraVehicleUiContext` | `QML_NAMED_ELEMENT(AeroraUi)` + `QML_SINGLETON` | none | none |
 | `AeroraTelemetryState` | `QML_ELEMENT` + `QML_SINGLETON` | 7 static classifiers | none |
-| `AeroraStateValue` | `QML_ELEMENT` + `QML_UNCREATABLE` | `ageMs()` | **`capability` — HO-TAB7-01** |
+| `AeroraStateValue` | `QML_ELEMENT` + `QML_UNCREATABLE` | `ageMs()` | none — `capability` lost its `WRITE` in U3 |
 | `AeroraReportedValue` | `QML_ELEMENT` + `QML_UNCREATABLE` | `ageMs()` | none |
 | `AeroraFreshness` | `QML_ELEMENT` + `QML_UNCREATABLE` | none | none |
 | `AeroraPayloadModel` | `QML_ELEMENT` + `QML_UNCREATABLE` | `reportedValue(id)` | none |
@@ -255,19 +262,25 @@ warning and no UI diff.
 Signals are excluded from this audit: emitting one from QML re-evaluates bindings and actuates
 nothing.
 
-### The one recorded deviation
+### The one recorded deviation, now closed
 
-`AeroraStateValue::capability` carries `WRITE setCapability` (`AeroraStateValue.h:111`).
-`CapabilityAbsent` is the only input producing `UNAVAILABLE`, so a QML write could manufacture an
-`UNAVAILABLE` the vehicle never reported — exactly what `AERORA-GCS-REQ-029` and `IF-UIS-005`
-prohibit. Not reachable from `AeroraUi` today because no property returns an `AeroraStateValue`;
-becomes reachable the moment `AeroraValueDisplay` is bound to one.
+`AeroraStateValue::capability` carried `WRITE setCapability` until U3 (`a7b317f89`).
+`CapabilityAbsent` is the only input producing `UNAVAILABLE`, so a QML write could have presented a
+reported-absent capability as available, or manufactured an `UNAVAILABLE` the vehicle never
+reported — exactly what `AERORA-GCS-REQ-029` and `IF-UIS-005` prohibit. It was never reachable from
+`AeroraUi`, because no property returns an `AeroraStateValue`; it would have become reachable the
+moment `AeroraValueDisplay` was bound to one.
 
-`AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` asserts the writable set is
-**exactly** this one entry, so a second cannot appear while the first is outstanding. Fix is
-HO-TAB7-01 / `D-UI-03`, owned by Tab 4: drop `WRITE` from the `Q_PROPERTY`, keep `setCapability()` as
-public C++, and **remove the entry from `recordedWritablePropertyDeviations()`** or the test will
-fail on the now-absent deviation.
+The `WRITE` is gone, the property stays readable, and `setCapability()` remains public C++ for the
+capability model. `recordedWritablePropertyDeviations()` returns an empty list, and the assertion is
+set equality, so `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` now requires
+**zero** writable properties across all ten audited types — stricter than before, not relaxed.
+
+Re-verified at this reconciliation, independently of Tab 4's report: every `aerora/**/*.h` grepped
+for `Q_PROPERTY` carrying `WRITE` or `MEMBER` returns no match. Both forms were checked because
+`QMetaProperty::isWritable()` is true for `MEMBER` properties as well.
+
+Status `IMPLEMENTED-UNCOMPILED`. The change has not been compiled and that test has not been run.
 
 ### A noted non-issue
 
@@ -387,12 +400,12 @@ Named rather than mocked, per the Phase B rule. Each row is a real gap with an o
 | 1 | Authorization policy, identity provider, role resolver | **Every command is permitted.** No operator action surface can exist | Tab 2 | `Q-029` → ADR-014 |
 | 2 | `AeroraAutoPilotPlugin` | 6 vehicle screens unreachable | Tab 3 | Nothing — ready to implement |
 | 3 | `FirmwarePlugin::toolIndicators()` override | No per-vehicle Aerora indicator | Tab 3 | Nothing — ready to implement |
-| 4 | Interceptor install (HO-TAB7-02) | Every overlay QML override silently never loads | **Tab 1** | Nothing — ready to implement |
-| 5 | `AeroraControlsModule` `IMPORTS QGC` + resource alias (`D-UI-04`) | `Aerora.Controls` cannot resolve `AeroraUi`; wrong resource paths | **Tab 1** | Nothing — ready to implement |
-| 6 | `AeroraStateValue::capability` `WRITE` removal (`D-UI-03`) | Blocks every screen binding an `AeroraStateValue` | **Tab 4** | Nothing — ready to implement |
+| 4 | ~~Interceptor install (HO-TAB7-02)~~ | — | Tab 1 | **DONE** — U1, `84bbb3a6e`, `IMPLEMENTED-UNCOMPILED` |
+| 5 | ~~`AeroraControlsModule` `IMPORTS QGC` + resource alias (`D-UI-04`)~~ | — | Tab 1 | **DONE** — U2, `a73699796`, `IMPLEMENTED-UNCOMPILED` |
+| 6 | ~~`AeroraStateValue::capability` `WRITE` removal (`D-UI-03`)~~ | — | Tab 4 | **DONE** — U3, `a7b317f89`, `IMPLEMENTED-UNCOMPILED` |
 | 7 | Fact group messages + freshness budgets | Telemetry explorer and quality dashboard have no data | Tab 4 | `Q-036`, `Q-023`/`Q-024` |
 | 8 | Aerora complex mission item | Painting and mission-planning journeys cannot start | Tab 5 | `Q-021`/`Q-023` |
-| 9 | Local persistence layer | 6 screens; probably also audit durability | **Tab 1** (architecture) | `P7-DAT-002` design |
+| 9 | Local persistence layer | 7 screens; carries audit durability but **not** tamper-evidence | **Tab 1** (store), domain tabs (writers) | **`DESIGNED`** — [09](09-local-persistence-architecture.md). Implementation ready to start |
 | 10 | Autonomy proposal model + source interface | Supervised-autonomy journey | Tab 6 + Tab 1 | `P7-AI-004`, `D-007` |
 | 11 | Painting / tether / consumable reported-value sets | Payload and power panels have nothing to show | Tab 6 | Payload ICD, `Q3-009` |
 | 12 | Durable, tamper-evident audit sink | No post-flight Aerora record exists | Tab 2 | `Q-037` |
@@ -476,6 +489,20 @@ Stated so the first build is read as a measurement rather than as a regression.
 | **`Aerora.Controls` may not resolve** | `D-UI-04`: the module block omits `IMPORTS QGC` |
 | **Overlay QML overrides will not load** | HO-TAB7-02: the interceptor is not installed. Allow-list is empty, so nothing is lost today — but it would fail silently once populated |
 | **Without `-DQGC_CUSTOM_DIR=aerora` everything "works" and the gate is never consulted** | ADR-012. The worst failure mode in the build, because it is invisible |
+| **`AeroraMissionTest.cc` will not compile — 11 known call sites** | Found by source inspection, not by a compiler. `UnitTest::expectLogMessage()` takes `const char *category` (`test/UnitTestFramework/UnitTest.h:472`) and there is no `QString` overload; the file passes `QString::fromUtf8(kLogCategory)` at lines 107, 113, 120, 366, 376, 382, 390, 406, 521, 538, 570. Fix is to drop the wrapper — `kLogCategory` is already `constexpr const char *`. Tab 5's file, filed as `HO-TAB1-01` |
+
+### A confirmed latent compile error, and what it implies
+
+The `AeroraMissionTest.cc` row above is the first defect found in the overlay by reading rather than
+by building, and it is worth recording how: `expectLogMessage` has exactly one declaration, the
+argument type does not convert, and the call sites were enumerated mechanically. The same scan
+confirmed the other 47 call sites across seven test files are correct and that every test-side
+category string matches its `QGC_LOGGING_CATEGORY` definition exactly — a mismatch there would be a
+*silent* test failure rather than a compile error, which is worse.
+
+It also sets the expectation for `R7-01` concretely: 105 never-compiled C++ files produced at least
+one type error that a careful reviewer missed eleven times in one file. The first build will find
+more.
 
 ### Build order for the first attempt
 

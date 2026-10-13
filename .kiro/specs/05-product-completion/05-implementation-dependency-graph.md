@@ -187,11 +187,17 @@ Five changes gated on nothing, independent of each other, that unblock twelve sc
 
 | # | Change | File | Owner | Unblocks | Size |
 | --- | --- | --- | --- | --- | --- |
-| **U1** | Install `AeroraQmlOverrides` â€” override `createQmlApplicationEngine` / `destroyQmlApplicationEngine` | `aerora/src/AeroraCorePlugin.{h,cc}` | **Tab 1** | Every tier-2/3 QML override path | ~15 lines, exact code in HO-TAB7-02 |
-| **U2** | Add `IMPORTS QGC` + `qgc_set_qt_resource_alias` to the module block | `aerora/CMakeLists.txt:160-172` | **Tab 1** | `Aerora.Controls` resolving `AeroraUi` / `AeroraTelemetryState`; correct resource paths | ~6 lines, exact block in HO-TAB7-03 |
-| **U3** | Drop `WRITE setCapability` from the `Q_PROPERTY`; keep `setCapability()` as public C++; remove the entry from `recordedWritablePropertyDeviations()` | `aerora/src/Telemetry/AeroraStateValue.h:111` + `aerora/test/UI/AeroraUiSafetyTest.cc` | **Tab 4** | `SCR-LIV-02` and every screen binding an `AeroraStateValue` | 2 lines + 1 test entry |
-| **U4** | Create `AeroraAutoPilotPlugin`; return it from `AeroraFirmwarePlugin::autopilotPlugin()` | new `aerora/src/Vehicle/AeroraAutoPilotPlugin.{h,cc}` + `Vehicle.cmake` | **Tab 3** | `SCR-VEH-01`..`06` (6 screens) | new class + `vehicleComponents()` |
-| **U5** | Override `FirmwarePlugin::toolIndicators(const Vehicle*)` | `aerora/src/Vehicle/AeroraFirmwarePlugin.{h,cc}` | **Tab 3** | `SCR-SHL-02` per-vehicle half | ~10 lines |
+| **U1** | Install `AeroraQmlOverrides` â€” override `createQmlApplicationEngine` / `destroyQmlApplicationEngine` | `aerora/src/AeroraCorePlugin.{h,cc}` | **Tab 1** | Every tier-2/3 QML override path | **DONE** `84bbb3a6e` |
+| **U2** | Add `IMPORTS QGC` + `qgc_set_qt_resource_alias` to the module block | `aerora/CMakeLists.txt:160-172` | **Tab 1** | `Aerora.Controls` resolving `AeroraUi` / `AeroraTelemetryState`; correct resource paths | **DONE** `a73699796` |
+| **U3** | Drop `WRITE setCapability` from the `Q_PROPERTY`; keep `setCapability()` as public C++; remove the entry from `recordedWritablePropertyDeviations()` | `aerora/src/Telemetry/AeroraStateValue.h:111` + `aerora/test/UI/AeroraUiSafetyTest.cc` | **Tab 4** | `SCR-LIV-02` and every screen binding an `AeroraStateValue` | **DONE** `a7b317f89` |
+| **U4** | Create `AeroraAutoPilotPlugin`; return it from `AeroraFirmwarePlugin::autopilotPlugin()` | new `aerora/src/Vehicle/AeroraAutoPilotPlugin.{h,cc}` + `Vehicle.cmake` | **Tab 3** | `SCR-VEH-01`..`06` (6 screens) | assigned to Tab 3 |
+| **U5** | Override `FirmwarePlugin::toolIndicators(const Vehicle*)` | `aerora/src/Vehicle/AeroraFirmwarePlugin.{h,cc}` | **Tab 3** | `SCR-SHL-02` per-vehicle half | assigned to Tab 3 |
+
+**Status: U1, U2 and U3 are complete at `IMPLEMENTED-UNCOMPILED`.** U3 was executed by Tab 4
+concurrently with U1 and integrated by Tab 1 with both halves in one change; the integration review
+independently confirmed the writable property set is now genuinely empty across the whole overlay —
+no `Q_PROPERTY` carrying `WRITE` or `MEMBER` remains in `aerora/src/**`. U4 and U5 are assigned to
+Tab 3 and gated on nothing.
 
 ### Why these five first
 

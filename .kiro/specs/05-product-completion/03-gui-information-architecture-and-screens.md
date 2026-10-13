@@ -263,13 +263,14 @@ Normative. A violation is a defect, not a style preference.
 | `UI-ST-08` | Colour is never the sole encoder of a state class |
 | `UI-ST-09` | A panel with no data says which state applies to the whole panel; it does not render empty |
 
-`UI-ST-07` is the one with an outstanding defect behind it:
+`UI-ST-07` had the one outstanding defect behind it, and it is now closed:
 [HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-is-qml-writable)
-— `AeroraStateValue::capability` carries `WRITE setCapability` (`AeroraStateValue.h:111`). Latent
-today because no `AeroraUi` property returns an `AeroraStateValue`; it becomes live the moment
-`AeroraValueDisplay` is bound to one. `AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable`
-asserts the writable set is exactly that one entry, so a second cannot appear while the first is
-outstanding. **Fixing this is a prerequisite for `SCR-LIV-02`.**
+— `AeroraStateValue::capability` carried `WRITE setCapability`, so QML could have written the
+classification. U3 (`a7b317f89`) removed the `WRITE`; the property stays readable and
+`setCapability()` remains public C++ for the capability model.
+`AeroraUiSafetyTest::_onlyTheRecordedPropertyDeviationIsWritable` now requires the writable set to be
+empty, so the ratchet fails on the first writable property to appear rather than on the second.
+**`SCR-LIV-02`'s prerequisite is met;** its remaining gate is `Q4-002` for fact-group content.
 
 ## 7. Responsive layout and accessibility
 
@@ -327,8 +328,8 @@ handoff and must not widen the security surface `AeroraUiSafetyTest` guards.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-LIV-01` | Live Operations overlay (root) | O | `FlyViewCustomLayer.qml` (tier 2, empty seam, `FlyView.qml:145`) | `DESIGNED` | 7 | HO-TAB7-02 (interceptor install) |
-| `SCR-LIV-02` | Vehicle state panel | O | child of `SCR-LIV-01`, binds `AeroraUi` | `DESIGNED` | 7 | HO-TAB7-01; `Q4-002` for fact groups |
+| `SCR-LIV-01` | Live Operations overlay (root) | O | `FlyViewCustomLayer.qml` (tier 2, empty seam, `FlyView.qml:145`) | `DESIGNED` | 7 | **unblocked** — HO-TAB7-02 closed by U1 |
+| `SCR-LIV-02` | Vehicle state panel | O | child of `SCR-LIV-01`, binds `AeroraUi` | `DESIGNED` | 7 | **HO-TAB7-01 closed by U3**; `Q4-002` still gates fact-group content |
 | `SCR-LIV-03` | Payload supervision panel | O/P | child; `AeroraUi.payload` | `DESIGNED` | 7 + 6 | `P7-PAY-004` reported-value set undefined |
 | `SCR-LIV-04` | Power & tether panel | O | child; `AeroraUi.power` | `DESIGNED` | 7 + 6 | `P7-PWR-006` tether item set undefined |
 | `SCR-LIV-05` | Proposal queue / approval | O | child | `SPECIFIED-NOT-DESIGNED` | 7 + 6 | `P7-AI-001` proposal model; `Q-029` |
@@ -582,8 +583,8 @@ Keeping this at zero is the main reason an upstream rebase stays mechanical (`P7
 | `D-NAV-01` | Top-level entry point: hub vs `SelectViewDropdown.qml` fork | **Product** | Nothing — hub is adopted and sufficient | **DECIDED** (hub); fork deferred and available |
 | `D-UI-01` | A QML-safe read path for `isAuthorizationEnforced()` without widening the security surface | Tab 2 + Tab 7 | `SCR-SHL-03`, `SCR-SEC-01` | `OPEN` |
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Nothing structurally; needed for acceptance | `OPEN` |
-| `D-UI-03` | `AeroraStateValue::capability` must lose `WRITE` (HO-TAB7-01) | **Tab 4** | `SCR-LIV-02` and every screen binding an `AeroraStateValue` | `OPEN` |
-| `D-UI-04` | `AeroraControlsModule` block omits `IMPORTS QGC` and `qgc_set_qt_resource_alias` versus HO-TAB7-03 | **Tab 1** | `Aerora.Controls` resolving `AeroraUi`/`AeroraTelemetryState`, and the resource path layout | `OPEN` |
+| `D-UI-03` | `AeroraStateValue::capability` must lose `WRITE` (HO-TAB7-01) | Tab 4 | — | **CLOSED** — U3, `a7b317f89`. `IMPLEMENTED-UNCOMPILED` |
+| `D-UI-04` | `AeroraControlsModule` block omits `IMPORTS QGC` and `qgc_set_qt_resource_alias` versus HO-TAB7-03 | Tab 1 | — | **CLOSED** — U2, `a73699796`. `IMPLEMENTED-UNCOMPILED` |
 | `D-UI-05` | Whether an Aerora QML Quick Test target is created now (HO-TAB7-04) | Tab 1 + Tab 7 | QML rendering tests only | `OPEN` — recommend at the first QML behaviour needing assertion |
 | `D-UI-06` | Multi-station authority display — which station holds authority | **Architecture** | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — raised by [benchmark §7.3](02-gcs-reference-benchmark.md#73-which-station-holds-authority-when-several-are-connected) |
 

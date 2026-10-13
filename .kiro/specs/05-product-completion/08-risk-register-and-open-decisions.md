@@ -66,7 +66,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
 | `ADR-014` | Outbound authorization scope, Options A/B/C | Architecture | Any general authorization claim | `OPEN — ARCHITECTURAL DECISION REQUIRED` |
-| `P7-DAT-002` | Local persistence design | **Tab 1** | 5 screens; plausibly also `Q-037` | `OPEN` — **highest-leverage item Tab 1 owns alone** |
+| `P7-DAT-002` | Local persistence design | Tab 1 | 7 screens; carries `Q-037` durability but not tamper-evidence | **CLOSED — `DESIGNED`.** [09](09-local-persistence-architecture.md). Seven new decisions `D-DAT-01`..`07` fall out of it, four of them product calls |
 | `P7-AI-004` | GPU/autonomy interface | Architecture + external | 2 screens, journey 6.4 | `OPEN` — **no endpoint, schema or response may be invented** |
 | `D-UI-06` | Multi-station authority | Architecture | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — [new, §3](#3-new-open-decisions-raised-by-the-benchmark) |
 | — | Authorization lifetime: re-evaluate on retry? | Architecture + Tab 2 | — | `OPEN` — bounded to enqueue time; **no second check added** |
@@ -76,7 +76,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
-| `Q-037` / `Q4-003` | Audit integrity mechanism | Tab 2 | 2 screens, journey 6.6 | `OPEN` — sink reports itself neither durable nor tamper-evident |
+| `Q-037` / `Q4-003` | Audit integrity mechanism | Tab 2 | 2 screens, journey 6.6 | **`PARTIALLY RESOLVED`** — [09](09-local-persistence-architecture.md) designs durability (WAL + `synchronous=FULL` for audit, `ON DELETE RESTRICT`, write-failure accounting). **Tamper-evidence stays `OPEN`** and is now explicitly blocked on `D-DAT-05`, a protected chain anchor, which is blocked on `AeroraPlatformKeyProtector` having a backend, which is blocked on `D-006` |
 | — | Platform key protection per OS | Tab 2 + architecture | `P7-SEC-003` | `OPEN` — **no backend on any of the 5 platforms, and gated on `D-006`: an untested crypto backend is worse than none** |
 | `Q-035` / `R-021` | Overlay test configuration leg | Tab 8 + CI | All denial-path tests | `OPEN` |
 | `Q-018` | Aerora `MAV_AUTOPILOT` value | Firmware | — | `OPEN` — **Aerora claims `Generic`; no value invented** |
@@ -87,6 +87,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | `D-UI-01` | QML-safe enforcement read path | Tab 2 + Tab 7 | `SCR-SHL-03`, `SCR-SEC-01` | `OPEN` |
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Acceptance | `OPEN` |
 | `D-UI-05` | Aerora Qt Quick Test target timing | Tab 1 + Tab 7 | 16 QML tests | `OPEN` — recommend at first need |
+| `D-UI-07` | Should `AeroraUiSafetyTest::auditedTypes()` be **derived** rather than hand-listed? | Tab 7 | Nothing today; it is the durable fix for `R7-19` | `OPEN` — raised this pass. A hand-maintained audit list fails the same way as the surface it guards |
 | `Q-040` | Visual distinguishability verification | Product | `DEMO` verification | `OPEN` |
 
 ### Resolved this pass
@@ -97,8 +98,20 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | — | Tab 7 numbering collision (UI vs Fact System) | **Resolved.** Tab 7 = GUI, Tab 8 = build/test, Tab 9 = Fact System |
 | — | `aerora/src/Supervisory/` ownership | **Resolved to Tab 4.** The directory move stays deferred |
 | `D-NAV-01` | Top-level entry point | **Decided: hub via `analyzePages()`. Zero forks.** Fork deferred and available |
-| `D-UI-03` | `AeroraStateValue::capability` `WRITE` | **Assigned to Tab 4 as WP4-A/U3.** Ready to implement, gated on nothing |
-| `D-UI-04` | `AeroraControlsModule` missing `IMPORTS QGC` + alias | **Newly identified. Assigned to Tab 1 as WP1-B/U2.** Gated on nothing |
+| `D-UI-03` | `AeroraStateValue::capability` `WRITE` | **CLOSED.** U3, `a7b317f89`, `IMPLEMENTED-UNCOMPILED` |
+| `D-UI-04` | `AeroraControlsModule` missing `IMPORTS QGC` + alias | **CLOSED.** U2, `a73699796`, `IMPLEMENTED-UNCOMPILED` |
+| HO-TAB7-02 | Interceptor install | **CLOSED.** U1, `84bbb3a6e`, `IMPLEMENTED-UNCOMPILED` |
+| `P7-DAT-002` / `P7-DAT-005` | Local persistence | **CLOSED at `DESIGNED`.** [09](09-local-persistence-architecture.md) |
+
+### New decisions raised by WP1-C
+
+Seven, in [09 §14](09-local-persistence-architecture.md#14-open-decisions). Four are product calls
+(`D-DAT-01` retention caps, `D-DAT-02` whether audit may be deleted at all, `D-DAT-03` fleet
+identity, `D-DAT-06` encryption at rest), one is security architecture (`D-DAT-05` protected chain
+anchor), two are engineering (`D-DAT-04` event categories, `D-DAT-07` multi-instance behaviour).
+
+**No default retention value was invented.** A retention period carries regulatory weight in some
+domains, and a placeholder would outlive the decision it substituted for (`P7-NOINV-002`).
 
 ## 3. New open decisions raised by the benchmark
 
@@ -155,11 +168,14 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 | `R7-10` | **`geoMapVisualQML()` is omitted** on the Aerora complex item and the item is silently invisible under the GeoMap engine | Medium | Medium | `mapVisualQML()` is pure virtual and enforced; `geoMapVisualQML()` returns `QString()` by default | `SCR-MIS-04` is a **separate** inventory entry so the omission is visible in the screen count, not buried in an item's definition of done | Tab 5 |
 | `R7-11` | **An interface gets a mock implementation** to make a screen demonstrable | Low | **Critical** | 8 interfaces with no implementation, 6 of them decision-gated | `AeroraPayloadCommandSink` and `AeroraPlatformKeyProtector` are deliberately unimplemented for safety. Phase B rule: **identify missing functionality, do not create mock production behaviour** | All tabs; Tab 1 enforces |
 | `R7-12` | **`registerCustomSettingsGroup()` is called with a wrong accessor name** and the group is silently deleted | Medium | Low | The call **takes ownership** and deletes a rejected group. Accessor must be camelCase JSON stem + `Settings`, matching `^[a-z_][A-Za-z0-9_]*$`, no collision with a built-in | Record the exact expected accessor name in the settings specification. A startup assertion would be better | Tab 7 |
-| `R7-13` | **U3 lands without the test entry removal** and the suite fails on the now-absent deviation | Medium | Low | `_onlyTheRecordedPropertyDeviationIsWritable` asserts the writable set is **exactly** one entry | WP4-A requires both halves in one commit. Tab 7 must not touch the file until U3 lands | Tab 4 |
+| `R7-13` | ~~U3 lands without the test entry removal~~ | — | — | — | **CLOSED.** U3 landed with both halves in one change (`a7b317f89`). The deviation list is now empty, so the assertion is stricter and this failure mode no longer exists | Tab 4 |
 | `R7-14` | **Upstream drift breaks a consumed seam silently.** A signature change is a compile error (safe); a semantic change is not | Low | High | The interceptor's self-check reports `isInstalled() == false` if the engine is created elsewhere. Other seams have no such check | WP8-D drift tooling. Prefer seams whose breakage is a compile error | Tab 8 |
 | `R7-15` | **`PARAM_SET` remains unowned** and someone claims Aerora authorizes vehicle reconfiguration | Low | High | `ParameterManager.cc:319`, `:398`. The command gate covers `MAV_CMD` only | Tab 9 created. `P7-AUTH-003` now assigned. **No parameter-authorization claim is supportable until WP9-A completes** | Tab 9 |
 | `R7-16` | **Accessibility and WCAG get claimed** on the strength of the design rules rather than testing | Low | Medium | `P7-SET-005` already says conformance is not claimed | Keep `P7-SET-005` in every deployment document. Conformance needs assistive-technology testing and expert review | Tab 7 |
 | `R7-17` | **The hub becomes a dashboard of green tiles** that are green because nothing was checked | Medium | Medium | It is the default shape for a hub screen | `SCR-SHL-01`'s anti-requirement is explicit: it must be the overlay's honest self-report, including what did **not** attach | Tab 7 |
+| `R7-18` | **A latent type error blocks a whole test binary at first build.** Confirmed, not hypothetical | **Confirmed** | Medium | `AeroraMissionTest.cc` passes `QString` to `expectLogMessage(const char *)` at 11 sites. One declaration, no overload, no conversion | `HO-TAB1-01` to Tab 5. The scan that found it also cleared the other 47 call sites and verified every category string, so the class is closed rather than sampled | Tab 5 |
+| `R7-19` | **A new QML-reachable type is added without being added to the safety audit**, so `P7-AUTH-004`'s ratchet silently stops covering the whole surface | **Occurred** | High | 12 QML-registered overlay types, 10 in `auditedTypes()`. `AeroraSecurityStatus` arrived with Tab 2's WP2-B; `AeroraFreshness` has been uncovered since Phase 6 | `HO-TAB1-03` to Tab 7. **The durable fix is a test that derives the audited set rather than listing it** — an audit whose membership is hand-maintained has the same failure mode as the thing it audits. Recorded as `D-UI-07` | Tab 7 |
+| `R7-19` | **A status row is closed while the prose still describes the defect as live.** Observed, not hypothetical | **Observed** | Medium | `HO-TAB4-03`'s first pass closed `D-UI-03`, HO-TAB7-01 and `R7-13` but left five passages in the same six documents calling the writable property a live defect | A documentation handoff closes when a grep for the old claim comes back empty, not when the status column flips. [07 §7](07-phase-7-work-packages-and-ownership.md#7-handoff-protocol) records the rule | Tab 1 |
 
 ### Exposure summary
 
@@ -183,7 +199,7 @@ by someone who does not know why they are there.
 
 | Risk | Mitigation already in place |
 | --- | --- |
-| A QML write manufactures a state the vehicle never reported | `AeroraUiSafetyTest` asserts the writable property set is **exactly** one recorded deviation |
+| A QML write manufactures a state the vehicle never reported | `AeroraUiSafetyTest` asserts the writable property set is **empty** since U3. The one recorded deviation is gone, so the assertion is stricter than when it was written |
 | The UI acquires an actuating path | The same test reads the meta-objects of all ten QML-reachable types and fails when the surface grows |
 | A station-side threshold acquires safety meaning | `kDefinedThresholdCount == 0`, asserted by `AeroraPowerModelTest` |
 | A payload actuator appears | `AeroraPayloadCommandSink` has no implementation; two `false` flags assert it |

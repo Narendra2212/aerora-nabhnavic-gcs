@@ -24,8 +24,26 @@ claimed anywhere.
 | 06 | [Requirements-to-Test Traceability Matrix](06-requirements-to-test-traceability.md) | Requirement â†’ component â†’ test, with coverage gaps named |
 | 07 | [Phase 7 Work Packages and Tab Ownership](07-phase-7-work-packages-and-ownership.md) | Per-tab assignment, prerequisites, exact editable file set, conflict avoidance |
 | 08 | [Risk Register and Unresolved Decisions](08-risk-register-and-open-decisions.md) | Risks, all OPEN decisions, blockers, and who must resolve each |
+| 09 | [Local Persistence Architecture](09-local-persistence-architecture.md) | WP1-C: schema, platform paths, durability, retention, export, failure behaviour, and the Q-037 assessment |
+| 10 | [Parameter Write Path and Authorization Boundary](10-parameter-write-path-and-authorization-boundary.md) | WP9-A: who can write a vehicle parameter, from where, and what the current gate does and does not cover |
 
-Read 01 and 03 first. 04 and 05 are the implementation gate. 07 is the assignment sheet.
+Document numbers are allocated by Tab 1 **before** a document is created. 09 was briefly used twice
+and Tab 9's was renumbered to 10; see
+[07 § Known shared-file hazards](07-phase-7-work-packages-and-ownership.md#known-shared-file-hazards).
+
+Read 01 and 03 first. 04 and 05 are the implementation gate. 07 is the assignment sheet. 09 is the
+first Phase C design document.
+
+## Phase C progress
+
+| Work package | Status | Commit |
+| --- | --- | --- |
+| U1 — install the QML override interceptor (HO-TAB7-02) | `IMPLEMENTED-UNCOMPILED` | `84bbb3a6e` |
+| U2 — complete the `AeroraControlsModule` block (HO-TAB7-03) | `IMPLEMENTED-UNCOMPILED` | `a73699796` |
+| U3 — drop `WRITE` from `AeroraStateValue::capability` (HO-TAB7-01) | `IMPLEMENTED-UNCOMPILED` | `a7b317f89` |
+| WP1-C — local persistence architecture | `DESIGNED` | doc 09 |
+| U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
+| U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
 
 ## Status vocabulary
 
@@ -68,7 +86,8 @@ every layer including the UI; collapsing any pair is a defect.
 `UNAVAILABLE` is producible **only** from a vehicle capability report
 (`AERORA-GCS-REQ-029`, `IF-UIS-005`). A UI or service that manufactures it is a defect, which is why
 [HO-TAB7-01](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-01--aerorastatevaluecapability-is-qml-writable)
-is tracked rather than tolerated.
+was tracked rather than tolerated, and is now closed by U3 (`a7b317f89`): QML reads the capability
+classification and cannot write it.
 
 ## Baseline and branch protection
 

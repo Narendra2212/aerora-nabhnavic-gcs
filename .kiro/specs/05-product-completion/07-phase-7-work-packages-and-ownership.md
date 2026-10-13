@@ -84,7 +84,8 @@ One tab per file. Two tabs may not edit the same file, or work the same root cau
 | `aerora/CMakeLists.txt` — every tab wants a test registered | **Only Tab 1 edits it.** A tab exports `_TEST_NAMES` from its own manifest and Tab 1 adds the `add_qgc_test` line |
 | `aerora/src/AeroraCorePlugin.*` — Tab 7 needs the interceptor installed, Tab 2 owns the authorization override | **Tab 1 owns the file.** Both tabs request changes through a handoff |
 | `.kiro/specs/03-implementation-specification/27-implementation-adrs.md` — contended in Phase 6 (Tab 1 created, Tab 2 extended) | **Accepted as-is.** New ADRs go in a new file with a unique number. Tab 1 reserves odd numbers, Tab 2 even, for ADRs added in Phase 7 |
-| Document number 28 used twice in Phase 6 | Phase 7 documents live in `05-product-completion/` with a single owner per file. Not reproduced |
+| Document number 28 used twice in Phase 6 | Phase 7 documents live in `05-product-completion/` with a single owner per file. **Reproduced once at number 09 — see the row below** |
+| **Document number 09 was used twice**, both untracked: `09-local-persistence-architecture.md` (Tab 1, WP1-C) and `09-parameter-write-path-and-authorization-boundary.md` (Tab 9, WP9-A) | **Resolved. Tab 9's document is now `10-parameter-write-path-and-authorization-boundary.md`** and its three self-references were updated with it. Decided on reference count rather than seniority: doc 09 had 8 inbound links from 00, 04, 07 and 08, Tab 9's had only self-references, so renumbering it touched nothing else. Tab 1 did not rename another tab's file; Tab 9 performed the move. **Allocation rule from here: Tab 1 assigns the number before a document is created** |
 
 ### Root-cause collisions to avoid
 
@@ -490,6 +491,49 @@ deferred.
 Do not add a parameter authorization gate before ADR-014 settles the general authorization scope. A
 second, differently-shaped gate would be worse than one gap.
 
+## 4a. Current assignments, Phase C batch 1
+
+Issued by Tab 1. Non-overlapping: no two tabs touch the same file. Branch for all work is
+`aerora/phase7-product-completion`; verify branch and a clean tree before the first edit.
+
+| Tab | Assignment | Prereq | Exclusive file set |
+| --- | --- | --- | --- |
+| **1** | WP1-D provenance; `AeroraLocalStore` per [09](09-local-persistence-architecture.md) | none | `aerora/CMakeLists.txt`, `aerora/src/AeroraCorePlugin.*`, new `aerora/src/Persistence/`, `05-product-completion/` |
+| **2** | WP2-A audit writer interface against `Q-037`, now informed by [09 §7](09-local-persistence-architecture.md#7-q-037-assessment-can-this-carry-audit); WP2-B the `D-UI-01` read path | none | `aerora/src/Security/*`, `aerora/test/Security/*` |
+| **3** | **U4 and U5 together**, with tests and `Vehicle.cmake` `_TEST_NAMES`; WP3-C the `attachTo` assertion | none | `aerora/src/Vehicle/*`, `aerora/test/Vehicle/*` |
+| **4** | WP4-B `Q4-002` attachment variants as specifications; WP4-C freshness budget requirements; WP4-D event timeline model once `AeroraLocalStore` lands | WP4-D needs Tab 1's store | `aerora/src/Telemetry/*`, `aerora/src/Supervisory/*`, `aerora/test/Telemetry/*` |
+| **5** | **`HO-TAB1-01` first — it will not compile.** Then WP5-B mission/payload boundary, WP5-C validation report | none | `aerora/src/Mission/*`, `aerora/test/Mission/*` |
+| **6** | WP6-A payload command boundary; WP6-B/C reported-value *requirements* only | none for the specs | `aerora/src/Payload/*`, `aerora/src/Power/*`, `aerora/src/PayloadPower.cmake`, `aerora/test/{Payload,Power,Supervisory}/*` |
+| **7** | WP7-A design-system components, then WP7-B `SCR-SHL-01`. **U1, U2 and U3 are closed, so both prerequisites are met.** Also `HO-TAB4-01` and `HO-TAB4-02` | U1/U2/U3 — **met** | `aerora/src/UI/*`, `aerora/test/UI/*` |
+| **8** | WP8-D drift tooling only | `D-006` blocks everything else | `.github/`, `tools/`, presets |
+| **9** | WP9-A `PARAM_SET` assessment. **Do not add a second authorization gate** | none | `src/FactSystem/*` |
+
+### Sequencing constraints for this batch
+
+| Constraint | Reason |
+| --- | --- |
+| Tab 7 must not edit `aerora/test/UI/AeroraUiSafetyTest.cc` for the U3 entry | Already done by Tab 4 in `a7b317f89`. The file is Tab 7's again from now on |
+| Tab 4's WP4-D waits on `AeroraLocalStore` | The timeline model has nothing to write to until the store exists |
+| Only Tab 1 edits `aerora/CMakeLists.txt` | Tabs export `_TEST_NAMES` from their own manifest; Tab 1 adds the `add_qgc_test` line |
+| Tab 3's U4 adds a new source pair | Must be declared in `Vehicle.cmake` in the same commit, or the manifest check fails |
+| No tab implements an operator action control | `P7-FLY-004` is `FORBIDDEN-UNTIL` an authorized command path exists |
+
+### Reporting contract
+
+Every tab reports, per completed work package:
+
+| Field | Required content |
+| --- | --- |
+| **Files** | Exact paths added and modified. Any file outside the tab's exclusive set is a protocol violation and must be a handoff instead |
+| **Tests** | Test names authored, which requirement IDs each covers, and the `add_qgc_test` label requested |
+| **Manifest** | Result of `.kiro/tools/aerora-manifest-check.ps1`. A source added without a manifest entry compiles into nothing, silently |
+| **Static checks** | Result of `.kiro/tools/aerora-ui-static-check.ps1` for the touched files |
+| **Commit** | Hash and Conventional Commits subject |
+| **Status** | Per item. **`IMPLEMENTED-UNCOMPILED` is the ceiling** until `D-006` resolves |
+| **Unresolved** | Open questions, new handoffs raised, and any decision the tab declined to invent |
+
+A report claiming `VERIFIED` is rejected. A report that is silent on the manifest is incomplete.
+
 ## 5. Activation state
 
 | Tab | Activated | Can start immediately | First blocked item |
@@ -522,6 +566,41 @@ whose blocker matters most.
 | Coding style | [CODING_STYLE.md](../../../CODING_STYLE.md). No `Q_ASSERT`, no `QTest::ignoreMessage`, no fixed-delay `qWait`, no uncategorised `qDebug()`, 4-space indent, LF, 120 columns |
 | Comments | Only where non-obvious. Comment the *why* |
 
+### Who commits what
+
+All nine tabs share **one working tree on one branch**. There are no per-tab worktrees, so at any
+moment the tree holds the in-flight edits of several tabs at once — at this reconciliation, 19
+modified and 20 untracked files belonging to Tabs 1, 2, 3 and 9 simultaneously. Everything below
+follows from that single fact.
+
+| Rule | Detail |
+| --- | --- |
+| **The owning tab commits its own files** | The tab that wrote the change writes the commit. Tab 1 reviews and integrates; reviewing is not committing |
+| **Never `git add -A`, `git add .`, or `git commit -a`** | In a shared tree these stage other tabs' unfinished work. Stage by explicit path, every time |
+| **Verify the staged set before committing** | `git status --porcelain` and `git diff --cached --stat`. If a path you do not own appears, unstage it — do not commit "while you are there" |
+| **A commit spans one tab's files** | If a change genuinely needs two tabs' files, it is a handoff ([§7](#7-handoff-protocol)), not a wider commit. U3's one-line exception in `AeroraUiSafetyTest.cc` is the only sanctioned cross-boundary edit in Phase 7, and it is named in [§1](#1-ownership-map) |
+| **Commit promptly once a change is validated** | An uncommitted change in a shared tree is exposed to the next tab's staging mistake. Validated and uncommitted is the risky state, not committed |
+
+#### When a tab commits another tab's work
+
+Allowed only when the owning tab cannot commit and the work is already validated. It happened once:
+Tab 1 committed Tab 4's U3 change as `a7b317f89` while Tab 4 was still validating its diff. No work
+was lost — the commit held exactly Tab 4's three files, and Tab 4 confirmed the hunks were
+byte-identical to what it wrote — but it published from an intermediate state, and Tab 4 had to
+follow with `54ffb4409` to finish a correction it was still making.
+
+If it is unavoidable:
+
+1. Tell the owning tab **before** staging, not after.
+2. Stage only that tab's paths, by name.
+3. Show `git diff --cached` to the owner, or verify the hunks against the owner's reported change,
+   before committing.
+4. Credit the owner in the commit message and say who integrated it.
+5. Let the owner confirm the published state matches what they intended.
+
+The failure this avoids is not a lost file; `git` makes that hard. It is **publishing a change its
+author had not finished checking**, which is exactly what happened above and cost an extra commit.
+
 ## 7. Handoff protocol
 
 A tab needing a change in another tab's file files a handoff rather than making the edit.
@@ -540,10 +619,37 @@ A tab needing a change in another tab's file files a handoff rather than making 
 
 | ID | Owner | Change | Status |
 | --- | --- | --- | --- |
-| HO-TAB7-01 | **Tab 4** | Drop `WRITE setCapability`, remove the test entry | `OPEN` → WP4-A (U3) |
-| HO-TAB7-02 | **Tab 1** | Install the interceptor | `OPEN` → WP1-A (U1) |
-| HO-TAB7-03 | **Tab 1** | `IMPORTS QGC` + resource alias | `OPEN` → WP1-B (U2) — **partially applied in Phase 6; the two load-bearing lines are missing** |
-| HO-TAB7-04 | Tab 1 + Tab 7 | Aerora Qt Quick Test target | `OPEN` → WP7-D, deferred until needed |
+| HO-TAB7-01 | Tab 4 | Drop `WRITE setCapability`, remove the test entry | **CLOSED** — U3, `a7b317f89`, reviewed and integrated by Tab 1 |
+| HO-TAB7-02 | Tab 1 | Install the interceptor | **CLOSED** — U1, `84bbb3a6e` |
+| HO-TAB7-03 | Tab 1 | `IMPORTS QGC` + resource alias | **CLOSED** — U2, `a73699796` |
+| HO-TAB7-04 | Tab 1 + Tab 7 | Aerora Qt Quick Test target | `OPEN` → WP7-D, deferred until the first QML behaviour needs asserting |
+
+### Raised this pass
+
+| ID | Owner | File | Change needed | Severity |
+| --- | --- | --- | --- | --- |
+| `HO-TAB1-01` | **Tab 5** | `aerora/test/Mission/AeroraMissionTest.cc` lines 107, 113, 120, 366, 376, 382, 390, 406, 521, 538, 570 | `UnitTest::expectLogMessage()` takes `const char *category` (`UnitTest.h:472`) and no `QString` overload exists. All 11 sites pass `QString::fromUtf8(kLogCategory)`, which does not convert. Drop the wrapper — `kLogCategory` is already `constexpr const char *`. **This will not compile.** | **High** — blocks `AeroraMissionTest` entirely at first build |
+| `HO-TAB1-03` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.cc`, `auditedTypes()` | **The overlay now registers 12 QML-reachable types and the safety audit covers 10.** Add `AeroraSecurityStatus` (new, Tab 2 WP2-B, `QML_NAMED_ELEMENT(AeroraSecurity)` + `QML_SINGLETON`) and `AeroraFreshness` (`QML_ELEMENT` + `QML_UNCREATABLE`, **unaudited since Phase 6**) | **Medium.** No live defect — both are read-only today and the independent sweep confirms no writable `Q_PROPERTY` anywhere in `aerora/src/**`. But the ratchet does not cover them, so `P7-AUTH-004`'s guarantee is narrower than it reads |
+| `HO-TAB4-01` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.h`, `\section known` | Describes one live recorded writable-property deviation; the set is now empty | Low, documentation only |
+| `HO-TAB4-02` | **Tab 7** | `aerora/src/UI/AeroraVehicleUiContext.h:63-66`, and `04-ui-implementation/01-ui-foundation-closure.md` HO-TAB7-01 | "carries a `WRITE setCapability`" is no longer true; the handoff is closed. Tab 1 independently found the same stale text and raised no duplicate | Low, documentation only — but it understates the safety posture, so it should not linger |
+| `HO-TAB4-03` | Tab 1 | `05-product-completion/` 00, 03, 04, 05, 07, 08 | Close `D-UI-03` / HO-TAB7-01; `R7-13` no longer applies | **CLOSED** — but in two passes, see below |
+| `HO-TAB1-02` | Tab 9 | `10-parameter-write-path-and-authorization-boundary.md` | Document number 09 was already taken by WP1-C, so the file renumbered to `10-` | **CLOSED.** Re-checked at 15:53 against the file itself: all three internal references (lines 556, 562, 568) read `10-parameter-write-path-…`, and `00-README` carries the doc-10 row. An earlier draft of this row called them broken links; that was written against a mid-move state and is withdrawn. Raised and closed inside this reconciliation |
+
+`HO-TAB1-01` is the significant one. It was found by source inspection rather than by a compiler:
+`expectLogMessage` has exactly one declaration, the argument type does not convert, and the call
+sites were enumerated mechanically. The same scan confirmed the other 47 call sites across seven test
+files are correct, and that every test-side category string matches its `QGC_LOGGING_CATEGORY`
+definition exactly — a mismatch there would be a silent test failure rather than a compile error.
+
+`HO-TAB4-03` closed in two passes, and the reason is worth recording. The first pass updated every
+**status row** — `D-UI-03`, HO-TAB7-01, `R7-13`, the U3 entries in 04 and 05 — and left five
+**prose passages** in the same six documents still describing the writable property as a live
+defect: `04 §3`'s "The one recorded deviation" section and two of its table rows, `00-README`'s
+state-vocabulary note, `03 §6`'s `UI-ST-07` paragraph, and `08 §6`'s mitigation row. A reader
+arriving at any of those would have concluded the opposite of the status table two sections away.
+**Closing a status row is not closing a handoff.** A handoff against documentation is closed when
+the prose agrees with the code, so the grep for the old claim — not the status column — is what
+ends it.
 
 HO-TAB7-03's partial application is worth noting: the `qt_add_qml_module` block exists, so the
 handoff looks done. The two lines that make it function are absent, and the omission carries a
