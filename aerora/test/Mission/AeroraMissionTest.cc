@@ -104,20 +104,20 @@ void AeroraMissionTest::_snapshotComparisonRefusesWrongOriginsAndUncapturedSides
     // would be the worst available failure, so it must refuse instead.
     const QRegularExpression wrongOrigins(QStringLiteral("refusing mission comparison with wrong origins"));
 
-    expectLogMessage(QString::fromUtf8(kLogCategory), QtWarningMsg, wrongOrigins);
+    expectLogMessage(kLogCategory, QtWarningMsg, wrongOrigins);
     QCOMPARE(AeroraMissionSnapshot::compare(plan, plan, AeroraMissionAgreement::DepthFullParameters).verdict(),
              AeroraMissionAgreement::NotCompared);
     verifyExpectedLogMessage();
 
     // Reversed arguments are also refused rather than silently compared.
-    expectLogMessage(QString::fromUtf8(kLogCategory), QtWarningMsg, wrongOrigins);
+    expectLogMessage(kLogCategory, QtWarningMsg, wrongOrigins);
     const AeroraMissionAgreement reversedArguments =
         AeroraMissionSnapshot::compare(vehicleMission, plan, AeroraMissionAgreement::DepthFullParameters);
     QCOMPARE(reversedArguments.verdict(), AeroraMissionAgreement::NotCompared);
     verifyExpectedLogMessage();
 
     // Absent is not empty. An uncaptured side cannot be shown to agree with anything.
-    expectLogMessage(QString::fromUtf8(kLogCategory), QtWarningMsg, wrongOrigins);
+    expectLogMessage(kLogCategory, QtWarningMsg, wrongOrigins);
     QCOMPARE(
         AeroraMissionSnapshot::compare(AeroraMissionSnapshot(), vehicleMission, AeroraMissionAgreement::DepthItemCount)
             .verdict(),
@@ -363,7 +363,7 @@ void AeroraMissionTest::_missionExtensionRegistryRefusesAmbiguity()
     // A duplicate id is a build configuration defect, not a last-one-wins override.
     auto *const duplicateId = new StubExtension(QStringLiteral("stub.one"), {QStringLiteral("OtherPattern")}, {});
     _stubExtensions.append(duplicateId);
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("rejecting duplicate mission extension id")));
     QVERIFY(!registry->registerExtension(duplicateId));
@@ -373,13 +373,13 @@ void AeroraMissionTest::_missionExtensionRegistryRefusesAmbiguity()
     // depends on link order.
     auto *const duplicateName = new StubExtension(QStringLiteral("stub.two"), {QStringLiteral("StubPattern")}, {});
     _stubExtensions.append(duplicateName);
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("already-claimed complex item name")));
     QVERIFY(!registry->registerExtension(duplicateName));
     verifyExpectedLogMessage();
 
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("rejecting null mission extension")));
     QVERIFY(!registry->registerExtension(nullptr));
@@ -387,7 +387,7 @@ void AeroraMissionTest::_missionExtensionRegistryRefusesAmbiguity()
 
     auto *const emptyId = new StubExtension(QString(), {QStringLiteral("AnotherPattern")}, {});
     _stubExtensions.append(emptyId);
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("empty id")));
     QVERIFY(!registry->registerExtension(emptyId));
@@ -403,7 +403,7 @@ void AeroraMissionTest::_missionExtensionRegistryRefusesAmbiguity()
 
     // A claimed name routes to its owner. The stub creates nothing, because no Aerora complex
     // item is evidenced, so the warning about that is expected.
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("claimed a complex item name but created nothing")));
     QVERIFY(!registry->createComplexMissionItem(QStringLiteral("StubPattern"), nullptr, false));
@@ -518,7 +518,7 @@ void AeroraMissionTest::_observerMarksTheVehicleMissionIndeterminateAfterAFailed
 
     mock.beginUpload(AeroraMissionMock::buildMission(AeroraMissionSnapshot::VehicleStore, {MAV_CMD_NAV_WAYPOINT}));
 
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("mission transfer error reported")));
     mock.rejectUpload(QStringLiteral("vehicle rejected item 1"));
@@ -535,7 +535,7 @@ void AeroraMissionTest::_observerMarksTheVehicleMissionIndeterminateAfterAFailed
 
     // Nothing can be verified against an indeterminate store, and the attempt is refused rather
     // than compared against the stale snapshot.
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("refusing mission comparison with wrong origins")));
     QVERIFY(!observer->verify(AeroraMissionAgreement::DepthItemCount).isVerified());
@@ -567,7 +567,7 @@ void AeroraMissionTest::_observerDistinguishesAFailedDownloadFromAnEmptyMission(
     // evidence that separates the two, and it has to survive until completion.
     mock.beginDownload();
 
-    expectLogMessage(QString::fromUtf8(kLogCategory),
+    expectLogMessage(kLogCategory,
                      QtWarningMsg,
                      QRegularExpression(QStringLiteral("mission transfer error reported")));
     mock.failDownload(QStringLiteral("ack timeout"));
