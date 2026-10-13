@@ -280,6 +280,11 @@ Re-verified at this reconciliation, independently of Tab 4's report: every `aero
 for `Q_PROPERTY` carrying `WRITE` or `MEMBER` returns no match. Both forms were checked because
 `QMetaProperty::isWritable()` is true for `MEMBER` properties as well.
 
+That grep is repo-wide rather than scoped to `auditedTypes()`, which matters because the audit list
+covers 10 of the 12 QML-registered overlay types (`R7-19`). So "no writable property exists" holds
+for all twelve, including the two the test does not yet reach — the conclusion does not depend on
+the audit list being complete. What the **test** asserts is still limited to its ten.
+
 Status `IMPLEMENTED-UNCOMPILED`. The change has not been compiled and that test has not been run.
 
 ### A noted non-issue

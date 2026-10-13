@@ -601,6 +601,20 @@ If it is unavoidable:
 The failure this avoids is not a lost file; `git` makes that hard. It is **publishing a change its
 author had not finished checking**, which is exactly what happened above and cost an extra commit.
 
+#### Correction to `7e41a529e`'s message
+
+`7e41a529e` absorbed Tab 1's staged reconciliation together with Tab 9's doc 10. Its message states
+that `HO-TAB1-02` is `PARTIALLY APPLIED` with doc 10's self-references "still read `09-`, so they
+are broken links". **That is not the state it committed.** Doc 10's three internal references at
+lines 556, 562 and 568 all read `10-parameter-write-path-…`, verified against the file before
+staging and again after the commit, and the `HO-TAB1-02` row inside the same commit correctly reads
+`CLOSED`. The message was drafted against a mid-move snapshot and the document overtook it.
+
+Recorded here rather than by amending: `7e41a529e` is published history on a shared branch and
+rewriting it would invalidate the three tabs working on top of it. **Where a commit message and the
+committed document disagree, the document is authoritative** — the message is a snapshot of
+intent, the document is the artefact under review. This is also why `R7-21` exists.
+
 ## 7. Handoff protocol
 
 A tab needing a change in another tab's file files a handoff rather than making the edit.
