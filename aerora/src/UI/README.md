@@ -25,18 +25,23 @@ Full design records, evidence and handoffs:
 | `Controls/AeroraTokenDisplay.qml` | One `AeroraReportedValue`: name, token, class label, age |
 | `Controls/AeroraValueDisplay.qml` | One `AeroraStateValue`: Fact value, units, class label, age |
 | `Controls/AeroraSelfReportRow.qml` | One self-report line. Carries three outcomes, so "not checked" cannot render as a finding |
+| `Indicators/AeroraEnforcementIndicator.qml` | `SCR-SHL-03`. The toolbar strip that says command authorization is not enforced |
 | `Screens/AeroraOperationsHub.qml` | `SCR-SHL-01`. The overlay's honest self-report: services attached, enforcement state, audit posture |
 | `Ui.cmake` | Source manifest, and the integration instructions for `aerora/CMakeLists.txt` |
 
-`Screens/` and `Controls/` are a source-tree split only. The resource alias flattens every QML file
-to `qrc:/qml/Aerora/Controls/<Name>.qml` in one module, which is why the hub needs no import to
-reach `AeroraSelfReportRow` and why its registration URL carries no `Screens/` segment.
+`Controls/`, `Indicators/` and `Screens/` are a source-tree split only. The resource alias flattens
+every QML file to `qrc:/qml/Aerora/Controls/<Name>.qml` in one module, which is why the hub needs no
+import to reach `AeroraSelfReportRow` and why its registration URL carries no `Screens/` segment.
 
 ## What is deliberately not here
 
-No panel, no indicator, no product surface, no guided action, no tool-strip entry. Every Aerora
-fact group is `CONTRACT-ONLY` for want of a dialect, so there is no Aerora value to populate a panel
-with — building one would be shape with nothing behind it.
+No panel, no product surface, no guided action, no tool-strip entry. Every Aerora fact group is
+`CONTRACT-ONLY` for want of a dialect, so there is no Aerora value to populate a panel with —
+building one would be shape with nothing behind it.
+
+The one indicator that does exist is the exception that proves the rule: it renders a C++ singleton
+the overlay already computes, so there is something behind it. It is also read-only — no click
+handler, no drawer, no command path — because its drill-in target `SCR-SEC-01` does not exist.
 
 The interface is **observation and supervision**, not flight authority. QML cannot reach payload
 command submission, power switching, mission commanding, command authorization or security policy;
@@ -46,7 +51,7 @@ command submission, power switching, mission commanding, command authorization o
 
 | Handoff | Owner | Effect while open |
 | --- | --- | --- |
-| HO-TAB7-05 | Tab 1 — override `analyzePages()` to register the Operations Hub | `SCR-SHL-01` is compiled into the resource and unreachable: no menu entry opens it |
+| HO-TAB7-06 | Tab 1 — override `toolBarIndicators()` to register the enforcement strip | `SCR-SHL-03` is compiled into the resource and never loaded: the toolbar shows no Aerora indicator, so the station still does not say authorization is unenforced. **No longer blocked** — its `HO-TAB1-10` prerequisite is this module's `Indicators/AeroraEnforcementIndicator.qml`, and the URL to register is `qrc:/qml/Aerora/Controls/AeroraEnforcementIndicator.qml`. That seam carries bare `QUrl`s, not `QmlComponentInfo` objects |
 
 ### Closed
 
@@ -60,6 +65,7 @@ leaving two of three would reproduce the same defect.
 | HO-TAB7-01 | Tab 4 — make `AeroraStateValue::capability` read-only in QML | U3, `a7b317f89`. The `WRITE` is gone; `setCapability()` stays public C++ |
 | HO-TAB7-02 | Tab 1 — install the interceptor on the QML engine | U1, `84bbb3a6e` |
 | HO-TAB7-03 | Tab 1 — create the `Aerora.Controls` QML module target | U2, `a73699796`, including the two load-bearing lines (`IMPORTS QGC`, resource alias) |
+| HO-TAB7-05 | Tab 1 — override `analyzePages()` to register the Operations Hub | `39406ff5f`. Registration alone was not sufficient: the module also needed `IMPORTS QGroundControl.AnalyzeView`, found and fixed at closure |
 | HO-TAB1-03 | Tab 7 — audit the two unaudited QML-registered types | `67f7137d0`. `AeroraFreshness` and `AeroraSecurityStatus` are audited; the closure is now derived |
 | HO-TAB4-01 | Tab 7 — the `\section known` note described a live writable-property deviation | `67f7137d0`. `AeroraUiSafetyTest.h` now states the set is empty, in the past tense |
 | HO-TAB4-02 | Tab 7 — two files still said the capability property carries a `WRITE` | `67f7137d0`. `AeroraVehicleUiContext.h:65` and `01-ui-foundation-closure.md` both read `carried`, and the closure doc records the audit gap the enumeration missed |

@@ -103,9 +103,10 @@ set(AERORA_UI_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 # Production sources
 #
-# Three files, two seams. No panel, no product surface and no indicator appears here: the backend
-# has no Aerora value to populate one with (no dialect, every fact group CONTRACT-ONLY), so a panel
-# would be shape with nothing behind it.
+# Three files, two seams. No panel and no product surface appears here: the backend has no Aerora
+# value to populate one with (no dialect, every fact group CONTRACT-ONLY), so a panel would be
+# shape with nothing behind it. The one indicator that does exist is QML reading a C++ singleton,
+# so it is declared in AERORA_UI_QML_FILES below and needs no source here.
 # ----------------------------------------------------------------------------
 
 set(AERORA_UI_SOURCES
@@ -138,25 +139,29 @@ set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraStateText.qml
     ${AERORA_UI_DIR}/Controls/AeroraTokenDisplay.qml
     ${AERORA_UI_DIR}/Controls/AeroraValueDisplay.qml
+    ${AERORA_UI_DIR}/Indicators/AeroraEnforcementIndicator.qml
     ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
 )
 
 # ----------------------------------------------------------------------------
 # Source layout versus resource layout
 #
-# Screens/ and Controls/ are a source-tree distinction only. qgc_set_qt_resource_alias() aliases
-# every entry above to its bare name, so all of them land flat at
-# qrc:/qml/Aerora/Controls/<Name>.qml in one module, Aerora.Controls. Two consequences worth
+# Controls/, Indicators/ and Screens/ are a source-tree distinction only.
+# qgc_set_qt_resource_alias() aliases every entry above to its bare name, so all of them land flat
+# at qrc:/qml/Aerora/Controls/<Name>.qml in one module, Aerora.Controls. Two consequences worth
 # stating because neither is guessable from this list:
 #
 #   * a file here must not import Aerora.Controls - that would be the module importing itself.
 #     Types in one QML module are mutually visible, which is how AeroraOperationsHub.qml reaches
 #     AeroraSelfReportRow without an import.
 #
-#   * the URL to register a screen with is qrc:/qml/Aerora/Controls/<Name>.qml regardless of its
-#     source directory. For the hub that is
+#   * the URL to register a screen or an indicator with is qrc:/qml/Aerora/Controls/<Name>.qml
+#     regardless of its source directory. For the hub that is
 #     qrc:/qml/Aerora/Controls/AeroraOperationsHub.qml, which is the string HO-TAB7-05 asks Tab 1
-#     to put in analyzePages().
+#     to put in analyzePages(). For the enforcement strip it is
+#     qrc:/qml/Aerora/Controls/AeroraEnforcementIndicator.qml, which is the string HO-TAB7-06
+#     asks Tab 1 to put in toolBarIndicators() - note that seam takes bare QUrls, not
+#     QmlComponentInfo objects.
 #
 # Splitting the module per surface was considered and declined: the URI is the module boundary and
 # a second URI would need its own qt_add_qml_module target in Tab 1's file, for one screen.

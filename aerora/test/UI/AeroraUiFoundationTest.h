@@ -29,6 +29,12 @@
 ///     behaviour with no error of any kind;
 /// \li a string-keyed service lookup appearing on the QML surface, which would let the interface
 ///     reach any service attached later with no review of its QML surface.
+///
+/// One test covers a third seam: the names `AeroraEnforcementIndicator.qml` binds to on the
+/// `AeroraSecurity` singleton. The strip itself is QML and cannot be loaded here - that needs the
+/// Qt Quick Test target, `HO-TAB7-04` - so what is asserted is the C++ half of its contract, which
+/// is also the half whose breakage is invisible: the indicator fails safe to "not enforced", so a
+/// renamed property or enumerator would leave it permanently correct-looking and permanently stuck.
 class AeroraUiFoundationTest : public UnitTest
 {
     Q_OBJECT
@@ -62,4 +68,9 @@ private slots:
     // the interface is in for most of its life and every accessor must survive it.
     void _uiContextIsUnavailableWithNoActiveVehicle();
     void _uiContextDoesNotExposeTheVehicleOrTheServiceMap();
+
+    // HO-TAB1-10 - the names AeroraEnforcementIndicator.qml binds to on the AeroraSecurity
+    // singleton. The strip's own rendering is QML and is not reachable from this harness; this
+    // covers only the part that is, which is the half that fails silently.
+    void _enforcementIndicatorBindingNamesResolve();
 };

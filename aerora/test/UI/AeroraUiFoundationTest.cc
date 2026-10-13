@@ -1,5 +1,7 @@
 #include "AeroraUiFoundationTest.h"
 
+#include <QtCore/QMetaClassInfo>
+#include <QtCore/QMetaEnum>
 #include <QtCore/QMetaMethod>
 #include <QtCore/QMetaObject>
 #include <QtCore/QRegularExpression>
@@ -8,6 +10,7 @@
 #include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraQmlOverrides.h"
+#include "AeroraSecurityStatus.h"
 #include "AeroraVehicleUiContext.h"
 
 namespace {
@@ -280,6 +283,44 @@ void AeroraUiFoundationTest::_releaseWithNothingInstalledIsANoOp()
     AeroraQmlOverrides::releaseFrom(nullptr);
 
     QVERIFY(!AeroraQmlOverrides::isInstalled());
+}
+
+void AeroraUiFoundationTest::_enforcementIndicatorBindingNamesResolve()
+{
+    const QMetaObject *const meta = &AeroraSecurityStatus::staticMetaObject;
+
+    // AeroraEnforcementIndicator.qml reads AeroraSecurity.enforcement, so the registered QML name
+    // is part of the binding rather than a registration detail. QML_NAMED_ELEMENT expands to a
+    // Q_CLASSINFO("QML.Element", …), which is the same public meta-object route AeroraUiSafetyTest
+    // takes rather than the private QQmlMetaType.
+    QString qmlName;
+    for (int i = meta->classInfoOffset(); i < meta->classInfoCount(); ++i) {
+        if (qstrcmp(meta->classInfo(i).name(), "QML.Element") == 0) {
+            qmlName = QString::fromUtf8(meta->classInfo(i).value());
+            break;
+        }
+    }
+
+    QCOMPARE(qmlName, QStringLiteral("AeroraSecurity"));
+
+    // Asserted positively, for the same reason the AeroraUi property set is: a rename must be a
+    // failure here rather than a silently dropped binding.
+    QVERIFY2(meta->indexOfProperty("enforcement") != -1,
+             "AeroraEnforcementIndicator.qml reads AeroraSecurity.enforcement");
+
+    const int enumIndex = meta->indexOfEnumerator("Enforcement");
+    QVERIFY(enumIndex >= 0);
+
+    // The indicator compares against the *enforced* enumerator and renders its negation as "not
+    // enforced". If this name stopped resolving, the comparison would yield `undefined === value`
+    // and the strip would report not enforced - the safe direction, and therefore a silent one.
+    // That is precisely why the name is asserted: the fail-safe hides the breakage from the
+    // operator, so a test has to be what notices.
+    bool resolved = false;
+    (void) meta->enumerator(enumIndex).keyToValue("EnforcedAtCommandGate", &resolved);
+
+    QVERIFY2(resolved,
+             "AeroraEnforcementIndicator.qml compares against AeroraSecurity.EnforcedAtCommandGate");
 }
 
 UT_REGISTER_TEST(AeroraUiFoundationTest, TestLabel::Unit)
