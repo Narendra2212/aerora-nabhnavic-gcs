@@ -460,6 +460,59 @@ each path to its bare filename; without it the resource lands at
 | **When** | At the first Aerora QML behaviour that needs asserting. Not now — an empty test target is a target with nothing in it |
 | **Shape** | Mirror `test/UnitTestFramework/QmlTesting/CMakeLists.txt` with `QUICK_TEST_SOURCE_DIR` pointing at `aerora/test/UI/qml`, the same `-platform offscreen` command, `LABELS "Unit;QML"`, and the same `ENVIRONMENT` block |
 
+### HO-TAB7-05 — register the Operations Hub in `analyzePages()`
+
+| Field | Detail |
+| --- | --- |
+| **Owner** | **Tab 1 (M-Plugin)**, `aerora/src/AeroraCorePlugin.{h,cc}` |
+| **Why not M-Ui** | Same boundary as HO-TAB7-02: `analyzePages()` is a `QGCCorePlugin` virtual and `AeroraCorePlugin.*` is M-Plugin's file. The screen itself is M-Ui's and is complete |
+| **Invariant at risk** | `P7-AUTH-002`, `P7-SEC-005`. `SCR-SHL-01` is the screen that tells an operator authorization is **not** enforced. While it is unreachable, the station holds that state and never says so |
+| **Blocks** | `SCR-SHL-01`, and every Aerora screen that `WP7-C` would reach from the hub through `mainWindow.showTool()` |
+| **Failure mode if skipped** | Silent, and the same shape as HO-TAB7-02's: the QML compiles into the resource, the module registers, and no menu entry opens it. Nothing errors |
+| **Tracked by** | Nothing yet. A registration test needs the Qt Quick Test target of HO-TAB7-04, so this handoff is currently guarded by review only — stated because it is the weakest link in this set |
+
+The URL is flat under the module prefix because `qgc_set_qt_resource_alias()` aliases each
+`AERORA_UI_QML_FILES` entry to its bare name, so the `Screens/` source directory does not appear
+in it. Confirmed against `cmake/Helpers.cmake` and `aerora/src/UI/Ui.cmake`.
+
+Header, in the `public:` section:
+
+```cpp
+    /// Appends the Aerora Operations Hub to the Analyze menu. See aerora/src/UI/Screens/.
+    const QVariantList &analyzePages() override;
+```
+
+Implementation:
+
+```cpp
+#include "QmlComponentInfo.h"
+
+const QVariantList &AeroraCorePlugin::analyzePages()
+{
+    // Built once, on first call, and appended to the base list rather than replacing it: the
+    // upstream Analyze pages are not Aerora's to remove, and QGCCorePlugin::analyzePages()
+    // returns a reference to its own static list.
+    static QVariantList pages = [this] {
+        QVariantList list = QGCCorePlugin::analyzePages();
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Operations"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraOperationsHub.qml")))));
+        return list;
+    }();
+
+    return pages;
+}
+```
+
+Two notes on the snippet, both checked against `src/API/QGCCorePlugin.cc:73-120`:
+
+- **No icon argument.** `QmlComponentInfo`'s `icon` defaults to an empty `QUrl`. Aerora has no icon
+  asset and `Q-040` leaves the visual language unresolved, so none is invented; the upstream pages
+  that pass one are passing an existing `qmlimages` resource.
+- **`requiresVehicle` is left `false`.** The hub's whole purpose is to report what is and is not
+  attached, which includes "no vehicle is connected". Gating it on a vehicle would hide the screen
+  in exactly the state an operator most needs to read it.
+
 ### Withdrawn
 
 **Q7-002 / Tab 3.** The architecture map proposed making `service()`, `serviceNames()` and
