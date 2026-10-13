@@ -61,3 +61,13 @@ leaving two of three would reproduce the same defect.
 | HO-TAB7-02 | Tab 1 — install the interceptor on the QML engine | U1, `84bbb3a6e` |
 | HO-TAB7-03 | Tab 1 — create the `Aerora.Controls` QML module target | U2, `a73699796`, including the two load-bearing lines (`IMPORTS QGC`, resource alias) |
 | HO-TAB1-03 | Tab 7 — audit the two unaudited QML-registered types | `67f7137d0`. `AeroraFreshness` and `AeroraSecurityStatus` are audited; the closure is now derived |
+| HO-TAB4-01 | Tab 7 — the `\section known` note described a live writable-property deviation | `67f7137d0`. `AeroraUiSafetyTest.h` now states the set is empty, in the past tense |
+| HO-TAB4-02 | Tab 7 — two files still said the capability property carries a `WRITE` | `67f7137d0`. `AeroraVehicleUiContext.h:65` and `01-ui-foundation-closure.md` both read `carried`, and the closure doc records the audit gap the enumeration missed |
+| HO-TAB1-04 | Tab 7 — two further stale HO-TAB7-01 rows outside the six documents swept by `HO-TAB4-03` | `3b19d112a`. `00-ui-architecture-map.md:533` and this file's row above are both struck and attributed to U3 |
+
+**Tab 1 and Tab 4 still carry the status rows for the three above.**
+`05-product-completion/07 §7` lists `HO-TAB1-03`, `HO-TAB4-01`, `HO-TAB4-02` and `HO-TAB1-04` with a
+severity and no closure marker, and `Telemetry/README.md`'s `HO-TAB4-02` row is the same shape. The
+work is delivered and the commits are above; flipping those rows is the owning tab's edit, not one
+to make here. Recorded so the lag is visible rather than discovered later — which is the
+`R7-20` failure mode this set was raised against in the first place.
