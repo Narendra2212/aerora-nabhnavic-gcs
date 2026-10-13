@@ -166,23 +166,51 @@ foreach ($t in @('python', 'git', 'node')) {
 
 # ---------------------------------------------------------- repository
 
+# git writes advisory notices to stderr - the "LF will be replaced by CRLF" normalisation warning
+# is emitted by `git diff` whenever a working-copy file differs in line endings from the index.
+# Under $ErrorActionPreference = 'Stop', PowerShell 5.1 promotes native stderr output to a
+# terminating error, and `2>$null` does not prevent that promotion. Wrapping the three git calls
+# in one try/catch therefore turned a benign warning into 'git unavailable or not a repository'
+# and, worse, abandoned the two checks after the throw: a dirty tree and an upstream push target
+# both went unreported while the summary gained a blocking failure with the wrong cause.
+#
+# Each call is now independent and decides on the exit code rather than on the stderr stream.
+function Invoke-Git {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArgs)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & git @GitArgs 2>$null
+        return [PSCustomObject]@{ Ok = ($LASTEXITCODE -eq 0); Lines = @($output) }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 $pinned = '9459a4b57986f40df8bdc193d5453c0596fbb416'
-try {
-    $head = (& git rev-parse HEAD 2>$null).Trim()
+
+$headResult = Invoke-Git rev-parse HEAD
+if (-not $headResult.Ok -or $headResult.Lines.Count -eq 0) {
+    Add-Check 'Repository state' 'FAIL' 'git unavailable or not a repository'
+} else {
+    $head = $headResult.Lines[0].Trim()
     if ($head -eq $pinned) {
         Add-Check 'HEAD at pinned commit' 'PASS' $head $false
     } else {
         Add-Check 'HEAD at pinned commit' 'WARN' ('HEAD is ' + $head + '; pinned is ' + $pinned) $false
     }
 
-    $dirty = @(& git diff --name-only HEAD 2>$null)
-    if ($dirty.Count -gt 0) {
-        Add-Check 'QGC source unmodified' 'FAIL' ($dirty.Count.ToString() + ' tracked file(s) modified')
+    $diffResult = Invoke-Git diff --name-only HEAD
+    if (-not $diffResult.Ok) {
+        Add-Check 'QGC source unmodified' 'FAIL' 'git diff failed'
+    } elseif ($diffResult.Lines.Count -gt 0) {
+        Add-Check 'QGC source unmodified' 'FAIL' ($diffResult.Lines.Count.ToString() + ' tracked file(s) modified')
     } else {
         Add-Check 'QGC source unmodified' 'PASS' 'git diff against HEAD is empty'
     }
 
-    $pushUrl = (& git remote get-url --push origin 2>$null).Trim()
+    $pushResult = Invoke-Git remote get-url --push origin
+    $pushUrl = if ($pushResult.Ok -and $pushResult.Lines.Count -gt 0) { $pushResult.Lines[0].Trim() } else { '' }
     if ($pushUrl -match 'mavlink/qgroundcontrol') {
         Add-Check 'origin push target' 'FAIL' ('origin pushes to UPSTREAM: ' + $pushUrl + '  (R-008)')
     } elseif ($pushUrl) {
@@ -190,8 +218,6 @@ try {
     } else {
         Add-Check 'origin push target' 'WARN' 'no origin remote' $false
     }
-} catch {
-    Add-Check 'Repository state' 'FAIL' 'git unavailable or not a repository'
 }
 
 # --------------------------------------------------- optional installs
