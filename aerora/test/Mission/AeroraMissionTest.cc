@@ -1,5 +1,7 @@
 #include "AeroraMissionTest.h"
 
+#include <limits>
+
 #include <QtCore/QRegularExpression>
 #include <QtTest/QTest>
 
@@ -8,6 +10,8 @@
 #include "AeroraMissionObserver.h"
 #include "AeroraMissionResumeBoundary.h"
 #include "AeroraMissionSnapshot.h"
+#include "AeroraMissionValidationReport.h"
+#include "AeroraMissionValidator.h"
 
 namespace {
 
@@ -630,6 +634,344 @@ void AeroraMissionTest::_mockIsDeterministicAndSimulatesNoAircraft()
     QCOMPARE(item.param5, 0.0);
     QCOMPARE(item.param6, 0.0);
     QCOMPARE(item.param7, 0.0);
+}
+
+void AeroraMissionTest::_validationModelNeverTreatsAnUncheckedConditionAsPassed()
+{
+    // The default is NotPerformed, so a check nobody stated the outcome of is not a passed one.
+    // This is the property the whole three-outcome model rests on.
+    const AeroraMissionCheck unstated;
+    QCOMPARE(unstated.outcome(), AeroraMissionCheck::NotPerformed);
+    QVERIFY(!unstated.isPassed());
+    QVERIFY(!unstated.isPerformed());
+
+    // NothingMissing is refused as a not-performed reason. Accepting it would make the one field
+    // that explains a skipped check say nothing, leaving it indistinguishable from a performed one.
+    expectLogMessage(kLogCategory, QtWarningMsg, QRegularExpression(QStringLiteral("no missing input")));
+    const AeroraMissionCheck malformed = AeroraMissionCheck::notPerformed(AeroraMissionCheck::GeometryLimits,
+                                                                         AeroraMissionCheck::NothingMissing);
+    verifyExpectedLogMessage();
+    QCOMPARE(malformed.outcome(), AeroraMissionCheck::NotPerformed);
+    QVERIFY(malformed.unavailableReason() != AeroraMissionCheck::NothingMissing);
+
+    // A performed check reports NothingMissing, which is what makes the field readable as
+    // "nothing was withheld" rather than as an unset default.
+    QCOMPARE(AeroraMissionCheck::passed(AeroraMissionCheck::MissionPresence).unavailableReason(),
+             AeroraMissionCheck::NothingMissing);
+
+    // An empty report is not a pass, and it is not fully checked either.
+    const AeroraMissionValidationReport emptyReport;
+    QCOMPARE(emptyReport.checkCount(), 0);
+    QCOMPARE(emptyReport.verdict(), AeroraMissionValidationReport::NoChecksPerformed);
+    QVERIFY(!emptyReport.isFullyChecked());
+    QVERIFY(!emptyReport.hasFailure());
+
+    // One gap is enough to stop a report being fully checked, however many checks passed.
+    AeroraMissionValidationReport withOneGap;
+    withOneGap.append(AeroraMissionCheck::passed(AeroraMissionCheck::MissionPresence));
+    withOneGap.append(AeroraMissionCheck::notPerformed(AeroraMissionCheck::GeometryLimits,
+                                                       AeroraMissionCheck::NoApprovedOperatingLimits));
+    QVERIFY(!withOneGap.isFullyChecked());
+
+    // P7-CHK-004, pinned rather than left as a reading of verdict(): a check that could not be
+    // evaluated blocks nothing on its own.
+    QVERIFY(!AeroraMissionValidationReport::kNotPerformedBlocksOperation);
+}
+
+void AeroraMissionTest::_validationVerdicts_data()
+{
+    // Counts as int so the table relies only on built-in metatypes, matching this file's
+    // convention for the comparison table above.
+    QTest::addColumn<int>("passed");
+    QTest::addColumn<int>("failed");
+    QTest::addColumn<int>("notPerformed");
+    QTest::addColumn<int>("expectedVerdict");
+
+    QTest::newRow("nothingNamed") << 0 << 0 << 0 << int(AeroraMissionValidationReport::NoChecksPerformed);
+    QTest::newRow("allPassed") << 3 << 0 << 0 << int(AeroraMissionValidationReport::Passed);
+    // The value a boolean cannot express, and the reason this type has no isValid().
+    QTest::newRow("passedWithOneGap") << 2 << 0 << 1 << int(AeroraMissionValidationReport::PassedWithGaps);
+    QTest::newRow("oneFailureAmongPasses") << 2 << 1 << 1 << int(AeroraMissionValidationReport::Failed);
+    QTest::newRow("failureOnly") << 0 << 1 << 0 << int(AeroraMissionValidationReport::Failed);
+    QTest::newRow("failureWithGaps") << 0 << 1 << 2 << int(AeroraMissionValidationReport::Failed);
+    // Checks were named and none of them ran. PassedWithGaps would imply something was examined.
+    QTest::newRow("namedButNoneRan") << 0 << 0 << 3 << int(AeroraMissionValidationReport::NoChecksPerformed);
+}
+
+void AeroraMissionTest::_validationVerdicts()
+{
+    QFETCH(int, passed);
+    QFETCH(int, failed);
+    QFETCH(int, notPerformed);
+    QFETCH(int, expectedVerdict);
+
+    AeroraMissionValidationReport report;
+    for (int i = 0; i < passed; i++) {
+        report.append(AeroraMissionCheck::passed(AeroraMissionCheck::MissionPresence));
+    }
+    for (int i = 0; i < failed; i++) {
+        report.append(AeroraMissionCheck::failed(AeroraMissionCheck::MissionPresence, QStringLiteral("synthetic")));
+    }
+    for (int i = 0; i < notPerformed; i++) {
+        report.append(AeroraMissionCheck::notPerformed(AeroraMissionCheck::GeometryLimits,
+                                                       AeroraMissionCheck::NoApprovedOperatingLimits));
+    }
+
+    QCOMPARE(int(report.verdict()), expectedVerdict);
+    QCOMPARE(report.passedCount(), passed);
+    QCOMPARE(report.failedCount(), failed);
+    QCOMPARE(report.notPerformedCount(), notPerformed);
+    QCOMPARE(report.checkCount(), passed + failed + notPerformed);
+    QCOMPARE(report.checksWithOutcome(AeroraMissionCheck::Passed).count(), qsizetype(passed));
+}
+
+void AeroraMissionTest::_validationNamesEveryCheckWhetherOrNotItRan()
+{
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission = AeroraMissionMock::buildMission(AeroraMissionSnapshot::GcsPlan, {MAV_CMD_NAV_WAYPOINT});
+
+    const AeroraMissionValidationReport report = AeroraMissionValidator::validate(inputs);
+
+    // Every named check appears exactly once, in enum order, whether or not it could run. A check
+    // omitted from the report would be indistinguishable from one that passed, which is the whole
+    // failure mode P7-CHK-002 exists to prevent.
+    //
+    // The other validation tests index report.checks() by enum value, which this assertion is
+    // what makes safe.
+    QCOMPARE(report.checkCount(), int(AeroraMissionCheck::GeometryLimits) + 1);
+    for (int i = 0; i < report.checkCount(); i++) {
+        QCOMPARE(int(report.checks().at(i).id()), i);
+    }
+
+    // An uncaptured mission still produces a full report rather than no report: "nothing was
+    // checked" has to be sayable.
+    const AeroraMissionValidationReport uncaptured = AeroraMissionValidator::validate(AeroraMissionValidator::Inputs());
+    QCOMPARE(uncaptured.checkCount(), report.checkCount());
+    QCOMPARE(uncaptured.verdict(), AeroraMissionValidationReport::NoChecksPerformed);
+    QCOMPARE(uncaptured.passedCount(), 0);
+    QCOMPARE(uncaptured.checks().at(int(AeroraMissionCheck::MissionPresence)).unavailableReason(),
+             AeroraMissionCheck::MissionNotCaptured);
+}
+
+void AeroraMissionTest::_validationPassesWithGapsOnACleanMission()
+{
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission = AeroraMissionMock::buildMission(
+        AeroraMissionSnapshot::GcsPlan,
+        {MAV_CMD_NAV_TAKEOFF, MAV_CMD_NAV_WAYPOINT, MAV_CMD_NAV_RETURN_TO_LAUNCH});
+
+    const AeroraMissionValidationReport report = AeroraMissionValidator::validate(inputs);
+    const QList<AeroraMissionCheck> &checks = report.checks();
+
+    // The five checks whose semantics come from an existing contract or from QGC source.
+    QVERIFY(checks.at(int(AeroraMissionCheck::MissionPresence)).isPassed());
+    QVERIFY(checks.at(int(AeroraMissionCheck::SequenceNumbering)).isPassed());
+    QVERIFY(checks.at(int(AeroraMissionCheck::FrameValidity)).isPassed());
+    QVERIFY(checks.at(int(AeroraMissionCheck::CoordinateRange)).isPassed());
+    QVERIFY(checks.at(int(AeroraMissionCheck::ResumeCompatibility)).isPassed());
+
+    // The four that cannot run, each with the reason that says what would have to change. This is
+    // the category reference products omit, and the one P7-CHK-002 is about.
+    QCOMPARE(checks.at(int(AeroraMissionCheck::ResumeStateCarryForward)).unavailableReason(),
+             AeroraMissionCheck::NoResumeIndexSupplied);
+    QCOMPARE(checks.at(int(AeroraMissionCheck::MissionCommandSupport)).unavailableReason(),
+             AeroraMissionCheck::NoDeclaredMissionCommandSet);
+    QCOMPARE(checks.at(int(AeroraMissionCheck::VehicleCapabilityAgreement)).unavailableReason(),
+             AeroraMissionCheck::NoReportedCapability);
+    QCOMPARE(checks.at(int(AeroraMissionCheck::GeometryLimits)).unavailableReason(),
+             AeroraMissionCheck::NoApprovedOperatingLimits);
+
+    // The headline assertion: a structurally sound mission is **not** reported as Passed, because
+    // four checks could not run. Collapsing this into a clean result is the defect.
+    QCOMPARE(report.verdict(), AeroraMissionValidationReport::PassedWithGaps);
+    QVERIFY(!report.isFullyChecked());
+    QVERIFY(!report.hasFailure());
+    QCOMPARE(report.passedCount(), 5);
+    QCOMPARE(report.notPerformedCount(), 4);
+
+    // And supplying every input the validator accepts does not make the geometry check run: no
+    // operating limit is approved, and none is invented. This is the ratchet against a future
+    // change quietly introducing a threshold.
+    inputs.resumeIndex = AeroraMissionIndex::resumeCandidate(1);
+    inputs.missionCommandSetDeclared = true;
+    inputs.declaredMissionCommandSet = {MAV_CMD_NAV_TAKEOFF, MAV_CMD_NAV_WAYPOINT, MAV_CMD_NAV_RETURN_TO_LAUNCH};
+    inputs.anyCapabilityReported = true;
+
+    const AeroraMissionValidationReport fullyFed = AeroraMissionValidator::validate(inputs);
+    QCOMPARE(fullyFed.checks().at(int(AeroraMissionCheck::GeometryLimits)).unavailableReason(),
+             AeroraMissionCheck::NoApprovedOperatingLimits);
+    QVERIFY(!fullyFed.isFullyChecked());
+    QVERIFY(!fullyFed.hasFailure());
+}
+
+void AeroraMissionTest::_validationFailures_data()
+{
+    QTest::addColumn<AeroraMissionSnapshot>("mission");
+    QTest::addColumn<int>("expectedFailedCheck");
+
+    const auto oneItem = [](MAV_CMD command, MAV_FRAME frame, int sequenceNumber, double latitude, double longitude) {
+        AeroraMissionItemFingerprint item;
+        item.sequenceNumber = sequenceNumber;
+        item.command = command;
+        item.frame = frame;
+        item.param5 = latitude;
+        item.param6 = longitude;
+
+        AeroraMissionSnapshot mission = AeroraMissionSnapshot::empty(AeroraMissionSnapshot::GcsPlan);
+        mission.append(item);
+
+        return mission;
+    };
+
+    QTest::newRow("capturedButEmpty") << AeroraMissionSnapshot::empty(AeroraMissionSnapshot::GcsPlan)
+                                      << int(AeroraMissionCheck::MissionPresence);
+
+    QTest::newRow("negativeSequenceNumber")
+        << oneItem(MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, -1, 0.0, 0.0)
+        << int(AeroraMissionCheck::SequenceNumbering);
+
+    {
+        AeroraMissionItemFingerprint first;
+        first.sequenceNumber = 0;
+        first.command = MAV_CMD_NAV_WAYPOINT;
+        first.frame = MAV_FRAME_GLOBAL_RELATIVE_ALT;
+
+        AeroraMissionItemFingerprint repeated = first;
+
+        AeroraMissionSnapshot mission = AeroraMissionSnapshot::empty(AeroraMissionSnapshot::GcsPlan);
+        mission.append(first);
+        mission.append(repeated);
+
+        QTest::newRow("sequenceNotIncreasing") << mission << int(AeroraMissionCheck::SequenceNumbering);
+    }
+
+    // MAV_FRAME_ENUM_END is the fingerprint's unpopulated default and is not a frame PlanManager
+    // can pack, so an item carrying it would reach the vehicle uninterpretable.
+    QTest::newRow("unpopulatedFrame") << oneItem(MAV_CMD_NAV_WAYPOINT, MAV_FRAME_ENUM_END, 0, 0.0, 0.0)
+                                      << int(AeroraMissionCheck::FrameValidity);
+
+    QTest::newRow("latitudeOutOfRange")
+        << oneItem(MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0, 91.0, 0.0)
+        << int(AeroraMissionCheck::CoordinateRange);
+
+    QTest::newRow("longitudeOutOfRange")
+        << oneItem(MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0, 0.0, 181.0)
+        << int(AeroraMissionCheck::CoordinateRange);
+
+    QTest::newRow("nonFiniteCoordinate")
+        << oneItem(MAV_CMD_NAV_WAYPOINT,
+                   MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                   0,
+                   std::numeric_limits<double>::quiet_NaN(),
+                   0.0)
+        << int(AeroraMissionCheck::CoordinateRange);
+
+    // generateResumeMission() refuses outright on any DO_JUMP (MissionManager.cc:84-86), so this
+    // mission cannot be resumed at all - better learned while planning than after an interruption.
+    QTest::newRow("resumeRefusedOnDoJump") << oneItem(MAV_CMD_DO_JUMP, MAV_FRAME_MISSION, 0, 0.0, 0.0)
+                                           << int(AeroraMissionCheck::ResumeCompatibility);
+}
+
+void AeroraMissionTest::_validationFailures()
+{
+    QFETCH(AeroraMissionSnapshot, mission);
+    QFETCH(int, expectedFailedCheck);
+
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission = mission;
+
+    const AeroraMissionValidationReport report = AeroraMissionValidator::validate(inputs);
+
+    const AeroraMissionCheck &check = report.checks().at(expectedFailedCheck);
+    QVERIFY2(check.isFailed(),
+             qPrintable(QStringLiteral("expected %1 to fail, got %2")
+                            .arg(AeroraMissionCheck::checkIdToString(check.id()))
+                            .arg(AeroraMissionCheck::outcomeToString(check.outcome()))));
+    QVERIFY(!check.detail().isEmpty());
+
+    // A failure outranks a gap in the aggregate, so a found problem is never hidden behind an
+    // unexamined one.
+    QCOMPARE(report.verdict(), AeroraMissionValidationReport::Failed);
+    QVERIFY(report.hasFailure());
+}
+
+void AeroraMissionTest::_missionCommandSupportRunsOnlyWithADeclaredSet()
+{
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission =
+        AeroraMissionMock::buildMission(AeroraMissionSnapshot::GcsPlan, {MAV_CMD_NAV_WAYPOINT, MAV_CMD_NAV_LAND});
+
+    const auto commandSupport = [](const AeroraMissionValidationReport &report) {
+        return report.checks().at(int(AeroraMissionCheck::MissionCommandSupport));
+    };
+
+    // Nothing declared: Q-023. There is no set to check a command against, so the check cannot run.
+    QCOMPARE(commandSupport(AeroraMissionValidator::validate(inputs)).unavailableReason(),
+             AeroraMissionCheck::NoDeclaredMissionCommandSet);
+
+    // Declared but empty. This is the trap FirmwarePlugin::supportedMissionCommands() contains -
+    // it reads an empty list as "every command is supported" - and adopting it here would turn an
+    // unconfigured build into a clean report. Refused instead.
+    inputs.missionCommandSetDeclared = true;
+    inputs.declaredMissionCommandSet.clear();
+    expectLogMessage(kLogCategory, QtWarningMsg, QRegularExpression(QStringLiteral("declared but empty")));
+    const AeroraMissionCheck onEmptySet = commandSupport(AeroraMissionValidator::validate(inputs));
+    verifyExpectedLogMessage();
+    QVERIFY(!onEmptySet.isPassed());
+    QCOMPARE(onEmptySet.unavailableReason(), AeroraMissionCheck::NoDeclaredMissionCommandSet);
+
+    // Declared and covering the mission: the check runs, which is what makes this gate testable
+    // rather than a permanent stub.
+    inputs.declaredMissionCommandSet = {MAV_CMD_NAV_WAYPOINT, MAV_CMD_NAV_LAND};
+    const AeroraMissionValidationReport covered = AeroraMissionValidator::validate(inputs);
+    QVERIFY(commandSupport(covered).isPassed());
+    QVERIFY(!covered.hasFailure());
+
+    // Declared and missing one of the mission's commands.
+    inputs.declaredMissionCommandSet = {MAV_CMD_NAV_WAYPOINT};
+    const AeroraMissionValidationReport uncovered = AeroraMissionValidator::validate(inputs);
+    QVERIFY(commandSupport(uncovered).isFailed());
+    QCOMPARE(uncovered.verdict(), AeroraMissionValidationReport::Failed);
+}
+
+void AeroraMissionTest::_resumeCarryForwardWithholdsItsVerdict()
+{
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission = AeroraMissionMock::buildMission(
+        AeroraMissionSnapshot::GcsPlan,
+        {MAV_CMD_NAV_TAKEOFF, MAV_CMD_DO_SET_CAM_TRIGG_DIST, MAV_CMD_NAV_WAYPOINT, MAV_CMD_NAV_WAYPOINT});
+
+    const auto carryForward = [](const AeroraMissionValidationReport &report) {
+        return report.checks().at(int(AeroraMissionCheck::ResumeStateCarryForward));
+    };
+
+    // No resume index: the caller asked no resume question, and index 0 is not assumed on its
+    // behalf.
+    QCOMPARE(carryForward(AeroraMissionValidator::validate(inputs)).unavailableReason(),
+             AeroraMissionCheck::NoResumeIndexSupplied);
+
+    inputs.resumeIndex = AeroraMissionIndex::resumeCandidate(3);
+    const AeroraMissionCheck withIndex = carryForward(AeroraMissionValidator::validate(inputs));
+
+    // The enumeration ran and the verdict is still withheld. Upstream deliberately does not carry
+    // forward a navigation item the aircraft already flew - that is what resuming means - while a
+    // state-setting item whose effect is silently lost is a real exposure. Telling the two apart
+    // needs the Aerora payload mission command set, which is Q-023 and NOT-EVIDENCED.
+    //
+    // So this must be neither Passed nor Failed: passing it because the list was short would be
+    // false assurance, and failing it would report a problem nothing established.
+    QVERIFY(!withIndex.isPassed());
+    QVERIFY(!withIndex.isFailed());
+    QCOMPARE(withIndex.unavailableReason(), AeroraMissionCheck::NoDeclaredMissionCommandSet);
+
+    // The count it could establish is carried, so a consumer can show the exposure without the
+    // module having classified it.
+    QVERIFY(withIndex.detail().contains(QStringLiteral("itemsNotCarriedForward=")));
+    QVERIFY(withIndex.detail().contains(QStringLiteral("resumeIndex=3")));
+
+    // And the module still replays no payload state and assumes no payload retention.
+    QVERIFY(!AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented);
+    QVERIFY(!AeroraMissionResumeBoundary::kPayloadStatePersistenceEvidenced);
 }
 
 UT_REGISTER_TEST(AeroraMissionTest, TestLabel::Unit, TestLabel::MissionManager)

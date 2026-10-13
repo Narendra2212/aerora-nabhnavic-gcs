@@ -116,6 +116,10 @@ set(AERORA_MISSION_SOURCES
     ${AERORA_MISSION_DIR}/AeroraMissionResumeBoundary.h
     ${AERORA_MISSION_DIR}/AeroraMissionSnapshot.cc
     ${AERORA_MISSION_DIR}/AeroraMissionSnapshot.h
+    ${AERORA_MISSION_DIR}/AeroraMissionValidationReport.cc
+    ${AERORA_MISSION_DIR}/AeroraMissionValidationReport.h
+    ${AERORA_MISSION_DIR}/AeroraMissionValidator.cc
+    ${AERORA_MISSION_DIR}/AeroraMissionValidator.h
 )
 
 set(AERORA_MISSION_INCLUDE_DIRECTORIES ${AERORA_MISSION_DIR})

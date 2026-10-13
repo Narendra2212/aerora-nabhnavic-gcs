@@ -37,6 +37,16 @@ private slots:
     void _resumeReportsItemsNotCarriedForwardBeforeResumeIndex();
     void _missionExtensionRegistryRefusesAmbiguity();
     void _missionCommandSetIsNotDeclared();
+
+    void _validationModelNeverTreatsAnUncheckedConditionAsPassed();
+    void _validationVerdicts_data();
+    void _validationVerdicts();
+    void _validationNamesEveryCheckWhetherOrNotItRan();
+    void _validationPassesWithGapsOnACleanMission();
+    void _validationFailures_data();
+    void _validationFailures();
+    void _missionCommandSupportRunsOnlyWithADeclaredSet();
+    void _resumeCarryForwardWithholdsItsVerdict();
     void _observerPresentsAnUncheckedUploadAsUnverified();
     void _observerMarksTheVehicleMissionIndeterminateAfterAFailedUpload();
     void _observerDistinguishesAFailedDownloadFromAnEmptyMission();
