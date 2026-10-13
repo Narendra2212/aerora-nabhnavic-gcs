@@ -560,7 +560,7 @@ whose blocker matters most.
 | Scope | The module: `feat(Vehicle): add AeroraAutoPilotPlugin for Aerora setup pages` |
 | Size | Small and reviewable. Combine fixups before publication; avoid a trail of WIP commits |
 | Push | **Prohibited.** `D-005` is unresolved and `origin` is upstream |
-| Tests | Authored alongside each implementation, `_TEST_NAMES` exported, Tab 1 adds the `add_qgc_test` line |
+| Tests | Authored alongside each implementation, `_TEST_NAMES` exported, Tab 1 adds the `add_qgc_test` line. **The export half is currently unenforced** — `aerora-manifest-check.ps1` never asserts that a registered test is declared by a manifest, which is how `HO-TAB1-05` went unnoticed since Phase 6. `HO-TAB1-06` closes the gap |
 | Status claims | Never claim `VERIFIED`. The ceiling is `IMPLEMENTED-UNCOMPILED` until `D-006` resolves |
 | Static checks | Re-run `.kiro/tools/aerora-manifest-check.ps1` after **every** commit that adds a file. A source added without a manifest entry compiles into nothing, silently |
 | Coding style | [CODING_STYLE.md](../../../CODING_STYLE.md). No `Q_ASSERT`, no `QTest::ignoreMessage`, no fixed-delay `qWait`, no uncategorised `qDebug()`, 4-space indent, LF, 120 columns |
@@ -642,18 +642,28 @@ A tab needing a change in another tab's file files a handoff rather than making 
 
 | ID | Owner | File | Change needed | Severity |
 | --- | --- | --- | --- | --- |
-| `HO-TAB1-01` | **Tab 5** | `aerora/test/Mission/AeroraMissionTest.cc` lines 107, 113, 120, 366, 376, 382, 390, 406, 521, 538, 570 | `UnitTest::expectLogMessage()` takes `const char *category` (`UnitTest.h:472`) and no `QString` overload exists. All 11 sites pass `QString::fromUtf8(kLogCategory)`, which does not convert. Drop the wrapper — `kLogCategory` is already `constexpr const char *`. **This will not compile.** | **High** — blocks `AeroraMissionTest` entirely at first build |
+| `HO-TAB1-01` | **Tab 5** | `aerora/test/Mission/AeroraMissionTest.cc` lines 107, 113, 120, 366, 376, 382, 390, 406, 521, 538, 570 | `UnitTest::expectLogMessage()` takes `const char *category` (`UnitTest.h:472`) and no `QString` overload exists. All 11 sites pass `QString::fromUtf8(kLogCategory)`, which does not convert. Drop the wrapper — `kLogCategory` is already `constexpr const char *`. **This will not compile.** | **CLOSED** — Tab 5, `bd1249aec`. Reviewed by Tab 1: 11 insertions, 11 deletions, one file, exactly the enumerated sites and nothing else. All 11 now pass `kLogCategory` (`AeroraMissionTest.cc:14`, `constexpr const char *`) directly, and zero `QString::fromUtf8` wrappers remain. Was **High** — it blocked `AeroraMissionTest` entirely at first build |
 | `HO-TAB1-03` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.cc`, `auditedTypes()` | **The overlay now registers 12 QML-reachable types and the safety audit covers 10.** Add `AeroraSecurityStatus` (new, Tab 2 WP2-B, `QML_NAMED_ELEMENT(AeroraSecurity)` + `QML_SINGLETON`) and `AeroraFreshness` (`QML_ELEMENT` + `QML_UNCREATABLE`, **unaudited since Phase 6**) | **Medium.** No live defect — both are read-only today and the independent sweep confirms no writable `Q_PROPERTY` anywhere in `aerora/src/**`. But the ratchet does not cover them, so `P7-AUTH-004`'s guarantee is narrower than it reads |
 | `HO-TAB4-01` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.h`, `\section known` | Describes one live recorded writable-property deviation; the set is now empty | Low, documentation only |
 | `HO-TAB4-02` | **Tab 7** | `aerora/src/UI/AeroraVehicleUiContext.h:63-66`, and `04-ui-implementation/01-ui-foundation-closure.md` HO-TAB7-01 | "carries a `WRITE setCapability`" is no longer true; the handoff is closed. Tab 1 independently found the same stale text and raised no duplicate | Low, documentation only — but it understates the safety posture, so it should not linger |
 | `HO-TAB4-03` | Tab 1 | `05-product-completion/` 00, 03, 04, 05, 07, 08 | Close `D-UI-03` / HO-TAB7-01; `R7-13` no longer applies | **CLOSED** — but in two passes, see below |
 | `HO-TAB1-02` | Tab 9 | `10-parameter-write-path-and-authorization-boundary.md` | Document number 09 was already taken by WP1-C, so the file renumbered to `10-` | **CLOSED.** Re-checked at 15:53 against the file itself: all three internal references (lines 556, 562, 568) read `10-parameter-write-path-…`, and `00-README` carries the doc-10 row. An earlier draft of this row called them broken links; that was written against a mid-move state and is withdrawn. Raised and closed inside this reconciliation |
+| `HO-TAB1-04` | **Tab 7** | `04-ui-implementation/00-ui-architecture-map.md:533` and `aerora/src/UI/README.md:45` | **Two further stale HO-TAB7-01 rows that `HO-TAB4-01` and `HO-TAB4-02` do not name.** Both still read in the present tense and list the handoff as live: the first as "`AeroraStateValue::capability` is QML-writable, so QML could manufacture an `UNAVAILABLE`", the second as "Tab 4 — make `AeroraStateValue::capability` read-only in QML / Latent; not reachable". U3 (`a7b317f89`) closed both. Owner column should also stop pointing at Tab 4 | Low, documentation only — but it is the `R7-20` failure mode recurring in files outside the six that `HO-TAB4-03` swept |
+| `HO-TAB1-05` | **Tab 4** | `aerora/src/Telemetry/Telemetry.cmake` | **The manifest never declares `_TEST_NAMES`.** `AeroraTelemetryStateTest` and `AeroraTelemetryAttachmentTest` have been registered straight into the aggregation since `738462422` instead of being exported by the module, which is why `aerora-manifest-check.ps1` reports 16 declared names against 18 `add_qgc_test` entries. Export both names so the module owns its own test list, per [§3](#3-conflict-avoidance) | **Low — no live defect.** Both tests build and run today; the gap is in the manifest contract, and it makes the checker's 16-vs-18 asymmetry permanent and unexplained. **Pre-existing since Phase 6; not caused by U3 or any Phase C commit** |
+| `HO-TAB1-07` | Tab 1 (self) | `00-README.md`, `01-…plan.md`, `02-…benchmark.md`, `05-…dependency-graph.md`, `06-…traceability.md` | **363 double-encoded character sequences.** UTF-8 bytes were decoded as cp1252 and re-encoded, so `—` is stored as `â€”` (`U+00E2 U+20AC U+201D`), `→` as `â†'` and `§` as `Â§`. Docs 03, 04, 07, 08, 09 and 10 are clean. **Functional symptom: exactly one broken anchor** — this document's WP7-D "Blocks" cell links `06#blocked-on-a-qml-test-target--16-tests`, which is correct for a real em dash and cannot resolve against the corrupted heading | **Low.** Cosmetic in rendering, one broken link. **Wants its own commit** per [CODING_STYLE](../../../CODING_STYLE.md#formatting-tools) — a 363-site substitution across five files must not ride along inside a reconciliation change, and a partial repair would leave one document internally inconsistent |
+| `HO-TAB1-06` | **Tab 8** | `.kiro/tools/aerora-manifest-check.ps1`, checks 4–6 (lines 122-181) | **The checker cannot detect `HO-TAB1-05`'s class.** Check 4 asserts declared ⊆ registered, check 5 self-registering ⊆ registered, check 6 registered ⊆ self-registering. **Nothing asserts registered ⊆ declared**, so a test may self-register and hold a `add_qgc_test` line while no module manifest ever exports it. The 16-vs-18 counts are printed at line 149 but not compared. Add the fourth direction | **Low**, and it is the durable fix: the `_TEST_NAMES` contract in [§6](#6-commit-and-review-conventions) is currently unenforced in the one direction that matters, which is the same hand-maintained-list failure mode as `D-UI-07` |
 
-`HO-TAB1-01` is the significant one. It was found by source inspection rather than by a compiler:
-`expectLogMessage` has exactly one declaration, the argument type does not convert, and the call
-sites were enumerated mechanically. The same scan confirmed the other 47 call sites across seven test
-files are correct, and that every test-side category string matches its `QGC_LOGGING_CATEGORY`
-definition exactly — a mismatch there would be a silent test failure rather than a compile error.
+`HO-TAB1-01` was the significant one, and it is now closed. It was found by source inspection rather
+than by a compiler: `expectLogMessage` has exactly one declaration, the argument type does not
+convert, and the call sites were enumerated mechanically. The same scan confirmed the other 47 call
+sites across seven test files are correct, and that every test-side category string matches its
+`QGC_LOGGING_CATEGORY` definition exactly — a mismatch there would be a silent test failure rather
+than a compile error.
+
+It is also the cleanest demonstration of the [§6](#6-commit-and-review-conventions) protocol working:
+Tab 5 owned the file, made the change, committed it alone, and the integration review was a diff
+stat plus a grep. **The fix is still `IMPLEMENTED-UNCOMPILED`** — the type now matches by
+inspection, which is not the same as having compiled.
 
 `HO-TAB4-03` closed in two passes, and the reason is worth recording. The first pass updated every
 **status row** — `D-UI-03`, HO-TAB7-01, `R7-13`, the U3 entries in 04 and 05 — and left five
@@ -664,6 +674,27 @@ arriving at any of those would have concluded the opposite of the status table t
 **Closing a status row is not closing a handoff.** A handoff against documentation is closed when
 the prose agrees with the code, so the grep for the old claim — not the status column — is what
 ends it.
+
+`HO-TAB1-04` is the same lesson applied twice over: `HO-TAB4-03`'s sweep was scoped to the six
+`05-product-completion/` documents it named, so two equivalent stale rows outside that set survived
+both passes. The scope of a documentation handoff has to be the grep, not a file list.
+
+### Test-declaration attribution
+
+`HO-TAB1-05` is **Tab 4's alone**, and the attribution is worth stating because the obvious guess is
+wrong. The two tests missing from a manifest are `AeroraTelemetryStateTest` and
+`AeroraTelemetryAttachmentTest`, both in `aerora/test/Telemetry/`.
+
+| Module | Manifest declares `_TEST_NAMES` | New tests this phase | Declared? |
+| --- | --- | --- | --- |
+| Vehicle (**Tab 3**) | Yes — 4 names | `AeroraVehicleSetupTest`, `AeroraProfileRegistryTest` | **Both declared.** Nothing outstanding |
+| Security (**Tab 2**) | Yes — 5 names | `AeroraAuditSinkTest`, `AeroraSecurityStatusTest` | **Both declared.** Nothing outstanding |
+| Telemetry (**Tab 4**) | **No — the `set(..._TEST_NAMES ...)` block is absent** | none this phase | **Neither declared**, since Phase 6 |
+| Mission, UI, Payload/Power | Yes — 2, 2, 3 names | none | Declared |
+
+Both tabs that added tests during Phase C declared them correctly in the same commit that added the
+source. **Tab 3's declarations are complete and must not be recorded as in flight or attributed
+elsewhere.** The 16-versus-18 gap predates Phase 7 entirely.
 
 HO-TAB7-03's partial application is worth noting: the `qt_add_qml_module` block exists, so the
 handoff looks done. The two lines that make it function are absent, and the omission carries a
