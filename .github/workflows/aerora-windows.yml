@@ -1,0 +1,265 @@
+name: Aerora Windows
+
+# WP8-B / Q-035: the overlay CI test leg.
+#
+# Derived from windows.yml (toolchain, Qt/MSVC/GStreamer setup) and custom-build.yml
+# (overlay semantics). Differences from windows.yml, each deliberate:
+#
+#   * Debug only. The overlay's tests are gated on QGC_BUILD_TESTING, which the
+#     Aerora-Windows-debug preset turns on. A Release leg would build no tests.
+#   * No packaging, attestation, or S3 upload. Those need NSIS plus the AWS_* secrets,
+#     which an Aerora-owned repository does not have. This leg proves compile + test.
+#   * GitHub-hosted windows-2022 only. The RunsOn pools in windows.yml are gated on
+#     `github.repository_owner == 'mavlink'` and are unavailable here.
+#   * Tests are scoped to `^Aerora` by name. Upstream deliberately does not run the
+#     full Unit/Integration suites on Windows (only `Portable`); widening this leg
+#     would report stock failures that the overlay neither causes nor can fix.
+#
+# Every pinned version (Qt 6.11.1, CMake minimum 3.25, GStreamer 1.28.4) comes from
+# .github/build-config.json via the build-setup action. Nothing is restated here, so
+# this workflow cannot drift from the project's single source of truth.
+
+# The two `paths` lists are duplicated rather than shared: GitHub Actions does not
+# support YAML anchors. Keep them in sync.
+on:
+  push:
+    branches:
+      - 'aerora/**'
+    paths:
+      - 'aerora/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+      - '.github/build-config.json'
+      - '.github/workflows/aerora-windows.yml'
+  pull_request:
+    paths:
+      - 'aerora/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+      - '.github/build-config.json'
+      - '.github/workflows/aerora-windows.yml'
+  workflow_dispatch:
+    inputs:
+      debug_runner:
+        description: 'Open an actor-only SSH session after a failure (up to 15 minutes, branches only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Matches windows.yml: Qt 6.11.1 on Windows needs an unreleased aqtinstall fix.
+  AQT_SOURCE: 'git+https://github.com/miurahr/aqtinstall.git@8d961e61720b3c06583517fbc68d57ec0a4e9f95'
+
+jobs:
+  build:
+    name: Aerora Overlay x64 Debug
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      actions: read
+      # checks: write lets test-report publish the JUnit summary (as in linux.yml).
+      checks: write
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Record build timeline
+        uses: Kesin11/actions-timeline@v3
+        continue-on-error: true
+        with:
+          show-waiting-runner: true
+
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Installs CMake (satisfies the 3.25 minimum), the tools/.venv Python used by
+      # CMake's generators, and Qt at the build-config version for MSVC 2022 x64.
+      # MSVC itself is preinstalled on windows-2022 and configured by this action.
+      - name: Build Setup
+        uses: ./.github/actions/build-setup
+        with:
+          qt-host: windows
+          qt-arch: win64_msvc2022_64
+          build-type: Debug
+          aqt-source: ${{ env.AQT_SOURCE }}
+          cache-variant: aerora
+          cache-key-suffix: aerora-debug
+
+      # The preset is the single source of truth for QGC_CUSTOM_DIR=aerora and the
+      # Debug/test configuration; it is not restated as extra-args. The assertion step
+      # below fails the job if that wiring ever stops taking effect.
+      - name: Configure
+        uses: ./.github/actions/cmake-configure
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          preset: Aerora-Windows-debug
+          testing: 'true'
+
+      # R7-02 / ADR-012: QGC_CUSTOM_BUILD is a plain CMake variable, not a cache entry,
+      # so it cannot be read back from CMakeCache.txt. Its only observable effect is the
+      # compile definitions src/CMakeLists.txt applies inside `if(QGC_CUSTOM_BUILD)`.
+      # Asserting those proves the overlay actually attached. Without this check the
+      # overlay can silently fall out of the build: it still compiles and still links,
+      # QGCCorePlugin::instance() just stops routing through AeroraCorePlugin and the
+      # authorization gate is never consulted.
+      - name: Assert the Aerora overlay is active
+        shell: pwsh
+        env:
+          BUILD_DIR: ${{ runner.temp }}/build
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $customDir = & python3 "$env:GITHUB_WORKSPACE/.github/scripts/cmake_helper.py" cache-var `
+            --build-dir "$env:BUILD_DIR" --name QGC_CUSTOM_DIR --required --output-key custom_dir
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $customDir = "$customDir".Trim()
+          if ($customDir -ne 'aerora') {
+            Write-Output "::error::QGC_CUSTOM_DIR is '$customDir', expected 'aerora'"
+            exit 1
+          }
+
+          # CMake may emit compile flags inline in build.ninja or spill them into
+          # response files on Windows, so search both rather than assuming a layout.
+          $searchFiles = @(Get-ChildItem -LiteralPath $env:BUILD_DIR -Recurse -File `
+            -Include 'build.ninja', '*.rsp' -ErrorAction SilentlyContinue)
+          if ($searchFiles.Count -eq 0) {
+            Write-Output "::error::No generated build files found under $env:BUILD_DIR"
+            exit 1
+          }
+          Write-Output "Searching $($searchFiles.Count) generated build file(s)"
+
+          # Set by aerora/CMakeLists.txt via CUSTOM_DEFINITIONS and applied to the
+          # application target by src/CMakeLists.txt only when QGC_CUSTOM_BUILD is ON.
+          # Substring matches: the surrounding quoting and -D/ /D spelling are
+          # generator- and compiler-specific.
+          $required = @(
+            'QGC_CUSTOM_BUILD',
+            'CUSTOMCLASS=AeroraCorePlugin',
+            'CUSTOMHEADER=',
+            'AERORA_VEHICLE_FACTGROUP_FRIENDSHIP'
+          )
+
+          $failed = $false
+          foreach ($define in $required) {
+            if (Select-String -LiteralPath $searchFiles.FullName -Pattern $define -SimpleMatch -Quiet) {
+              Write-Output "ok: $define"
+            } else {
+              Write-Output "::error::Overlay compile definition missing from the generated build: $define"
+              $failed = $true
+            }
+          }
+          if ($failed) {
+            Write-Output "::error::QGC_CUSTOM_BUILD did not take effect; the Aerora overlay is not attached."
+            exit 1
+          }
+
+      # CMake auto-downloads the pinned GStreamer SDK for MSVC x64 and verifies it
+      # against the build-config.json SHA-256, so no separate install step is needed.
+      # Its bin/ must be on PATH for the built binaries and tests to resolve the DLLs.
+      - name: Resolve GStreamer root
+        id: gst-root
+        run: |
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/cmake_helper.py" cache-var \
+            --build-dir "${RUNNER_TEMP}/build" \
+            --name GStreamer_ROOT_DIR \
+            --required \
+            --output-key gst_root
+
+      - name: Add GStreamer to PATH
+        run: echo "${STEPS_GST_ROOT_OUTPUTS_GST_ROOT}/bin" >> "$GITHUB_PATH"
+        env:
+          STEPS_GST_ROOT_OUTPUTS_GST_ROOT: ${{ steps.gst-root.outputs.gst_root }}
+
+      - name: Build
+        id: build
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+
+      # cmake_helper.py always passes --no-tests=error, so a regex that selects nothing
+      # fails the job rather than reporting a vacuous pass.
+      - name: Run Aerora unit tests
+        id: unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: ./.github/actions/run-unit-tests
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          tests-regex: '^Aerora'
+          include-labels: Unit
+          junit-output: junit-aerora-unit.xml
+          ctest-output: aerora-unit-output.txt
+
+      - name: Report Aerora unit tests
+        if: ${{ !cancelled() && steps.unit.outcome != 'skipped' && steps.unit.outcome != '' }}
+        uses: ./.github/actions/test-report
+        with:
+          name: Aerora unit tests (windows)
+          build-dir: ${{ runner.temp }}/build
+          junit-file: junit-aerora-unit.xml
+          output-file: aerora-unit-output.txt
+          artifact-name: test-results-aerora-unit-windows
+          retention-days: 7
+
+      # Serialized: the Vehicle-labelled integration tests hold CTest resource locks.
+      - name: Run Aerora integration tests
+        id: integration
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: ./.github/actions/run-unit-tests
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          tests-regex: '^Aerora'
+          include-labels: Integration
+          parallel: '1'
+          junit-output: junit-aerora-integration.xml
+          ctest-output: aerora-integration-output.txt
+
+      - name: Report Aerora integration tests
+        if: ${{ !cancelled() && steps.integration.outcome != 'skipped' && steps.integration.outcome != '' }}
+        uses: ./.github/actions/test-report
+        with:
+          name: Aerora integration tests (windows)
+          build-dir: ${{ runner.temp }}/build
+          junit-file: junit-aerora-integration.xml
+          output-file: aerora-integration-output.txt
+          artifact-name: test-results-aerora-integration-windows
+          retention-days: 7
+
+      - name: Debug failed runner
+        if: ${{ failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.debug_runner && github.ref_type == 'branch' }}
+        timeout-minutes: 15
+        uses: ./.github/actions/debug-runner
