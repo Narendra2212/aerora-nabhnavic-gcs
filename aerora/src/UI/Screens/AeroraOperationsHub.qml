@@ -73,10 +73,17 @@ AnalyzePage {
 
     readonly property bool _servicesAvailable: AeroraUi.available
 
-    // Read once into locals so every row below is derived from the same observation rather than
-    // re-reading a live property per row, which could render a self-inconsistent screen if the
-    // active vehicle changed mid-layout.
-    readonly property bool _notEnforced: AeroraSecurity.enforcement === AeroraSecurity.NotEnforced
+    /// Enforcement is derived by matching the **enforced** value, never the unenforced one, and
+    /// `_notEnforced` is its negation.
+    ///
+    /// The asymmetry is deliberate and it is a fail-safe. If `AeroraSecurity.EnforcedAtCommandGate`
+    /// ever failed to resolve - a renamed enumerator, a registration that did not happen, a typo -
+    /// the comparison yields `undefined === value`, so `_enforced` is false and this screen reports
+    /// *not enforced*. Written the other way round, matching `NotEnforced`, the identical failure
+    /// would make `_notEnforced` false and the screen would claim enforcement that is not
+    /// happening. Only one of those two failure directions is acceptable.
+    readonly property bool _enforced: AeroraSecurity.enforcement === AeroraSecurity.EnforcedAtCommandGate
+    readonly property bool _notEnforced: !root._enforced
 
     /// The basis string shared by every per-vehicle service row.
     ///

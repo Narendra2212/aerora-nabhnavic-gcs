@@ -458,6 +458,7 @@ each path to its bare filename; without it the resource lands at
 | **Owner** | **Tab 1** (the `add_executable` / `add_test`) and **Tab 7** (`AeroraQmlQuickTestMain.cc`) |
 | **Blocks** | QML rendering tests only. The C++ foundation tests are unaffected |
 | **When** | At the first Aerora QML behaviour that needs asserting. Not now — an empty test target is a target with nothing in it |
+| **Candidates, in order of value** | 1. `AeroraStateText` rendering `UNKNOWN` as the word rather than an empty string (`P7-STATE-002`). 2. **New with `SCR-SHL-01`:** `AeroraSelfReportRow` letting `unchecked` outrank `warning`, and `AeroraOperationsHub`'s fail-safe enforcement derivation — that a resolution failure on `EnforcedAtCommandGate` renders *not enforced*. Both are pure QML logic the C++ harness cannot reach, and the second is a safety claim (`P7-AUTH-002`) currently guarded by review only |
 | **Shape** | Mirror `test/UnitTestFramework/QmlTesting/CMakeLists.txt` with `QUICK_TEST_SOURCE_DIR` pointing at `aerora/test/UI/qml`, the same `-platform offscreen` command, `LABELS "Unit;QML"`, and the same `ENVIRONMENT` block |
 
 ### HO-TAB7-05 — register the Operations Hub in `analyzePages()`
