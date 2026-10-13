@@ -94,7 +94,11 @@ public:
 class RecordingAuditSink : public AeroraAuditSink
 {
 public:
-    void record(const AeroraAuditEvent& event) override { events.append(event); }
+    AeroraAuditWriteOutcome record(const AeroraAuditEvent& event) override
+    {
+        events.append(event);
+        return AeroraAuditWriteOutcome::Accepted;
+    }
 
     [[nodiscard]] QString sinkName() const override { return QStringLiteral("Recording"); }
 

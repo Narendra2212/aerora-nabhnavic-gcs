@@ -26,29 +26,6 @@ QString AeroraAuthorizationDecision::outcomeToString(AeroraAuthorizationOutcome 
     return QStringLiteral("Denied: Unknown");
 }
 
-QString AeroraAuditEvent::typeToString(AeroraAuditEventType type)
-{
-    switch (type) {
-    case AeroraAuditEventType::OperatorIdentityResolved:
-        return QStringLiteral("OperatorIdentityResolved");
-    case AeroraAuditEventType::AuthorizationDecision:
-        return QStringLiteral("AuthorizationDecision");
-    case AeroraAuditEventType::CommandRequested:
-        return QStringLiteral("CommandRequested");
-    case AeroraAuditEventType::CommandDenied:
-        return QStringLiteral("CommandDenied");
-    case AeroraAuditEventType::CommandTransmitted:
-        return QStringLiteral("CommandTransmitted");
-    case AeroraAuditEventType::VehicleResponse:
-        return QStringLiteral("VehicleResponse");
-    case AeroraAuditEventType::SecurityEvent:
-        return QStringLiteral("SecurityEvent");
-    case AeroraAuditEventType::SystemEvent:
-        return QStringLiteral("SystemEvent");
-    }
-    return QStringLiteral("Unknown");
-}
-
 AeroraCommandAuthorizer* AeroraCommandAuthorizer::instance()
 {
     static AeroraCommandAuthorizer instance;
@@ -58,21 +35,48 @@ AeroraCommandAuthorizer* AeroraCommandAuthorizer::instance()
 void AeroraCommandAuthorizer::setIdentityProvider(std::unique_ptr<AeroraIdentityProvider> provider)
 {
     _identityProvider = std::move(provider);
+    _notifyChanged();
 }
 
 void AeroraCommandAuthorizer::setRoleResolver(std::unique_ptr<AeroraRoleResolver> resolver)
 {
     _roleResolver = std::move(resolver);
+    _notifyChanged();
 }
 
 void AeroraCommandAuthorizer::setPolicy(std::unique_ptr<AeroraAuthorizationPolicy> policy)
 {
     _policy = std::move(policy);
+    _notifyChanged();
 }
 
 void AeroraCommandAuthorizer::setAuditSink(std::shared_ptr<AeroraAuditSink> sink)
 {
     _auditSink = std::move(sink);
+
+    // A new sink does not clear the loss counters. The records lost under the previous
+    // configuration were still lost, and resetting on install would let a station erase the
+    // evidence of its own audit gap by installing a sink late.
+    _warnedAuditWriteFailure = false;
+
+    _notifyChanged();
+}
+
+void AeroraCommandAuthorizer::setChangeNotifier(ChangeNotifier notifier)
+{
+    _changeNotifier = notifier;
+
+    // Fires immediately, so an observer that registers after the chain was configured sees the
+    // current state instead of waiting for a change that may never come - the shipped station
+    // installs no policy, so without this the first notification would never arrive.
+    _notifyChanged();
+}
+
+void AeroraCommandAuthorizer::_notifyChanged() const
+{
+    if (_changeNotifier) {
+        _changeNotifier();
+    }
 }
 
 bool AeroraCommandAuthorizer::isFullyConfigured() const
@@ -80,17 +84,45 @@ bool AeroraCommandAuthorizer::isFullyConfigured() const
     return _identityProvider && _roleResolver && _policy && _policy->isConfigured();
 }
 
+QString AeroraCommandAuthorizer::auditSinkName() const
+{
+    return _auditSink ? _auditSink->sinkName() : QString();
+}
+
+bool AeroraCommandAuthorizer::auditIsDurable() const
+{
+    // No sink means no record survives anything, so the answer is false rather than unknown.
+    return _auditSink && _auditSink->isDurable();
+}
+
+bool AeroraCommandAuthorizer::auditIsTamperEvident() const
+{
+    return _auditSink && _auditSink->isTamperEvident();
+}
+
 void AeroraCommandAuthorizer::_audit(AeroraAuditEventType type, const QString& operatorId,
                                      const QString& reasonCode, const AeroraGatedOperation& operation)
 {
     if (!_auditSink) {
         ++_droppedAuditRecords;
+        _notifyChanged();
         return;
     }
 
     AeroraAuditEvent event;
     event.type = type;
-    event.utc = QDateTime::currentDateTimeUtc();
+
+    // Stamped here, at composition, not by the sink. The time fields are the producer's statement
+    // about when the event happened; a sink that stamped them would be recording when it got
+    // around to the record instead. See the ordering section in AeroraAuditSink.h.
+    event.stampNow();
+
+    // Both captured at composition for the same reason. The enforcement posture can change between
+    // composing a record and writing it, and the loss count is only evidence if it is the count
+    // that applied to this record.
+    event.authorizationEnforced = isFullyConfigured();
+    event.recordsLostBeforeThis = lostAuditRecordCount();
+
     event.operatorId = operatorId;
     event.reasonCode = reasonCode;
     event.vehicleMavlinkSystemId = operation.vehicle.mavlinkSystemId;
@@ -111,7 +143,28 @@ void AeroraCommandAuthorizer::_audit(AeroraAuditEventType type, const QString& o
     event.detail.insert(QStringLiteral("param6"), operation.param6);
     event.detail.insert(QStringLiteral("param7"), operation.param7);
 
-    _auditSink->record(event);
+    const AeroraAuditWriteOutcome outcome = _auditSink->record(event);
+    if (!AeroraAuditSink::isLoss(outcome)) {
+        return;
+    }
+
+    ++_failedAuditWrites;
+
+    // The command is not blocked and the decision is not changed. Whether an unauditable allow
+    // must instead be denied is P7-AUDIT-003, which is an OPEN product decision; answering it
+    // here would be inventing a security policy. The loss is counted and surfaced instead.
+    if (!_warnedAuditWriteFailure) {
+        _warnedAuditWriteFailure = true;
+        qCWarning(AeroraAuthorizationLog)
+            << "audit record was not accepted and the command was NOT blocked."
+            << "sink:" << _auditSink->sinkName()
+            << "outcome:" << AeroraAuditSink::outcomeToString(outcome)
+            << "sequence:" << event.sequence
+            << "- further failures are counted, not logged. See failedAuditWriteCount()"
+            << "and P7-AUDIT-003.";
+    }
+
+    _notifyChanged();
 }
 
 AeroraAuthorizationDecision AeroraCommandAuthorizer::authorize(const AeroraGatedOperation& operation)
