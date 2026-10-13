@@ -1,6 +1,8 @@
 #include "AeroraCorePlugin.h"
 
 #include <QtCore/QApplicationStatic>
+#include <QtCore/QUrl>
+#include <QtCore/QVariant>
 #include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraCommandAuthorizer.h"
@@ -9,6 +11,7 @@
 #include "AeroraSigningKeyStore.h"
 #include "MAVLinkSigningKeys.h"
 #include "QGCLoggingCategory.h"
+#include "QmlComponentInfo.h"
 #include "Vehicle.h"
 
 QGC_LOGGING_CATEGORY(AeroraCorePluginLog, "Aerora.CorePlugin")
@@ -79,6 +82,34 @@ void AeroraCorePlugin::destroyQmlApplicationEngine(QQmlApplicationEngine *qmlEng
     AeroraQmlOverrides::releaseFrom(qmlEngine);
 
     QGCCorePlugin::destroyQmlApplicationEngine(qmlEngine);
+}
+
+const QVariantList &AeroraCorePlugin::analyzePages()
+{
+    // Built once on first call and held in this override's own static, because the base returns a
+    // reference to its own function-local static list: appending to that would mutate the base's
+    // list, and returning a reference to a local would dangle.
+    static const QVariantList pages = [this]() {
+        QVariantList list = QGCCorePlugin::analyzePages();
+
+        // No icon argument - QmlComponentInfo defaults it to an empty QUrl. Aerora has no icon
+        // asset and Q-040 leaves the visual language unresolved, so none is invented here.
+        //
+        // requiresVehicle stays false. The hub's purpose is to report what is and is not attached,
+        // which includes "no vehicle is connected"; gating it on a vehicle would hide the screen in
+        // exactly the state an operator most needs to read it.
+        //
+        // The URL carries no Screens/ segment: qgc_set_qt_resource_alias() aliases every
+        // AERORA_UI_QML_FILES entry to its bare name, so the whole module lands flat under
+        // qrc:/qml/Aerora/Controls/.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Operations"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraOperationsHub.qml")))));
+
+        return list;
+    }();
+
+    return pages;
 }
 
 void AeroraCorePlugin::_installSigningKeyStore()

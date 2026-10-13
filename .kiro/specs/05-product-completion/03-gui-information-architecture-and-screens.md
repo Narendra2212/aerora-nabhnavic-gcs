@@ -315,14 +315,55 @@ Columns: **Class** per [§4](#4-delivery-classes) · **Seam** the exact mechanis
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-SHL-01` | Aerora Operations Hub | O | `analyzePages()` + `mainWindow.showTool()` | `DESIGNED` | 7 | — |
+| `SCR-SHL-01` | Aerora Operations Hub | O | `analyzePages()` + `mainWindow.showTool()` | `IMPLEMENTED-UNCOMPILED` | 7 | — (navigation half deferred: no destination screen exists) |
 | `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `DESIGNED` | 7 + 3 | — |
-| `SCR-SHL-03` | Enforcement-state strip | O | Indicator exposing `AeroraCorePlugin::isAuthorizationEnforced()` | `DESIGNED` | 7 + 2 | needs a QML-safe read path; `isAuthorizationEnforced()` is plain static C++ |
+| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `DESIGNED` | 7 + 2 | **unblocked** — `D-UI-01` closed by `AeroraSecurityStatus` (WP2-B). Needs `toolBarIndicators()`, which is HO-TAB7-06 |
 | `SCR-SHL-04` | Build provenance / about | O | `analyzePages()` entry | `SPECIFIED-NOT-DESIGNED` | 1 | `P7-HELP-004` — no provenance source exists |
 
 `SCR-SHL-03` is the screen that makes `P7-AUTH-002` visible: the station must be able to say "not
-enforced". Exposing it requires a read-only accessor on a QML-visible type, which is a Tab 2 + Tab 7
-handoff and must not widen the security surface `AeroraUiSafetyTest` guards.
+enforced". That read path now exists: `AeroraSecurityStatus` (`QML_NAMED_ELEMENT(AeroraSecurity)`,
+`QML_SINGLETON`) projects enforcement and audit posture as read-only properties, holds no security
+state of its own, and is audited by `AeroraUiSafetyTest` with no writable property, no
+`Q_INVOKABLE` and no slot. `D-UI-01` is closed by it. What remains for the strip itself is a
+`toolBarIndicators()` override, which is a `QGCCorePlugin` virtual and therefore Tab 1's —
+HO-TAB7-06.
+
+### `SCR-SHL-01`: three facts, held apart
+
+The hub is the first Aerora screen to exist, and "implemented" is doing less work in that sentence
+than it looks. Three separate things have to be true before an operator can read it, and they are
+recorded separately because two of them have failed silently in this programme already:
+
+| Fact | State | Evidence |
+| --- | --- | --- |
+| The screen exists in source | **Yes** | `aerora/src/UI/Screens/AeroraOperationsHub.qml` and `Controls/AeroraSelfReportRow.qml`, committed in `3b19d112a` |
+| It is compiled into the application resources | **Yes, `SOURCE-INSPECTED`** | Declared in `AERORA_UI_QML_FILES` (`aerora/src/UI/Ui.cmake`), which `aerora/CMakeLists.txt` passes to `qt_add_qml_module` through `QML_FILES` after `qgc_set_qt_resource_alias()`. Read from the build files; no build has run |
+| It is reachable through navigation | **Yes, `SOURCE-INSPECTED`** | `AeroraCorePlugin::analyzePages()` appends it to the base registry — HO-TAB7-05, applied. Before that it was in the resource with no menu entry and no error of any kind |
+| Its root type resolves | **Yes, `SOURCE-INSPECTED`** | The hub roots on `AnalyzePage`, which upstream declares in `AnalyzeViewModule` under URI `QGroundControl.AnalyzeView` (`src/AnalyzeView/CMakeLists.txt:19-24`). Upstream's own pages import nothing for it because they are members of that module; the hub is a member of `Aerora.Controls`, so `IMPORTS QGroundControl.AnalyzeView` was added to the module block |
+
+That fourth row was found at this reconciliation and is the reason the list is four rows long rather
+than three. Each of the four fails **silently and differently**, which is why they are tracked
+apart rather than collapsed into "implemented":
+
+| If this is missing | What an operator sees | When it shows up |
+| --- | --- | --- |
+| Source | Nothing | Immediately |
+| Resource entry | Nothing, and the QML never compiles into the binary | Build time, if anything |
+| `analyzePages()` entry | No menu entry. No error anywhere | Never, without someone looking |
+| `IMPORTS QGroundControl.AnalyzeView` | Menu entry present, page fails to load: *AnalyzePage is not a type* | **Runtime only**, on the first click |
+
+The last one is the worst of the four: everything else looks correct, the entry is in the menu, and
+the failure needs a running application to observe — which `D-006` means nobody has.
+
+What is **not** claimed: the screen has never been compiled, parsed by `qmllint`, loaded, or
+rendered. Its safety-status bindings — the fail-safe enforcement derivation, and
+`AeroraSelfReportRow` letting `unchecked` outrank `warning` — have **never been executed**. They
+are pure QML logic that the C++ test harness cannot reach, so they are guarded by review only
+until the Qt Quick Test target of HO-TAB7-04 exists. `IMPLEMENTED-UNCOMPILED` is the ceiling, and
+`D-006` is why.
+
+The navigation half of the hub is deliberately absent rather than incomplete: it is specified to
+reach other Aerora screens through `mainWindow.showTool()`, and no destination screen exists yet.
 
 ### Live operations — 9 screens
 

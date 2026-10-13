@@ -84,7 +84,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | `Q3-009` | Capability presence reporting | Firmware | `SCR-VEH-03` content, autonomy preconditions | `OPEN` |
 | `IF-MAV-022` | Telemetry source attribution | Dialect | `P7-TEL-005` | `OPEN` |
 | `D-004` | Radio transport / ADR-002 | Hardware | `P7-RAD-005` | `DEFERRED` — **no radio attached** |
-| `D-UI-01` | QML-safe enforcement read path | Tab 2 + Tab 7 | `SCR-SHL-03`, `SCR-SEC-01` | `OPEN` |
+| `D-UI-01` | QML-safe enforcement read path | Tab 2 + Tab 7 | — | **CLOSED** — `AeroraSecurityStatus` (WP2-B). A read-only projection that holds no security state and reaches no security type; audited by `AeroraUiSafetyTest` with no writable property, no `Q_INVOKABLE` and no slot. Found still marked `OPEN` at this reconciliation after the code had landed |
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Acceptance | `OPEN` |
 | `D-UI-05` | Aerora Qt Quick Test target timing | Tab 1 + Tab 7 | 16 QML tests | `OPEN` — recommend at first need |
 | `D-UI-07` | Should `AeroraUiSafetyTest::auditedTypes()` be **derived** rather than hand-listed? | Tab 7 | Nothing today; it is the durable fix for `R7-19` | `OPEN` — raised this pass. A hand-maintained audit list fails the same way as the surface it guards |

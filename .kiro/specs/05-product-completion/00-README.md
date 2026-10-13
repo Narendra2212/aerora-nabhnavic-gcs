@@ -41,9 +41,46 @@ first Phase C design document.
 | U1 — install the QML override interceptor (HO-TAB7-02) | `IMPLEMENTED-UNCOMPILED` | `84bbb3a6e` |
 | U2 — complete the `AeroraControlsModule` block (HO-TAB7-03) | `IMPLEMENTED-UNCOMPILED` | `a73699796` |
 | U3 — drop `WRITE` from `AeroraStateValue::capability` (HO-TAB7-01) | `IMPLEMENTED-UNCOMPILED` | `a7b317f89` |
+| HO-TAB1-03 — audit all twelve QML-registered types; derive the closure | `IMPLEMENTED-UNCOMPILED` | `67f7137d0` |
+| `SCR-SHL-01` — Aerora Operations Hub, the first Aerora screen | `IMPLEMENTED-UNCOMPILED` | `3b19d112a`, `d2ffd7c93` |
+| HO-TAB7-05 — register the hub in `analyzePages()` | `IMPLEMENTED-UNCOMPILED` | this pass |
 | WP1-C — local persistence architecture | `DESIGNED` | doc 09 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
 | U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
+
+### Screen inventory, stated precisely
+
+52 screens. The headline is that **one exists**, and the three statuses below it are not
+interchangeable.
+
+| Count | State | Means |
+| --- | --- | --- |
+| **1** | `IMPLEMENTED-UNCOMPILED` | `SCR-SHL-01`. QML exists, is in the resource, and is registered in `analyzePages()`. Never compiled, loaded or rendered |
+| 3 | Split status | `SCR-MIS-09`, `SCR-VEH-05`, `SCR-SEC-04`. The **service, gate or store** is `IMPLEMENTED-UNCOMPILED`; the **screen** is still `DESIGNED`. These are not implemented screens and must not be counted as such |
+| 28 | `DESIGNED` | Implementable; no code |
+| 20 | `SPECIFIED-NOT-DESIGNED` | Requirement captured, mechanism not chosen |
+
+The 51 screens that do not exist are overwhelmingly **not** blocked on UI work. They are blocked on
+absent data contracts: no Aerora MAVLink dialect, so all six fact groups stay `CONTRACT-ONLY`
+(`SCR-TEL-01`); no freshness budget values, `Q-036` (`SCR-TEL-03`); no durable store
+(`SCR-TEL-02`, `SCR-LOG-01`, `SCR-SEC-03`); no operator role set, `Q-029` (`SCR-SEC-02`); no
+autonomy interface, `P7-AI-004` (`SCR-AIS-*`); no fleet identity format (`SCR-FLT-01/02`).
+Building them now would mean inventing the data behind them, which `P7-NOINV-001` prohibits.
+
+### Next integration blockers
+
+In the order they gate the most work. None is a UI screen.
+
+| # | Blocker | Owner | What it gates |
+| --- | --- | --- | --- |
+| 1 | **`D-006` build host.** Nothing in this programme has been compiled, linted or executed. 21 commits of overlay source are `IMPLEMENTED-UNCOMPILED` | User / Tab 8 | Every `VERIFIED` claim, and the first real measurement of ~130 overlay sources |
+| 2 | **HO-TAB7-04** Qt Quick Test target | Tab 1 + Tab 7 | `SCR-SHL-01`'s two safety-relevant QML behaviours are guarded by review only — the fail-safe enforcement derivation is a `P7-AUTH-002` claim with no test that can reach it |
+| 3 | **HO-TAB7-06** `toolBarIndicators()` override | Tab 1 | `SCR-SHL-02` and `SCR-SHL-03`, both now unblocked on everything else |
+| 4 | **`Q4-002` core edit** — one `friend` line in `src/Vehicle/Vehicle.h` plus a define | Tab 1 authorises | Aerora telemetry reaching the value picker and the CSV record; `SCR-TEL-01` |
+| 5 | **`Q-029` / ADR-014** authorization policy | Product + architecture | Any enforcement beyond "not enforced", `SCR-SEC-01/02` |
+| 6 | **`Q-037`** audit durability and tamper evidence | Tab 2 | `SCR-SEC-03`, `SCR-LOG-01`, and the audit rows the hub currently reports as false |
+
+`D-006` is first by a wide margin and is the only one whose resolution is not an engineering task.
 
 ## Status vocabulary
 

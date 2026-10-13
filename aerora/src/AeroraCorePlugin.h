@@ -37,6 +37,17 @@ public:
     /// engine, so it must be removed and deleted while the engine is still alive.
     void destroyQmlApplicationEngine(QQmlApplicationEngine *qmlEngine) override;
 
+    /// Appends the Aerora Operations Hub to the Analyze page registry (HO-TAB7-05, SCR-SHL-01).
+    ///
+    /// Registration is what makes the screen reachable at all: without it the QML compiles into
+    /// the resource, the module registers, and no menu entry opens it - with no error of any kind.
+    /// That matters more than one menu entry here, because SCR-SHL-01 is the screen that reports
+    /// authorization is *not* being enforced (P7-AUTH-002, P7-SEC-005).
+    ///
+    /// Appends to the base list rather than replacing it: the upstream Analyze pages are not
+    /// Aerora's to remove. See aerora/src/UI/Screens/AeroraOperationsHub.qml.
+    const QVariantList &analyzePages() override;
+
     /// Delegates to AeroraCommandAuthorizer when an authorization policy is configured.
     ///
     /// While no policy is configured (Q-029 is OPEN) this returns true and warns once. That is a

@@ -169,6 +169,16 @@ list(APPEND _aerora_include_directories
 #     module that does not import it cannot see AeroraUi or AeroraTelemetryState. This mirrors
 #     src/CMakeLists.txt:15-26, where QGroundControlModule does exactly the same thing.
 #
+#   * IMPORTS QGroundControl.AnalyzeView is what makes AnalyzePage resolvable. AeroraOperationsHub.qml
+#     roots on AnalyzePage, which upstream declares in AnalyzeViewModule (src/AnalyzeView/CMakeLists.txt:19-24,
+#     URI QGroundControl.AnalyzeView). Upstream's own analyze pages import nothing for it because they
+#     are members of that same module (MAVLinkInspector/MAVLinkInspectorPage.qml is listed at :29) and
+#     types within a module are mutually visible. The hub is a member of Aerora.Controls instead, so it
+#     gets no such visibility and would fail to load with "AnalyzePage is not a type" - at runtime only,
+#     with the resource present and the page registered. Declared here rather than as a file-level import
+#     in the hub because this block is where this module's dependencies are stated, and because
+#     aerora/CMakeLists.txt is M-Plugin's file while the hub is M-Ui's.
+#
 # No addImportPath() call is needed. The base QGCCorePlugin::createQmlApplicationEngine() already
 # adds qrc:/qml (src/API/QGCCorePlugin.cc:303) and a module at qrc:/qml/Aerora/Controls/ resolves
 # from it.
@@ -191,6 +201,7 @@ if(AERORA_UI_QML_FILES)
             QGC
             QGroundControl
             QGroundControl.Controls
+            QGroundControl.AnalyzeView
         NO_PLUGIN
     )
 
