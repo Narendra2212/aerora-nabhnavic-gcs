@@ -2,11 +2,14 @@
 
 #include <QtCore/QString>
 
+#include "AeroraAutoPilotPlugin.h"
 #include "AeroraFirmwareClaim.h"
 #include "AeroraMissionBridge.h"
 #include "AeroraPayloadModel.h"
 #include "AeroraPowerModel.h"
 #include "AeroraTelemetrySet.h"
+#include "AeroraToolIndicators.h"
+#include "AeroraVehicleCapabilities.h"
 #include "AeroraVehicleFactGroupRegistrar.h"
 #include "AeroraVehicleLog.h"
 #include "AeroraVehicleServices.h"
@@ -99,6 +102,10 @@ void AeroraFirmwarePlugin::initializeVehicle(Vehicle *vehicle)
     // A later capability report retries resolution through AeroraVehicleServices.
     services->resolveProductProfile();
 
+    // Before the offline-editing return below, because the capability inventory is attached on
+    // that path too and the connection costs nothing when there is no indicator to re-offer.
+    _installToolIndicatorInvalidation(services->capabilities());
+
     if (vehicle->isOfflineEditingVehicle()) {
         // The offline-editing vehicle exists so a plan can be built with no aircraft present. It
         // has no link, reports nothing, and its firmware class follows a settings value rather
@@ -165,6 +172,58 @@ void AeroraFirmwarePlugin::attachDomainServices(AeroraVehicleServices *services)
         // group. Publication seals the set, and sealing is one-way.
         publishTelemetry(vehicle, telemetrySet);
     }
+}
+
+AutoPilotPlugin *AeroraFirmwarePlugin::autopilotPlugin(Vehicle *vehicle) const
+{
+    if (!vehicle) {
+        qCWarning(AeroraVehicleLog) << "cannot create the Aerora autopilot plugin, no vehicle";
+        return nullptr;
+    }
+
+    // Parented to the vehicle, matching the base. Vehicle re-parents it to itself anyway and
+    // deletes it in its own destructor (Vehicle.cc:145-146, :407).
+    return new AeroraAutoPilotPlugin(vehicle, vehicle);
+}
+
+const QVariantList &AeroraFirmwarePlugin::toolIndicators(const Vehicle *vehicle)
+{
+    const QVariantList &baseIndicators = FirmwarePlugin::toolIndicators(vehicle);
+
+    const QList<AeroraToolIndicators::IndicatorDescriptor> declared = AeroraToolIndicators::declaredIndicators();
+    if (declared.isEmpty()) {
+        // Aerora declares no indicator, so the base list is returned untouched rather than copied
+        // into this object's member. Nothing is added and nothing is removed.
+        return baseIndicators;
+    }
+
+    if (!vehicle) {
+        // Without a vehicle there is no capability inventory, and a capability-gated indicator
+        // must not be offered on no evidence.
+        qCWarning(AeroraVehicleLog) << "no vehicle, Aerora tool indicators withheld";
+        return baseIndicators;
+    }
+
+    const AeroraVehicleServices *const services = AeroraVehicleServices::forVehicle(vehicle);
+
+    const AeroraVehicleCapabilities *const capabilities = services ? services->capabilities() : nullptr;
+
+    _aeroraToolIndicators = baseIndicators;
+    _aeroraToolIndicators.append(AeroraToolIndicators::urlsFor(declared, capabilities));
+
+    return _aeroraToolIndicators;
+}
+
+void AeroraFirmwarePlugin::_installToolIndicatorInvalidation(AeroraVehicleCapabilities *capabilities)
+{
+    if (!capabilities || AeroraToolIndicators::declaredIndicators().isEmpty()) {
+        return;
+    }
+
+    (void) connect(capabilities, &AeroraVehicleCapabilities::capabilityChanged,
+                   this, &AeroraFirmwarePlugin::toolIndicatorsChanged);
+    (void) connect(capabilities, &AeroraVehicleCapabilities::reportsCleared,
+                   this, &AeroraFirmwarePlugin::toolIndicatorsChanged);
 }
 
 MAV_AUTOPILOT AeroraFirmwarePlugin::_autopilotType() const

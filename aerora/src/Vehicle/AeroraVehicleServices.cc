@@ -65,6 +65,15 @@ AeroraVehicleServices *AeroraVehicleServices::forVehicle(Vehicle *vehicle)
     return vehicle->findChild<AeroraVehicleServices *>(QString(), Qt::FindDirectChildrenOnly);
 }
 
+const AeroraVehicleServices *AeroraVehicleServices::forVehicle(const Vehicle *vehicle)
+{
+    if (!vehicle) {
+        return nullptr;
+    }
+
+    return vehicle->findChild<AeroraVehicleServices *>(QString(), Qt::FindDirectChildrenOnly);
+}
+
 void AeroraVehicleServices::reportAeroraCorroboration()
 {
     if (_classification == Classification::NotAerora) {

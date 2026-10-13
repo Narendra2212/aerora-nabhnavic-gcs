@@ -16,7 +16,11 @@ phase document and the current source disagree, the source wins and the differen
 | Source in this subtree | `IMPLEMENTED-UNCOMPILED` |
 | Tests in this subtree | `IMPLEMENTED-UNCOMPILED` |
 | QGC core modifications by this workstream | **NONE.** Two authorized core edits exist — the `AeroraVehicleFactGroupRegistrar` friend declaration (Q4-002/ADR-016) and the `startCalibration()` authorization gate — both made by M-Plugin / M-Security, not here |
-| Wiring into `aerora/CMakeLists.txt` | `BLOCKED` — in a file owned by M-Plugin |
+| Wiring into `aerora/CMakeLists.txt` | Serviced by M-Plugin. This module exports `AERORA_VEHICLE_TEST_NAMES`; the `add_qgc_test` lines are M-Plugin's |
+| Vehicle setup pages — `AeroraAutoPilotPlugin` (U4) | `IMPLEMENTED-UNCOMPILED` — seam complete; **no page publishes**, because the Aerora setup QML does not exist. See [Vehicle setup pages and tool indicators](#vehicle-setup-pages-and-tool-indicators-u4-u5) |
+| Vehicle setup pages — the JSON-driven `vehicleConfigJson()` path | `CONTRACT-ONLY` — the override exists and returns empty. A page definition names real parameters, and no Aerora parameter is evidenced |
+| Vehicle setup pages — calibration (`SCR-VEH-05`) | **WITHHELD** by decision while `Q-029` is open, with the reason in source and a test asserting the absence |
+| Per-vehicle tool indicators — `toolIndicators()` (U5) | `IMPLEMENTED-UNCOMPILED` — gate and per-vehicle resolution complete; **the declared set is empty** |
 | Mission attachment | `IMPLEMENTED-UNCOMPILED` |
 | Payload attachment | `IMPLEMENTED-UNCOMPILED` |
 | Power attachment | `IMPLEMENTED-UNCOMPILED` |
@@ -29,7 +33,8 @@ phase document and the current source disagree, the source wins and the differen
 | Product profiles | `CONTRACT-ONLY` — interface exists, no profile implemented |
 
 **Nothing here has been compiled.** This host has no compiler, no CMake, no Ninja, no Qt and
-0.19 GB free on its only drive, so no build or test has run. Verification that did happen is listed
+2.02 GB free on its only drive against the 40 GB required, so no build or test has run. Verification
+that did happen is listed
 under [What was actually verified](#what-was-actually-verified).
 
 ## What this layer is
@@ -132,7 +137,10 @@ fails when the translation unit is dropped instead of forcing it to link.
 | --- | --- |
 | `AeroraFirmwareClaim.h` | The one firmware class an Aerora build claims. One line to change when Q-018 resolves |
 | `AeroraFirmwarePluginFactory.{h,cc}` | Self-registering factory |
-| `AeroraFirmwarePlugin.{h,cc}` | `FirmwarePlugin` subclass; attaches services in `initializeVehicle()` |
+| `AeroraFirmwarePlugin.{h,cc}` | `FirmwarePlugin` subclass; attaches services in `initializeVehicle()`, supplies the autopilot plugin and the tool indicators |
+| `AeroraAutoPilotPlugin.{h,cc}` | `AutoPilotPlugin` subclass; the vehicle setup page index |
+| `AeroraVehicleComponent.{h,cc}` | The setup page type and the page catalogue |
+| `AeroraToolIndicators.{h,cc}` | Per-vehicle toolbar indicator set and its capability gate |
 | `AeroraVehicleServices.{h,cc}` | The per-vehicle hub, parented to the `Vehicle` |
 | `AeroraVehicleIdentity.{h,cc}` | MAVLink identity and Aerora fleet identity, kept apart |
 | `AeroraVehicleCapabilities.{h,cc}` | Five capability categories with a three-state evidence model |
@@ -146,6 +154,8 @@ Under `aerora/test/Vehicle/`:
 | --- | --- |
 | `AeroraVehicleMock.{h,cc}` | **MOCK / TEST ONLY** deterministic driver |
 | `AeroraVehicleIntegrationTest.{h,cc}` | Architectural-property tests, `Unit` |
+| `AeroraVehicleSetupTest.{h,cc}` | Setup page catalogue and indicator gate, `Unit` |
+| `AeroraProfileRegistryTest.{h,cc}` | Profile registration and selection direction, `Unit` |
 | `AeroraVehicleLifecycleTest.{h,cc}` | Lifecycle on a real `Vehicle`, `Integration Vehicle` |
 
 The layout and the manifest style follow `aerora/src/Telemetry/Telemetry.cmake`, which established
@@ -590,6 +600,125 @@ is written inside the hook, this one path records no attempt where every other p
 Owner: M-Security for whether the audit record should cover unsendable attempts, M-Plugin for the
 core file if it should. Reported, not changed.
 
+## Vehicle setup pages and tool indicators (U4, U5)
+
+Two `FirmwarePlugin` virtuals, both previously unoverridden:
+
+```text
+Vehicle ctor ──► FirmwarePlugin::autopilotPlugin(this)      FirmwarePlugin.h:122
+                      ↓
+                 AeroraAutoPilotPlugin                      the setup page index, SCR-VEH-01
+                      ↓  vehicleComponents()
+                 AeroraVehicleComponent × n   +   JoystickComponent
+
+Toolbar ──────► FirmwarePlugin::toolIndicators(vehicle)     FirmwarePlugin.h:344
+                      ↓
+                 base list  +  AeroraToolIndicators::urlsFor(capabilities)
+```
+
+### Three corrections to the Phase 7 plan, from reading the source
+
+| Plan statement | What the source says |
+| --- | --- |
+| `vehicleConfigJson()` is an `AutoPilotPlugin`-level path (plan docs 03 and 07) | It is a virtual on **`VehicleComponent`** (`VehicleComponent.h:52`). The section engine is in `VehicleComponent.cc` |
+| Subclass `AutoPilotPlugin` | Forced, not a choice. `GenericAutoPilotPlugin` declares `vehicleComponents()` **`final`** (`GenericAutoPilotPlugin.h:18`), so it cannot be extended |
+| "`toolIndicators` — ~10 lines" | ~10 lines only if the list is appended to the inherited `_toolIndicatorList`, which is wrong. `FirmwarePluginManager` caches one plugin per firmware class, so a capability-dependent list cached there is computed for whichever vehicle asks first and then served to all of them |
+
+The third is the same shared-singleton hazard that keeps `factGroups()` unoverridden in this module,
+reached by a different route. The list is therefore recomputed per call into this plugin's own
+member, never into the inherited one.
+
+### A page publishes only when its QML exists
+
+A descriptor names resources; it does not create them. The Aerora setup QML is M-Ui's, and until it
+exists a published page would load a panel that renders nothing —
+`VehicleConfigView.qml:209` calls `panelLoader.setSource(vehicleComponent.setupSource, ...)` with no
+existence check of its own, and `FlyViewToolBarIndicators.qml` binds `visible: item.showIndicator`
+on the loaded item with no null guard.
+
+So both seams gate on the resource being present, and the honest result today is **no Aerora setup
+page and no Aerora indicator**. This is the declared-intent-plus-existence shape
+`AeroraQmlOverrides::verify()` already established in this overlay: the catalogue is the declaration
+of intent, and `unresolvedPageResources()` names what is declared but absent, so an absent page is
+reportable rather than silent. A page appears with no C++ change once its QML lands.
+
+The resource root is `:/qml/Aerora/Controls`, which is not a guess: it follows
+`AERORA_UI_QML_MODULE_URI` and `RESOURCE_PREFIX /qml` from `aerora/src/UI/Ui.cmake:133`, and the
+alias that flattens it to that path landed in `a73699796`. A stale path fails closed — the page is
+withheld — rather than publishing a panel that cannot load.
+
+### The six `SCR-VEH-*` integration points
+
+| Screen | Treatment |
+| --- | --- |
+| `SCR-VEH-01` page index | `AeroraAutoPilotPlugin::vehicleComponents()`. The list itself, not a page |
+| `SCR-VEH-02` identity and profile | Declared. Backed by `AeroraVehicleIdentity` and the resolved profile |
+| `SCR-VEH-03` capability report | Declared. Backed by `AeroraVehicleCapabilities`' three-state model |
+| `SCR-VEH-04` sensor and health | Declared, with the `vehicleConfigJson()` seam implemented and empty |
+| `SCR-VEH-05` calibration | **WITHHELD.** See below |
+| `SCR-VEH-06` service diagnostics | Declared. Backed by `AeroraVehicleServices::serviceNames()` |
+
+Calibration is the one `SCR-VEH-*` screen that acts on the aircraft, and the ADR-015 gate in front
+of it permits everything while the operator role set is undecided (`Q-029`). An Aerora calibration
+page would present a gated operation whose gate evaluates nothing, so none is published.
+`AeroraVehicleComponent::withheldPageReason()` carries the reason in source and
+`AeroraVehicleSetupTest` asserts the absence, so the omission is a decision with a test behind it
+rather than a gap in the numbering.
+
+Upstream calibration pages are unaffected and remain reachable through their own firmware plugins.
+
+### Every published page is read-only
+
+`requiresSetup()` returns false and `setupComplete()` returns true for every Aerora page. Returning
+true from `requiresSetup()` would badge a page that has no action on it and would make
+`AutoPilotPlugin::parametersReadyPreChecks()` raise "Configuration tasks remain before this vehicle
+is ready to fly" for a vehicle with no outstanding task. `setupCompleteChangedTriggerList()` is
+empty because a trigger list is parameter names and no Aerora parameter is evidenced.
+
+The joystick page is reproduced from `GenericAutoPilotPlugin` rather than dropped. It is the entire
+content of the plugin this one displaces, and `JoystickComponent` is firmware neutral
+(`AutoPilotPlugins/Common`), so omitting it would remove joystick setup from every Aerora vehicle
+with no error attached.
+
+### Indicator membership is not indicator visibility
+
+`showIndicator` inside a component answers "is there something to show right now" from live state.
+`AeroraToolIndicators::isPublishable()` answers a different question: "does this vehicle have the
+capability this indicator reports on at all". The gate requires
+`AeroraVehicleCapabilities::isAvailable()`, which is true only for `State::Available` — so
+`NotEvidenced` and `Unavailable` both withhold the indicator, and a null inventory withholds it too.
+An attached-but-silent capabilities object is not evidence, and the absence of one is not
+permission.
+
+This is the sanctioned place for a capability-driven indicator: `toolIndicators()` is the one
+indicator registry with a `toolIndicatorsChanged()` signal, where `QGCCorePlugin::toolBarIndicators`
+is `CONSTANT` and never re-read after first bind.
+
+Nothing in QGroundControl's `src/` emits `toolIndicatorsChanged()` — `Vehicle` only relays it
+(`Vehicle.cc:231`) — so this module emits it on a capability report, otherwise the answer to the
+first query would become the permanent one. That connection is not installed while the declared set
+is empty, because there is no membership it could change.
+
+### What the declared sets contain, and why
+
+| Set | Contents | Why |
+| --- | --- | --- |
+| Page catalogue | 4 descriptors, 0 publishable | The QML is M-Ui's and does not exist |
+| Indicator set | **empty** | Two prerequisites absent: no Aerora toolbar QML, and no capability identifier to gate on (`Q3-009`). An entry written now would invent a capability key |
+
+### One limit on the profile-capability claim
+
+`P7-FLEET-002` — "a profile never grants a capability" — is asserted of the two pieces that can
+enforce it: the registry, whose `resolve()` takes a `const AeroraVehicleCapabilities &`, and this
+layer, which reports nothing on a profile's behalf. It is **not** structurally enforced against a
+profile implementation: `AeroraProductProfile::attachToVehicle()` receives a mutable
+`AeroraVehicleServices &`, whose `capabilities()` hands out a non-const pointer with a public
+`report()`. A profile that called it would succeed.
+
+Recorded rather than tested, because a test asserting it would enshrine it. Closing it means
+narrowing either `capabilities()` or `report()`, which touches the evidence-source contract and is
+not this change's scope.
+
 ## Product-family attachment
 
 ```text
@@ -717,10 +846,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure -R AeroraVehicle
 ```
 
-Both tests also self-register through `UT_REGISTER_TEST`, so they are reachable without CTest:
+All four tests also self-register through `UT_REGISTER_TEST`, so they are reachable without CTest:
 
 ```bash
 ./QGroundControl --unittest:AeroraVehicleIntegrationTest
+./QGroundControl --unittest:AeroraVehicleSetupTest
+./QGroundControl --unittest:AeroraProfileRegistryTest
 ./QGroundControl --unittest:AeroraVehicleLifecycleTest
 ```
 
@@ -757,9 +888,21 @@ as to the production code. That is stricter than the core test tree and is inten
 | Test execution | **NOT RUN** |
 | `clang-format`, `clang-tidy`, `clazy`, `cmake-format`, `cmake-lint` | **NOT RUN** — not installed |
 
-The text-level checks were run from a throwaway script outside the repository. They are not a
-compile and are not claimed to be one. The honest status of this subtree is
-`IMPLEMENTED-UNCOMPILED`.
+Re-run for the U4 / U5 change, on the files it touches:
+
+| Check | Result |
+| --- | --- |
+| `.kiro/tools/aerora-manifest-check.ps1` | **PASS**, 0 problems across all 6 checks, 127 sources, 0 undeclared, every `_TEST_NAMES` entry registered |
+| `python tools/analyzers/vehicle_null_check.py` on all 10 changed production files | **PASS**, exit 0 |
+| `python tools/analyzers/qt_translate_noop_check.py` on all 16 changed files | **PASS**, exit 0 |
+| `check-no-qassert`, `check-no-qtest-ignore-message`, `check-no-fixed-qwait`, `check-categorized-logging`, no `qCInfo`, no tabs | **PASS**, hook patterns replicated locally |
+| 120-column limit, LF endings, no trailing whitespace, final newline | **PASS** on all 16 files |
+| `python tools/check_clang_format.py` | **NOT RUN** — fails with `WinError 2`; the `clang-format` binary is absent |
+| `.kiro/tools/aerora-preflight.ps1` | **NO-GO**, 8 blocking failures: no CMake, no Ninja, no MSVC, no Qt, no GStreamer, 2.02 GB free of 40 GB required, no elevation |
+| Compile, link, test execution | **NOT RUN** — see above |
+
+The text-level checks are not a compile and are not claimed to be one. **Every test in this subtree
+is written and unexecuted.** The honest status is `IMPLEMENTED-UNCOMPILED`.
 
 ## Corrections to earlier phases
 
@@ -809,14 +952,14 @@ Only genuine blockers. Nothing here is answerable from this repository.
 | **`startCalibration()` audit on an absent link** | The gate sits after the link check, so an unsendable attempt is not offered to the hook. Enforcement unaffected | Nothing. An audit-completeness decision for M-Security |
 | **Concrete Aerora fact groups** | Q4-002 is resolved and publication is wired, but the set is empty: no dialect exists, so no group, Fact name, unit or metadata does either | Anything Aerora-specific appearing in the value picker, the CSV record or MAVLink dispatch. Owned by M-Telemetry, gated on the dialect |
 | **Telemetry service name** | `AeroraTelemetrySet` publishes no `kServiceName`; the composition root supplies `"telemetry"` | Nothing. One constant, to be adopted on the type by M-Telemetry |
-| **Overlay aggregation** | `aerora/CMakeLists.txt` does not include any module manifest, and this module is no longer standalone | Building or running anything in this module |
+| ~~Overlay aggregation~~ | **Closed.** `aerora/CMakeLists.txt` includes every module manifest, this one among them, and registers this module's four tests | — |
 | **Q-018** | The `MAV_AUTOPILOT` value Aerora firmware reports | Nothing structural. `AeroraFirmwareClaim::kFirmwareClass` is one line |
 | **Q-007** | Aerora flight-mode and authority-mode mapping | Every named flight-mode accessor. Empty is the safe state meanwhile |
 | Aerora fleet identity format | Serial, UUID, registration number — none evidenced | Nothing structural. The token is opaque |
 | Aerora capability identifiers | No capability key is evidenced | Nothing structural. Keys are opaque strings |
 | **Q4-004** | Whether to disable the upstream factories | Nothing in this module. Evidence that narrows it is above: there is no selection race, so this is a product and UI decision with a known test-suite cost |
-| Overlay wiring | `aerora/CMakeLists.txt` does not yet include `src/Vehicle/Vehicle.cmake` | Building or running anything in this module. Four lines in a file this workstream does not own |
-| Build host | 0.19 GB free, no toolchain, no elevation | Every compile, link and test claim in the programme |
+| Aerora setup-page and indicator QML | Four page panels and any toolbar component. Owned by M-Ui | Only the *display* of `SCR-VEH-02`..`04`, `06` and `SCR-SHL-02`. The C++ seams are in place and publish nothing until the QML exists |
+| Build host | 2.02 GB free of 40 GB required, no toolchain, no elevation (`D-006`) | Every compile, link and test claim in the programme |
 
 ## Status vocabulary
 

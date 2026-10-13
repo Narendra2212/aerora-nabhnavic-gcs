@@ -1,8 +1,12 @@
 #pragma once
 
+#include <QtCore/QVariantList>
+
 #include "FirmwarePlugin.h"
 
+class AeroraVehicleCapabilities;
 class AeroraVehicleServices;
+class AutoPilotPlugin;
 class Vehicle;
 
 /// Aerora's firmware abstraction.
@@ -121,8 +125,49 @@ public:
     /// services object with no vehicle.
     static void attachDomainServices(AeroraVehicleServices *services);
 
+    /// @return A new AeroraAutoPilotPlugin owned by @a vehicle, or nullptr when @a vehicle is null.
+    ///
+    /// This is QGroundControl's only seam for supplying a firmware class's vehicle setup pages.
+    /// The base returns a `GenericAutoPilotPlugin`, whose single page is joystick setup;
+    /// AeroraAutoPilotPlugin reproduces that page rather than dropping it. See that class for why
+    /// it cannot simply derive from the generic one.
+    ///
+    /// Null is returned rather than delegating to the base when @a vehicle is null, because the
+    /// base would construct a `GenericAutoPilotPlugin`, whose `AutoPilotPlugin` constructor reads
+    /// `vehicle->firmwarePlugin()` unguarded. `Vehicle` always passes itself
+    /// (`Vehicle.cc:145-146`), so the null case is reachable only from a direct call.
+    AutoPilotPlugin *autopilotPlugin(Vehicle *vehicle) const final;
+
+    /// The toolbar indicators for @a vehicle: the base set, plus any Aerora indicator whose
+    /// capability this vehicle has reported available.
+    ///
+    /// Recomputed per call into this object's own member, and deliberately **not** appended to the
+    /// inherited `_toolIndicatorList`. `FirmwarePluginManager::firmwarePluginForAutopilot()` caches
+    /// one plugin instance per firmware class, so a capability-dependent list cached in the
+    /// inherited member would be computed for whichever vehicle asked first and then served to
+    /// every other vehicle of the class. That is the same shared-singleton hazard that keeps
+    /// `factGroups()` unoverridden here.
+    ///
+    /// The returned reference is valid until the next call, which is the contract the base already
+    /// has: it too returns a reference to a single shared member.
+    const QVariantList &toolIndicators(const Vehicle *vehicle) final;
+
 protected:
     /// @return The autopilot type matching the claimed firmware class, so parameter metadata
     ///         lookup follows AeroraFirmwareClaim::kFirmwareClass rather than being hard-coded.
     MAV_AUTOPILOT _autopilotType() const final;
+
+private:
+    /// Makes a capability report re-reach the toolbar by emitting `toolIndicatorsChanged()`.
+    ///
+    /// Indicator membership depends on reported capability, and capability reports arrive after
+    /// connect. Without this the answer to the first query would become the permanent one, because
+    /// nothing in QGroundControl's `src/` ever emits that signal — `Vehicle` only relays it
+    /// (`Vehicle.cc:231`).
+    ///
+    /// A no-op while no Aerora indicator is declared: there is no membership to change, so the
+    /// connection would emit on every capability report and alter nothing.
+    void _installToolIndicatorInvalidation(AeroraVehicleCapabilities *capabilities);
+
+    QVariantList _aeroraToolIndicators;
 };

@@ -26,4 +26,7 @@ public:
 private slots:
     void _aeroraServicesAttachToADiscoveredVehicle();
     void _domainServicesAttachToADiscoveredVehicle();
+    void _missionBridgeIsAttachedByTheLifecycleAndOnlyOnce();
+    void _autopilotPluginPublishesOnlyPagesThatExist();
+    void _toolIndicatorsAreResolvedPerVehicle();
 };

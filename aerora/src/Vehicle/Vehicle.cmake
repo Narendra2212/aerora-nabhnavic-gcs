@@ -23,6 +23,8 @@
 #       list(APPEND CUSTOM_INCLUDE_DIRECTORIES ${AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES})
 #       include(QGCTest)
 #       add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
+#       add_qgc_test(AeroraVehicleSetupTest LABELS Unit)
+#       add_qgc_test(AeroraProfileRegistryTest LABELS Unit)
 #       add_qgc_test(AeroraVehicleLifecycleTest LABELS Integration Vehicle)
 #   endif()
 #
@@ -78,6 +80,8 @@ set(AERORA_VEHICLE_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 
 set(AERORA_VEHICLE_SOURCES
+    ${AERORA_VEHICLE_DIR}/AeroraAutoPilotPlugin.cc
+    ${AERORA_VEHICLE_DIR}/AeroraAutoPilotPlugin.h
     ${AERORA_VEHICLE_DIR}/AeroraFirmwareClaim.h
     ${AERORA_VEHICLE_DIR}/AeroraFirmwarePlugin.cc
     ${AERORA_VEHICLE_DIR}/AeroraFirmwarePlugin.h
@@ -85,8 +89,12 @@ set(AERORA_VEHICLE_SOURCES
     ${AERORA_VEHICLE_DIR}/AeroraFirmwarePluginFactory.h
     ${AERORA_VEHICLE_DIR}/AeroraProductProfile.cc
     ${AERORA_VEHICLE_DIR}/AeroraProductProfile.h
+    ${AERORA_VEHICLE_DIR}/AeroraToolIndicators.cc
+    ${AERORA_VEHICLE_DIR}/AeroraToolIndicators.h
     ${AERORA_VEHICLE_DIR}/AeroraVehicleCapabilities.cc
     ${AERORA_VEHICLE_DIR}/AeroraVehicleCapabilities.h
+    ${AERORA_VEHICLE_DIR}/AeroraVehicleComponent.cc
+    ${AERORA_VEHICLE_DIR}/AeroraVehicleComponent.h
     ${AERORA_VEHICLE_DIR}/AeroraVehicleIdentity.cc
     ${AERORA_VEHICLE_DIR}/AeroraVehicleIdentity.h
     ${AERORA_VEHICLE_DIR}/AeroraVehicleLog.cc
@@ -94,6 +102,24 @@ set(AERORA_VEHICLE_SOURCES
     ${AERORA_VEHICLE_DIR}/AeroraVehicleServices.cc
     ${AERORA_VEHICLE_DIR}/AeroraVehicleServices.h
 )
+
+# ----------------------------------------------------------------------------
+# Core dependency added by the setup-page and indicator integration
+#
+# AeroraAutoPilotPlugin, AeroraVehicleComponent and AeroraToolIndicators consume QGroundControl's
+# setup-page API by unqualified include: AutoPilotPlugin.h and VehicleComponent.h from
+# src/AutoPilotPlugins, and JoystickComponent.h from src/AutoPilotPlugins/Common.
+#
+# No include directory is added here for them, deliberately. Both directories are already PRIVATE
+# include directories on the application target (src/AutoPilotPlugins/CMakeLists.txt:15-20 and
+# src/AutoPilotPlugins/Common/CMakeLists.txt:28), and CUSTOM_SOURCES compile into that same target
+# - which is the same reason AeroraFirmwarePlugin.cc can include "Vehicle.h" and "FirmwarePlugin.h"
+# unqualified today. Re-listing them would imply they are not already present.
+#
+# The consequence to be aware of: this module now depends on the application target's include set,
+# so it cannot be built as a standalone library even if the static-initialiser constraint above
+# were lifted.
+# ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
 # Cross-module dependency
@@ -150,10 +176,14 @@ cmake_path(NORMAL_PATH AERORA_VEHICLE_TEST_DIR)
 set(AERORA_VEHICLE_TEST_SOURCES
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleMock.cc
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleMock.h
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraProfileRegistryTest.cc
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraProfileRegistryTest.h
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleIntegrationTest.cc
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleIntegrationTest.h
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleLifecycleTest.cc
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleLifecycleTest.h
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleSetupTest.cc
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleSetupTest.h
 )
 
 set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES
@@ -163,4 +193,14 @@ set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES
 )
 
 # CTest names, so the aggregation point can register them without reading this file.
-set(AERORA_VEHICLE_TEST_NAMES AeroraVehicleIntegrationTest AeroraVehicleLifecycleTest)
+#
+# Labels are not carried in this variable because add_qgc_test takes them positionally and the two
+# label sets differ: the three Unit tests need no Vehicle, no link and no event loop, while
+# AeroraVehicleLifecycleTest drives a MockLink connection. See the integration snippet at the top
+# of this file for the exact calls.
+set(AERORA_VEHICLE_TEST_NAMES
+    AeroraVehicleIntegrationTest
+    AeroraVehicleSetupTest
+    AeroraProfileRegistryTest
+    AeroraVehicleLifecycleTest
+)

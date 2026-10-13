@@ -86,6 +86,12 @@ public:
     ///         the supported entry point for other Aerora workstreams.
     static AeroraVehicleServices *forVehicle(Vehicle *vehicle);
 
+    /// Read-only overload, for the QGroundControl seams that hand out a `const Vehicle *` —
+    /// `FirmwarePlugin::toolIndicators()` is the first. The lookup is a `findChild`, so it mutates
+    /// neither the vehicle nor the services object; the overload exists so a read-only caller does
+    /// not have to cast the constness away to perform it.
+    static const AeroraVehicleServices *forVehicle(const Vehicle *vehicle);
+
     /// @return The vehicle these services belong to, or nullptr on the mock and test path.
     ///         Callers must null-check before dereferencing.
     Vehicle *vehicle() const { return _vehicle; }
