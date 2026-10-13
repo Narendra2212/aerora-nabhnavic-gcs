@@ -328,17 +328,44 @@ state of its own, and is audited by `AeroraUiSafetyTest` with no writable proper
 `toolBarIndicators()` override, which is a `QGCCorePlugin` virtual and therefore Tab 1's —
 HO-TAB7-06.
 
-### `SCR-SHL-01`: three facts, held apart
+### `SCR-SHL-01`: four facts, held apart
 
 The hub is the first Aerora screen to exist, and "implemented" is doing less work in that sentence
-than it looks. Three separate things have to be true before an operator can read it, and they are
-recorded separately because two of them have failed silently in this programme already:
+than it looks. Four separate things have to be true before an operator can read it, and they are
+recorded separately because three of them have failed silently in this programme already:
 
 | Fact | State | Evidence |
 | --- | --- | --- |
 | The screen exists in source | **Yes** | `aerora/src/UI/Screens/AeroraOperationsHub.qml` and `Controls/AeroraSelfReportRow.qml`, committed in `3b19d112a` |
-| It is compiled into the application resources | **Yes, `SOURCE-INSPECTED`** | Declared in `AERORA_UI_QML_FILES` (`aerora/src/UI/Ui.cmake`), which `aerora/CMakeLists.txt` passes to `qt_add_qml_module` through `QML_FILES` after `qgc_set_qt_resource_alias()`. Read from the build files; no build has run |
+| It is compiled into the application resources | **Yes, `SOURCE-INSPECTED`** | Declared in `AERORA_UI_QML_FILES` (`Ui.cmake:141`), which `aerora/CMakeLists.txt` passes to `qt_add_qml_module` through `QML_FILES` after `qgc_set_qt_resource_alias()`. Read from the build files; no build has run |
 | It is reachable through navigation | **Yes, `SOURCE-INSPECTED`** | `AeroraCorePlugin::analyzePages()` appends it to the base registry — HO-TAB7-05, applied. Before that it was in the resource with no menu entry and no error of any kind |
+| **Its root type resolves** | **Yes, `SOURCE-INSPECTED` — and it did not until this pass** | See below |
+
+#### The fourth fact was a real defect, not a formality
+
+The hub roots on `AnalyzePage`, which is the correct upstream convention — `MAVLinkInspectorPage.qml`
+does the same. But upstream's analyze pages resolve that type without importing anything for it
+because they are **members of the module that declares it**: `AnalyzePage.qml` and
+`MAVLinkInspector/MAVLinkInspectorPage.qml` are both listed in `AnalyzeViewModule`
+(`src/AnalyzeView/CMakeLists.txt:19-29`, URI `QGroundControl.AnalyzeView`), and types within a QML
+module are mutually visible.
+
+The hub is a member of `Aerora.Controls` instead, and that module imported only `QGC`,
+`QGroundControl` and `QGroundControl.Controls`. So `AnalyzePage` was **unresolvable from the hub**:
+the resource would be present, the page registered, the menu entry live, and opening it would have
+failed with "AnalyzePage is not a type" — at runtime, with nothing wrong at configure or compile
+time to catch it.
+
+Fixed by adding `IMPORTS QGroundControl.AnalyzeView` to the module declaration in
+`aerora/CMakeLists.txt`. Declared there rather than as a file-level `import` in the hub because that
+block is where this module's dependencies are stated and because the CMake is M-Plugin's file while
+the hub is M-Ui's.
+
+This is the third silent-registration failure in the same family — HO-TAB7-02 (interceptor never
+installed), `D-UI-04` (`IMPORTS QGC` missing), and now this. All three were invisible without a
+build, all three would have presented as "the Aerora UI just isn't there", and none would have
+produced an error. The pattern is worth naming: **a QML module's `IMPORTS` list is load-bearing and
+is not checkable by any tool available on this host.**
 | Its root type resolves | **Yes, `SOURCE-INSPECTED`** | The hub roots on `AnalyzePage`, which upstream declares in `AnalyzeViewModule` under URI `QGroundControl.AnalyzeView` (`src/AnalyzeView/CMakeLists.txt:19-24`). Upstream's own pages import nothing for it because they are members of that module; the hub is a member of `Aerora.Controls`, so `IMPORTS QGroundControl.AnalyzeView` was added to the module block |
 
 That fourth row was found at this reconciliation and is the reason the list is four rows long rather
