@@ -506,6 +506,10 @@ The interface consumes `AeroraStateValue` and reads only. Everything needed to r
 `ageMs()` is deliberately a function rather than a notifying property: age advances continuously with
 no event to signal, so a consumer displaying it must re-read it.
 
+This module chooses no colour, icon, label or layout. `classToString()` and `kindToString()` return
+stable machine-readable identifiers for logs and records, not operator-facing text — visual design is
+Q-040 and `AeroraValueDisplay` is `M-Ui`'s artefact.
+
 ### The interface cannot write the capability
 
 `capability` carried `WRITE setCapability` until U3 / HO-TAB7-01, so "reads only" above was the
@@ -537,10 +541,6 @@ in [07 §7](../../../.kiro/specs/05-product-completion/07-phase-7-work-packages-
 | `HO-TAB4-01` | Tab 7 | `aerora/test/UI/AeroraUiSafetyTest.h`, `\section known` | Describes one live recorded deviation; the set is now empty. The `.cc` half was Tab 4's sanctioned edit, the header is not |
 | `HO-TAB4-02` | Tab 7 | `aerora/src/UI/AeroraVehicleUiContext.h:64-68`, and `04-ui-implementation/01-ui-foundation-closure.md` HO-TAB7-01 | "carries a `WRITE setCapability`" is no longer true; the handoff is closed |
 | `HO-TAB4-03` | Tab 1 | `05-product-completion/` 00, 03, 04 §3, 05 §5, 06 §5, 07 §7, 08 | Close `D-UI-03` / HO-TAB7-01 at `IMPLEMENTED-UNCOMPILED`; `R7-13` no longer applies |
-
-This module chooses no colour, icon, label or layout. `classToString()` and `kindToString()` return
-stable machine-readable identifiers for logs and records, not operator-facing text — visual design is
-Q-040 and `AeroraValueDisplay` is `M-Ui`'s artefact.
 
 ## Companion / GPU boundary
 
