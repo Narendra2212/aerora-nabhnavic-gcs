@@ -28,8 +28,10 @@ import QGroundControl.Controls
 /// produced an operator role set for one to be written against. This screen must never read as
 /// though authorization is in force, and three separate things keep it from doing so:
 ///
-/// \li the enforcement row is a `warning` whenever `enforcement === AeroraSecurity.NotEnforced`,
-///     and its text says *not enforced* in those words;
+/// \li the enforcement row is a `warning` unless `enforcement` matches
+///     `AeroraSecurity.EnforcedAtCommandGate`, and its text says *not enforced* in those words.
+///     The comparison is written against the enforced value and negated, never against
+///     `NotEnforced` — see `_enforced` below for why that direction is the fail-safe one;
 /// \li `AeroraSecurity.enforcementVerified` is reported as its own row, because a configured
 ///     policy is not an observed one. It is false on every build that has not been compiled and
 ///     exercised (`D-006`), so the satisfied case still carries the caveat;
