@@ -619,9 +619,25 @@ intent, the document is the artefact under review. This is also why `R7-21` exis
 
 A tab needing a change in another tab's file files a handoff rather than making the edit.
 
+### ID allocation
+
+`HO-TAB<n>-<nn>`, where `<n>` is the **raising** tab and `<nn>` is the next number **not already in
+the table below**. Grep the table before choosing; do not assume the highest number you remember is
+still the highest.
+
+This rule exists because it has now been broken twice. Document number 09 was used twice, and in the
+same pass `HO-TAB1-04` and `HO-TAB1-05` were each issued twice — the second time by Tab 1, which
+owns this file, because rows were appended without re-reading a table that other passes had grown
+concurrently. Both collisions were resolved by renumbering the entry with fewer inbound references:
+Tab 1's two new rows became `HO-TAB1-08` and `HO-TAB1-09`, leaving Tab 7's closed `HO-TAB1-04` and
+Tab 4's `HO-TAB1-05` untouched, since those are already referenced from module documentation.
+
+The durable fix is the same shape as `D-UI-07`: an identifier space that is checked mechanically
+rather than remembered. Until something checks it, re-reading the table is the rule.
+
 | Field | Required |
 | --- | --- |
-| ID | `HO-TAB<n>-<nn>` |
+| ID | `HO-TAB<n>-<nn>` — see [ID allocation](#id-allocation) |
 | Owner | The tab that owns the file |
 | File and line | Exact |
 | Change | The exact text where it is short enough to quote |
@@ -643,8 +659,8 @@ A tab needing a change in another tab's file files a handoff rather than making 
 | ID | Owner | File | Change needed | Severity |
 | --- | --- | --- | --- | --- |
 | `HO-TAB1-01` | **Tab 5** | `aerora/test/Mission/AeroraMissionTest.cc` lines 107, 113, 120, 366, 376, 382, 390, 406, 521, 538, 570 | `UnitTest::expectLogMessage()` takes `const char *category` (`UnitTest.h:472`) and no `QString` overload exists. All 11 sites pass `QString::fromUtf8(kLogCategory)`, which does not convert. Drop the wrapper — `kLogCategory` is already `constexpr const char *`. **This will not compile.** | **CLOSED** — Tab 5, `bd1249aec`. Reviewed by Tab 1: 11 insertions, 11 deletions, one file, exactly the enumerated sites and nothing else. All 11 now pass `kLogCategory` (`AeroraMissionTest.cc:14`, `constexpr const char *`) directly, and zero `QString::fromUtf8` wrappers remain. Was **High** — it blocked `AeroraMissionTest` entirely at first build |
-| `HO-TAB1-04` | **Tab 5** | `aerora/src/Mission/README.md` — L14, L15, L755-758, L763, L764, L787, L788, L974, L977 | Replace the 12 status-token uses of `VERIFIED` with `SOURCE-INSPECTED`, and replace the local redefinition at L977 with a reference to the programme table. Every one of those rows is source reading, grepping or mechanical comparison — **none involved a build**. Leave the ordinary-English uses alone (L22, L23, L36, L62, L213, L279, L325, L326, L347, L574, L841) and **do not touch L801**, where `GCS-VERIFIED` quotes an earlier phase's state name. Do not rename the `## What was actually verified` heading — `00-README` and `03` do not link to it, but the sentence at L36 does | **Medium.** Tab 1 could not apply it: the file carried 133 lines of uncommitted Tab 5 work and was open in an active editor, so editing it would have been overwritten and committing it would have swept in another tab's work |
-| `HO-TAB1-05` | **Tab 3** | `aerora/src/Vehicle/README.md` — L14, L15, L966, L969 | Same change, same reason. This file independently adopted the identical convention, so the collision is wider than Tab 5 reported: **three** module documents locally redefined `VERIFIED`, two of them resolved this pass | **Medium.** Outside Tab 1's instructed scope for this pass |
+| `HO-TAB1-08` | **Tab 5** | `aerora/src/Mission/README.md` — L14, L15, L755-758, L763, L764, L787, L788, L974, L977 | Replace the 12 status-token uses of `VERIFIED` with `SOURCE-INSPECTED`, and replace the local redefinition at L977 with a reference to the programme table. Every one of those rows is source reading, grepping or mechanical comparison — **none involved a build**. Leave the ordinary-English uses alone (L22, L23, L36, L62, L213, L279, L325, L326, L347, L574, L841) and **do not touch L801**, where `GCS-VERIFIED` quotes an earlier phase's state name. Do not rename the `## What was actually verified` heading — `00-README` and `03` do not link to it, but the sentence at L36 does | **Medium.** Tab 1 could not apply it: the file carried 133 lines of uncommitted Tab 5 work and was open in an active editor, so editing it would have been overwritten and committing it would have swept in another tab's work |
+| `HO-TAB1-09` | **Tab 3** | `aerora/src/Vehicle/README.md` — L14, L15, L966, L969 | Same change as `HO-TAB1-08`, same reason. This file independently adopted the identical convention, so the collision is wider than Tab 5 reported: **three** module documents locally redefined `VERIFIED`, two of them resolved this pass | **Medium.** Outside Tab 1's instructed scope for this pass |
 | `HO-TAB1-03` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.cc`, `auditedTypes()` | **The overlay now registers 12 QML-reachable types and the safety audit covers 10.** Add `AeroraSecurityStatus` (new, Tab 2 WP2-B, `QML_NAMED_ELEMENT(AeroraSecurity)` + `QML_SINGLETON`) and `AeroraFreshness` (`QML_ELEMENT` + `QML_UNCREATABLE`, **unaudited since Phase 6**) | **Medium.** No live defect — both are read-only today and the independent sweep confirms no writable `Q_PROPERTY` anywhere in `aerora/src/**`. But the ratchet does not cover them, so `P7-AUTH-004`'s guarantee is narrower than it reads |
 | `HO-TAB4-01` | **Tab 7** | `aerora/test/UI/AeroraUiSafetyTest.h`, `\section known` | Describes one live recorded writable-property deviation; the set is now empty | Low, documentation only |
 | `HO-TAB4-02` | **Tab 7** | `aerora/src/UI/AeroraVehicleUiContext.h:63-66`, and `04-ui-implementation/01-ui-foundation-closure.md` HO-TAB7-01 | "carries a `WRITE setCapability`" is no longer true; the handoff is closed. Tab 1 independently found the same stale text and raised no duplicate | Low, documentation only — but it understates the safety posture, so it should not linger |
