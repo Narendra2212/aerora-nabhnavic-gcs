@@ -316,8 +316,8 @@ Columns: **Class** per [§4](#4-delivery-classes) · **Seam** the exact mechanis
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-SHL-01` | Aerora Operations Hub | O | `analyzePages()` + `mainWindow.showTool()` | `IMPLEMENTED-UNCOMPILED` | 7 | — (navigation half deferred: no destination screen exists) |
-| `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `DESIGNED` | 7 + 3 | — |
-| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `DESIGNED` | 7 + 2 | **unblocked** — `D-UI-01` closed by `AeroraSecurityStatus` (WP2-B). Needs `toolBarIndicators()`, which is HO-TAB7-06 |
+| `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `DESIGNED` | 7 + 3 | **Both seams implemented and correctly inert.** Per-vehicle: `AeroraFirmwarePlugin::toolIndicators()` returns the base list untouched because `AeroraToolIndicators::declaredIndicators()` is empty (U5). Non-vehicle: `BLOCKED` on `HO-TAB1-10` — no indicator QML exists to register |
+| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `DESIGNED` | 7 + 2 | Read path **closed** (`D-UI-01`, `AeroraSecurityStatus`). **`BLOCKED` on `HO-TAB1-10`**: the indicator QML does not exist, so `HO-TAB7-06` has nothing to register — see [§ The indicator seam](#the-indicator-seam-is-implemented-and-has-nothing-to-carry) |
 | `SCR-SHL-04` | Build provenance / about | O | `analyzePages()` entry | `SPECIFIED-NOT-DESIGNED` | 1 | `P7-HELP-004` — no provenance source exists |
 
 `SCR-SHL-03` is the screen that makes `P7-AUTH-002` visible: the station must be able to say "not
@@ -327,6 +327,58 @@ state of its own, and is audited by `AeroraUiSafetyTest` with no writable proper
 `Q_INVOKABLE` and no slot. `D-UI-01` is closed by it. What remains for the strip itself is a
 `toolBarIndicators()` override, which is a `QGCCorePlugin` virtual and therefore Tab 1's —
 HO-TAB7-06.
+
+### The indicator seam is implemented and has nothing to carry
+
+`HO-TAB7-06` was investigated this pass and **deliberately not implemented**. Both halves of
+`SCR-SHL-02` are already wired; what is missing is content, and writing it here would mean
+inventing it.
+
+The two registries are not interchangeable, which is why the work splits across two tabs:
+
+| | `QGCCorePlugin::toolBarIndicators()` | `FirmwarePlugin::toolIndicators(const Vehicle *)` |
+| --- | --- | --- |
+| Scope | Non-vehicle | Per-vehicle |
+| Re-read after first bind | **No** — the `Q_PROPERTY` is `CONSTANT` (`QGCCorePlugin.h:55`) | **Yes** — carries `toolIndicatorsChanged()` (`FirmwarePlugin.h:344`) |
+| Owner | Tab 1 (`AeroraCorePlugin`) | Tab 3 (`AeroraFirmwarePlugin`) |
+| State | `BLOCKED` on `HO-TAB1-10` | Implemented (U5), returns the base list untouched |
+
+Anything whose membership depends on reported capability must go in the per-vehicle registry,
+because the non-vehicle one is read once and never again.
+
+#### Why registering something would be worse than registering nothing
+
+The seam carries **`QUrl` values**, not `QmlComponentInfo` objects — unlike `analyzePages()`. The
+base returns a single-element list holding `RTKGPSIndicator.qml` (`QGCCorePlugin.cc:333`), and
+`FlyViewToolBarIndicators.qml` consumes it as:
+
+```qml
+Repeater {
+    model: QGroundControl.corePlugin.toolBarIndicators
+    Loader { source: modelData; visible: item.showIndicator }
+}
+```
+
+`visible: item.showIndicator` has **no null guard**. So the loaded root must declare
+`property bool showIndicator`, and a URL with no resource behind it produces a binding error on a
+null `item` rather than a quietly absent indicator. **No file in `aerora/src/UI/` declares
+`showIndicator`** — there are five generic controls and one `AnalyzePage` screen.
+
+That leaves two possible overrides, both wrong:
+
+- Return the base list unchanged — dead code by `CODING_STYLE.md`'s own rule, the same reason
+  `AeroraFirmwarePlugin` leaves four base defaults un-overridden and asserts them in a test instead.
+- Register any URL — an invented indicator (`P7-NOINV-001`) and a runtime binding error.
+
+Tab 3 reached the same conclusion independently and recorded it in `AeroraToolIndicators.h`: the
+declared set is empty because no Aerora indicator QML exists *and* no capability identifier is
+evidenced (`Q3-009`), and its `isPublishable()` checks resource existence precisely because of the
+unguarded binding. The gate is implemented and tested; the content it would carry does not exist.
+
+**Prerequisite is `HO-TAB1-10`, Tab 7**: write the indicator QML. The read path needs nothing new —
+`AeroraSecurity` is a `QML_SINGLETON`, reachable with no vehicle, which is exactly what makes the
+enforcement strip a *non-vehicle* indicator. Once the QML exists, `HO-TAB7-06` is a ~10-line
+override.
 
 ### `SCR-SHL-01`: four facts, held apart
 
@@ -649,7 +701,7 @@ Keeping this at zero is the main reason an upstream rebase stays mechanical (`P7
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
 | `D-NAV-01` | Top-level entry point: hub vs `SelectViewDropdown.qml` fork | **Product** | Nothing — hub is adopted and sufficient | **DECIDED** (hub); fork deferred and available |
-| `D-UI-01` | A QML-safe read path for `isAuthorizationEnforced()` without widening the security surface | Tab 2 + Tab 7 | `SCR-SHL-03`, `SCR-SEC-01` | `OPEN` |
+| `D-UI-01` | A QML-safe read path for `isAuthorizationEnforced()` without widening the security surface | Tab 2 + Tab 7 | — | **CLOSED** — `AeroraSecurityStatus` (WP2-B), `QML_NAMED_ELEMENT(AeroraSecurity)` + `QML_SINGLETON`, six `READ`-only properties, no `WRITE`, no `Q_INVOKABLE`, no slot, and in `AeroraUiSafetyTest::auditedTypes()`. This row read `OPEN` while three others in this document and `08` read closed — the `R7-20` failure mode, corrected here |
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Nothing structurally; needed for acceptance | `OPEN` |
 | `D-UI-03` | `AeroraStateValue::capability` must lose `WRITE` (HO-TAB7-01) | Tab 4 | — | **CLOSED** — U3, `a7b317f89`. `IMPLEMENTED-UNCOMPILED` |
 | `D-UI-04` | `AeroraControlsModule` block omits `IMPORTS QGC` and `qgc_set_qt_resource_alias` versus HO-TAB7-03 | Tab 1 | — | **CLOSED** — U2, `a73699796`. `IMPLEMENTED-UNCOMPILED` |
