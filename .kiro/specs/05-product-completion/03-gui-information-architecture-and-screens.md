@@ -225,10 +225,12 @@ host):
 | `AeroraTokenDisplay` | `.../AeroraTokenDisplay.qml` | Discrete token/enum state |
 
 Registered as the `Aerora.Controls` QML module (`AeroraControlsModule`,
-`aerora/CMakeLists.txt:160-172`). **Note a gap**: the module block in `aerora/CMakeLists.txt` omits
-the `IMPORTS QGC` / `qgc_set_qt_resource_alias` lines that
+`aerora/CMakeLists.txt:190-210`), which reaches the binary via `_aerora_libraries` →
+`CUSTOM_LIBRARIES` (`:208`, `:292`). The `IMPORTS QGC` / `qgc_set_qt_resource_alias` lines that
 [HO-TAB7-03](../04-ui-implementation/01-ui-foundation-closure.md#ho-tab7-03--create-the-aeroracontrols-qml-module-target)
-specifies. Recorded as [D-UI-04](#11-open-ui-decisions).
+specifies are now present (`:194`, `:201-202`); [D-UI-04](#11-open-ui-decisions) is closed by U2,
+`a73699796`. Every file in the module lands flat at `qrc:/qml/Aerora/Controls/<Name>.qml` — the
+alias discards the `Controls/`, `Indicators/` and `Screens/` source subdirectories.
 
 ### Composite components to build
 
@@ -316,23 +318,23 @@ Columns: **Class** per [§4](#4-delivery-classes) · **Seam** the exact mechanis
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-SHL-01` | Aerora Operations Hub | O | `analyzePages()` + `mainWindow.showTool()` | `IMPLEMENTED-UNCOMPILED` | 7 | — (navigation half deferred: no destination screen exists) |
-| `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `DESIGNED` | 7 + 3 | **Both seams implemented and correctly inert.** Per-vehicle: `AeroraFirmwarePlugin::toolIndicators()` returns the base list untouched because `AeroraToolIndicators::declaredIndicators()` is empty (U5). Non-vehicle: `BLOCKED` on `HO-TAB1-10` — no indicator QML exists to register |
-| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `DESIGNED` | 7 + 2 | Read path **closed** (`D-UI-01`, `AeroraSecurityStatus`). **`BLOCKED` on `HO-TAB1-10`**: the indicator QML does not exist, so `HO-TAB7-06` has nothing to register — see [§ The indicator seam](#the-indicator-seam-is-implemented-and-has-nothing-to-carry) |
+| `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `IMPLEMENTED-UNCOMPILED` (non-vehicle half) | 7 + 3 | Non-vehicle: **closed** — `HO-TAB7-06` registers `AeroraEnforcementIndicator.qml`. Per-vehicle: implemented and correctly inert — `AeroraFirmwarePlugin::toolIndicators()` returns the base list untouched because `AeroraToolIndicators::declaredIndicators()` is empty (U5), awaiting an evidenced capability identifier (`Q3-009`) |
+| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `IMPLEMENTED-UNCOMPILED` | 7 + 2 | Read path **closed** (`D-UI-01`, `AeroraSecurityStatus`); QML **closed** (`HO-TAB1-10`, `602b38a18`); registration **closed** (`HO-TAB7-06`) — see [§ The indicator seam](#the-indicator-seam-and-what-it-is-allowed-to-carry). Renders `NotEnforced` vs `EnforcedAtCommandGate` only; no roles, policies or command paths |
 | `SCR-SHL-04` | Build provenance / about | O | `analyzePages()` entry | `SPECIFIED-NOT-DESIGNED` | 1 | `P7-HELP-004` — no provenance source exists |
 
 `SCR-SHL-03` is the screen that makes `P7-AUTH-002` visible: the station must be able to say "not
 enforced". That read path now exists: `AeroraSecurityStatus` (`QML_NAMED_ELEMENT(AeroraSecurity)`,
 `QML_SINGLETON`) projects enforcement and audit posture as read-only properties, holds no security
 state of its own, and is audited by `AeroraUiSafetyTest` with no writable property, no
-`Q_INVOKABLE` and no slot. `D-UI-01` is closed by it. What remains for the strip itself is a
+`Q_INVOKABLE` and no slot. `D-UI-01` is closed by it. The strip itself needed a
 `toolBarIndicators()` override, which is a `QGCCorePlugin` virtual and therefore Tab 1's —
-HO-TAB7-06.
+HO-TAB7-06, now implemented.
 
-### The indicator seam is implemented and has nothing to carry
+### The indicator seam, and what it is allowed to carry
 
-`HO-TAB7-06` was investigated this pass and **deliberately not implemented**. Both halves of
-`SCR-SHL-02` are already wired; what is missing is content, and writing it here would mean
-inventing it.
+`HO-TAB7-06` is **implemented** (`IMPLEMENTED-UNCOMPILED`). It was deliberately held back on the
+previous pass because the seam had nothing to carry; `HO-TAB1-10` then delivered
+`AeroraEnforcementIndicator.qml` (`602b38a18`), and the override registers exactly that one file.
 
 The two registries are not interchangeable, which is why the work splits across two tabs:
 
@@ -341,12 +343,12 @@ The two registries are not interchangeable, which is why the work splits across 
 | Scope | Non-vehicle | Per-vehicle |
 | Re-read after first bind | **No** — the `Q_PROPERTY` is `CONSTANT` (`QGCCorePlugin.h:55`) | **Yes** — carries `toolIndicatorsChanged()` (`FirmwarePlugin.h:344`) |
 | Owner | Tab 1 (`AeroraCorePlugin`) | Tab 3 (`AeroraFirmwarePlugin`) |
-| State | `BLOCKED` on `HO-TAB1-10` | Implemented (U5), returns the base list untouched |
+| State | Implemented (`HO-TAB7-06`), appends one `QUrl` | Implemented (U5), returns the base list untouched |
 
 Anything whose membership depends on reported capability must go in the per-vehicle registry,
 because the non-vehicle one is read once and never again.
 
-#### Why registering something would be worse than registering nothing
+#### The three constraints the override has to satisfy
 
 The seam carries **`QUrl` values**, not `QmlComponentInfo` objects — unlike `analyzePages()`. The
 base returns a single-element list holding `RTKGPSIndicator.qml` (`QGCCorePlugin.cc:333`), and
@@ -359,26 +361,31 @@ Repeater {
 }
 ```
 
-`visible: item.showIndicator` has **no null guard**. So the loaded root must declare
-`property bool showIndicator`, and a URL with no resource behind it produces a binding error on a
-null `item` rather than a quietly absent indicator. **No file in `aerora/src/UI/` declares
-`showIndicator`** — there are five generic controls and one `AnalyzePage` screen.
+1. **`visible: item.showIndicator` has no null guard.** The loaded root must declare
+   `property bool showIndicator`, and a URL with no resource behind it produces a binding error on a
+   null `item` rather than a quietly absent indicator. `AeroraEnforcementIndicator.qml` declares it
+   (`:74`); the URL is the one `aerora/src/UI/Ui.cmake:162` states, which is why that string is
+   copied from the owning manifest rather than reconstructed from the source path.
+2. **The URL carries no `Indicators/` segment.** `qgc_set_qt_resource_alias()`
+   (`aerora/CMakeLists.txt:194`) aliases every `AERORA_UI_QML_FILES` entry to its bare name, so the
+   whole module lands flat at `qrc:/qml/Aerora/Controls/<Name>.qml`. `Controls/`, `Indicators/` and
+   `Screens/` are a source-tree distinction only.
+3. **The override keeps its own static.** The base returns a reference to its own function-local
+   `static const QVariantList`; appending to it would mutate the base's list, and returning a
+   reference to a lambda-local would dangle. The override therefore holds its own static, seeded
+   from the base call — net effect two entries, `RTKGPSIndicator.qml` plus the Aerora one.
 
-That leaves two possible overrides, both wrong:
+Returning the base list unchanged was the alternative and is dead code by `CODING_STYLE.md`'s own
+rule — the same reason `AeroraFirmwarePlugin` leaves four base defaults un-overridden and asserts
+them in a test instead.
 
-- Return the base list unchanged — dead code by `CODING_STYLE.md`'s own rule, the same reason
-  `AeroraFirmwarePlugin` leaves four base defaults un-overridden and asserts them in a test instead.
-- Register any URL — an invented indicator (`P7-NOINV-001`) and a runtime binding error.
+Tab 3's half stays empty for an unrelated reason recorded in `AeroraToolIndicators.h`: no capability
+identifier is evidenced (`Q3-009`) for a *per-vehicle* indicator. Its `isPublishable()` checks
+resource existence precisely because of the unguarded binding above. That gate is implemented and
+tested; the content it would carry still does not exist.
 
-Tab 3 reached the same conclusion independently and recorded it in `AeroraToolIndicators.h`: the
-declared set is empty because no Aerora indicator QML exists *and* no capability identifier is
-evidenced (`Q3-009`), and its `isPublishable()` checks resource existence precisely because of the
-unguarded binding. The gate is implemented and tested; the content it would carry does not exist.
-
-**Prerequisite is `HO-TAB1-10`, Tab 7**: write the indicator QML. The read path needs nothing new —
-`AeroraSecurity` is a `QML_SINGLETON`, reachable with no vehicle, which is exactly what makes the
-enforcement strip a *non-vehicle* indicator. Once the QML exists, `HO-TAB7-06` is a ~10-line
-override.
+The read path needed nothing new — `AeroraSecurity` is a `QML_SINGLETON`, reachable with no vehicle,
+which is exactly what makes the enforcement strip a *non-vehicle* indicator.
 
 ### `SCR-SHL-01`: four facts, held apart
 
@@ -408,17 +415,29 @@ the resource would be present, the page registered, the menu entry live, and ope
 failed with "AnalyzePage is not a type" — at runtime, with nothing wrong at configure or compile
 time to catch it.
 
-Fixed by adding `IMPORTS QGroundControl.AnalyzeView` to the module declaration in
+Mitigated by adding `IMPORTS QGroundControl.AnalyzeView` to the module declaration in
 `aerora/CMakeLists.txt`. Declared there rather than as a file-level `import` in the hub because that
 block is where this module's dependencies are stated and because the CMake is M-Plugin's file while
 the hub is M-Ui's.
+
+**That mitigation is not provably sufficient, and the claim is withdrawn.** Qt documents `IMPORTS`
+as: *if a QML file imports this module*, it also imports everything listed under `IMPORTS`
+([qt_add_qml_module](https://doc.qt.io/qt-6/qt-add-qml-module.html)) — a statement about consumers
+of `Aerora.Controls`, not about its own members. Whether a module member's implicit self-import
+propagates the generated `qmldir` import entry is not documented either way. The in-repo reference
+pattern sides against relying on it: `custom-example` declares no module `IMPORTS` at all and its
+QML files import `QGroundControl.PlanView` and `QGroundControl.FlightMap` at file level. A one-line
+file-level import in the hub makes it unconditional and is filed as `HO-TAB1-13`, Tab 7.
+`aerora-manifest-check.ps1` reports this row as `ASSUMED`, which it defines as unresolved rather
+than passed. `AeroraEnforcementIndicator.qml` is unaffected — it file-imports
+`QGroundControl.Controls` for its `QGCLabel` root, and the checker marks it `OK`.
 
 This is the third silent-registration failure in the same family — HO-TAB7-02 (interceptor never
 installed), `D-UI-04` (`IMPORTS QGC` missing), and now this. All three were invisible without a
 build, all three would have presented as "the Aerora UI just isn't there", and none would have
 produced an error. The pattern is worth naming: **a QML module's `IMPORTS` list is load-bearing and
 is not checkable by any tool available on this host.**
-| Its root type resolves | **Yes, `SOURCE-INSPECTED`** | The hub roots on `AnalyzePage`, which upstream declares in `AnalyzeViewModule` under URI `QGroundControl.AnalyzeView` (`src/AnalyzeView/CMakeLists.txt:19-24`). Upstream's own pages import nothing for it because they are members of that module; the hub is a member of `Aerora.Controls`, so `IMPORTS QGroundControl.AnalyzeView` was added to the module block |
+| Its root type resolves | **Unresolved — `HO-TAB1-13`** | The hub roots on `AnalyzePage`, which upstream declares in `AnalyzeViewModule` under URI `QGroundControl.AnalyzeView` (`src/AnalyzeView/CMakeLists.txt:19-24`). Upstream's own pages import nothing for it because they are members of that module; the hub is a member of `Aerora.Controls`, so `IMPORTS QGroundControl.AnalyzeView` was added to the module block. That is a documented guarantee for *consumers* of `Aerora.Controls`, not for its own members — a file-level import is wanted |
 
 That fourth row was found at this reconciliation and is the reason the list is four rows long rather
 than three. Each of the four fails **silently and differently**, which is why they are tracked
@@ -708,16 +727,17 @@ Keeping this at zero is the main reason an upstream rebase stays mechanical (`P7
 | `D-UI-05` | Whether an Aerora QML Quick Test target is created now (HO-TAB7-04) | Tab 1 + Tab 7 | QML rendering tests only | `OPEN` — recommend at the first QML behaviour needing assertion |
 | `D-UI-06` | Multi-station authority display — which station holds authority | **Architecture** | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — raised by [benchmark §7.3](02-gcs-reference-benchmark.md#73-which-station-holds-authority-when-several-are-connected) |
 
-`D-UI-04` is the one with a concrete cost, and it is unusually well evidenced because **Tab 7's own
-manifest documents the requirement that Tab 1's aggregation omitted**:
+`D-UI-04` was the one with a concrete cost, and it was unusually well evidenced because **Tab 7's
+own manifest documented the requirement that Tab 1's aggregation had omitted**. The evidence is kept
+because it is what the alias behaviour rests on, and `HO-TAB7-06` depends on that behaviour again:
 
 | Fact | Source |
 | --- | --- |
 | `IMPORTS QGC` is "the load-bearing line" — how `AeroraTelemetryState` and `AeroraUi` resolve inside the module | `aerora/src/UI/Ui.cmake:64` |
 | Without the alias the resource lands at `qrc:/qml/Aerora/Controls/src/UI/Controls/<Name>.qml` instead of `qrc:/qml/Aerora/Controls/<Name>.qml` | `aerora/src/UI/Ui.cmake:57-61` |
 | The function sets `QT_RESOURCE_ALIAS` to the bare filename | `cmake/Helpers.cmake:12-22` |
-| `AERORA_UI_QML_FILES` holds absolute paths, so the nesting is real rather than hypothetical | `aerora/src/UI/Ui.cmake:135-141` |
-| The aggregation omits both lines and justifies the omission on shadowing grounds | `aerora/CMakeLists.txt:150-172` |
+| `AERORA_UI_QML_FILES` holds absolute paths, so the nesting is real rather than hypothetical | `aerora/src/UI/Ui.cmake:136-143` |
+| The aggregation **now carries both lines**; it previously omitted them on shadowing grounds | `aerora/CMakeLists.txt:194`, `:201-202` |
 
 The omission's justification is the interesting part: it reasons that aliases exist to shadow stock
 QGroundControl files by basename, and that `Aerora.Controls` shadows nothing. That is true about

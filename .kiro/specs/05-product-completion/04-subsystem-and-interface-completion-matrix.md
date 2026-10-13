@@ -79,13 +79,15 @@ The exported-variable contract is identical, which is all the aggregation depend
 | `authorizeMavCommand()` override | — | `IMPLEMENTED-UNCOMPILED` — **returns `true` and warns once**. No policy installed |
 | `isAuthorizationEnforced()` | — | `IMPLEMENTED-UNCOMPILED` — reports `false` |
 | `_installSigningKeyStore()` | — | `IMPLEMENTED-UNCOMPILED` |
-| `createQmlApplicationEngine` / `destroyQmlApplicationEngine` overrides | — | **ABSENT — HO-TAB7-02** |
+| `createQmlApplicationEngine` / `destroyQmlApplicationEngine` overrides | — | `IMPLEMENTED-UNCOMPILED` — HO-TAB7-02 closed by U1, `84bbb3a6e` |
+| `analyzePages()` override | — | `IMPLEMENTED-UNCOMPILED` — one `QmlComponentInfo`, the Operations Hub (HO-TAB7-05). Root-type resolution still open, `HO-TAB1-13` |
+| `toolBarIndicators()` override | — | `IMPLEMENTED-UNCOMPILED` — one `QUrl`, the enforcement indicator (HO-TAB7-06). Two entries net, with the base's `RTKGPSIndicator.qml` |
 | Overlay aggregation | `CMakeLists.txt` | `IMPLEMENTED-UNCOMPILED` |
-| `AeroraControlsModule` QML module target | `CMakeLists.txt:160-172` | `IMPLEMENTED-UNCOMPILED` — **missing `IMPORTS QGC` + `qgc_set_qt_resource_alias`, D-UI-04** |
+| `AeroraControlsModule` QML module target | `CMakeLists.txt:190-210` | `IMPLEMENTED-UNCOMPILED` — `IMPORTS QGC` and `qgc_set_qt_resource_alias` both present (`:194`, `:201-202`); `D-UI-04` closed by U2, `a73699796` |
 
-`AeroraCorePlugin` is deliberately minimal: Layer 1 scope is the security and command boundary. It
-overrides no UI, branding, firmware-factory or resource hook. Two of the three outstanding Tab 1
-items are in this file.
+`AeroraCorePlugin` is deliberately minimal: Layer 1 scope is the security and command boundary, plus
+the two QML registries that put Aerora surfaces in the stock shell. It overrides no branding,
+firmware-factory or resource hook.
 
 ### M-Security (Tab 2)
 
@@ -404,7 +406,7 @@ Named rather than mocked, per the Phase B rule. Each row is a real gap with an o
 | --- | --- | --- | --- | --- |
 | 1 | Authorization policy, identity provider, role resolver | **Every command is permitted.** No operator action surface can exist | Tab 2 | `Q-029` → ADR-014 |
 | 2 | `AeroraAutoPilotPlugin` | 6 vehicle screens unreachable | Tab 3 | Nothing — ready to implement |
-| 3 | `FirmwarePlugin::toolIndicators()` override | No per-vehicle Aerora indicator | Tab 3 | Nothing — ready to implement |
+| 3 | Per-vehicle Aerora indicator **content** | No per-vehicle Aerora indicator. The `FirmwarePlugin::toolIndicators()` seam itself is implemented (U5) and correctly inert — `AeroraToolIndicators::declaredIndicators()` is empty | Tab 3 | `Q3-009` — no evidenced capability identifier. The *non-vehicle* half is done, HO-TAB7-06 |
 | 4 | ~~Interceptor install (HO-TAB7-02)~~ | — | Tab 1 | **DONE** — U1, `84bbb3a6e`, `IMPLEMENTED-UNCOMPILED` |
 | 5 | ~~`AeroraControlsModule` `IMPORTS QGC` + resource alias (`D-UI-04`)~~ | — | Tab 1 | **DONE** — U2, `a73699796`, `IMPLEMENTED-UNCOMPILED` |
 | 6 | ~~`AeroraStateValue::capability` `WRITE` removal (`D-UI-03`)~~ | — | Tab 4 | **DONE** — U3, `a7b317f89`, `IMPLEMENTED-UNCOMPILED` |

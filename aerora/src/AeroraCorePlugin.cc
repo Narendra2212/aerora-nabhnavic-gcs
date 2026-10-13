@@ -112,6 +112,30 @@ const QVariantList &AeroraCorePlugin::analyzePages()
     return pages;
 }
 
+const QVariantList &AeroraCorePlugin::toolBarIndicators()
+{
+    // Same shape and same reason as analyzePages() above: the base returns a reference to its own
+    // function-local static, so this override keeps its own.
+    // Captures this because QGCCorePlugin::toolBarIndicators() is a non-static member; a
+    // non-capturing lambda would not compile.
+    static const QVariantList indicators = [this]() {
+        QVariantList list = QGCCorePlugin::toolBarIndicators();
+
+        // A bare QUrl, not a QmlComponentInfo - this registry and analyzePages() differ in element
+        // type, and the consumer loads this one directly as Loader.source.
+        //
+        // No Indicators/ segment in the URL: qgc_set_qt_resource_alias() aliases every
+        // AERORA_UI_QML_FILES entry to its bare name, so the module lands flat under
+        // qrc:/qml/Aerora/Controls/ regardless of the source subdirectory.
+        list.append(QVariant::fromValue(
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraEnforcementIndicator.qml"))));
+
+        return list;
+    }();
+
+    return indicators;
+}
+
 void AeroraCorePlugin::_installSigningKeyStore()
 {
     auto protector = AeroraPlatformKeyProtector::createForCurrentPlatform();

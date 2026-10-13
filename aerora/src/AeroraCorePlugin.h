@@ -48,6 +48,23 @@ public:
     /// Aerora's to remove. See aerora/src/UI/Screens/AeroraOperationsHub.qml.
     const QVariantList &analyzePages() override;
 
+    /// Appends the Aerora enforcement-state strip to the non-vehicle toolbar indicator registry
+    /// (HO-TAB7-06, SCR-SHL-03).
+    ///
+    /// This registry carries bare QUrl values, not QmlComponentInfo objects as analyzePages()
+    /// does, and FlyViewToolBarIndicators.qml loads each one with
+    /// `visible: item.showIndicator` and no null guard. So a registered URL must resolve to a
+    /// root declaring that property; AeroraEnforcementIndicator.qml declares it.
+    ///
+    /// Non-vehicle is the correct registry for this strip: AeroraSecurity is a process singleton
+    /// readable with no vehicle connected. Anything whose membership depended on reported
+    /// capability would have to go through FirmwarePlugin::toolIndicators() instead, because this
+    /// one is a CONSTANT property and is never re-read after the first bind.
+    ///
+    /// Appends to the base list rather than replacing it: upstream's RTK GPS indicator is not
+    /// Aerora's to remove.
+    const QVariantList &toolBarIndicators() override;
+
     /// Delegates to AeroraCommandAuthorizer when an authorization policy is configured.
     ///
     /// While no policy is configured (Q-029 is OPEN) this returns true and warns once. That is a
