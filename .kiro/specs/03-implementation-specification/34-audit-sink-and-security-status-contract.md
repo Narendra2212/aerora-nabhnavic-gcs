@@ -325,27 +325,46 @@ shipped station installs no policy, so without this the first notification would
 fires on configuration changes and on every counted audit loss. Do not poll. `enforcementVerified`
 is `CONSTANT` — a binding on it is evaluated once, which is correct.
 
-### 3.6 `AeroraUiSafetyTest` is unchanged, and why that is not a loophole
+### 3.6 Two suites guard this type, and why both are kept
 
-`WP2-B`'s constraint is that `AeroraUiSafetyTest` must still pass unchanged, and it does: the new
-type adds no writable property, and `recordedWritablePropertyDeviations()` — now empty after Tab 4's
-`U3` (`a7b317f89`) — stays empty.
+`WP2-B`'s constraint was that `AeroraUiSafetyTest` must still pass unchanged, and it did: the type
+adds no writable property, and `recordedWritablePropertyDeviations()` — empty after Tab 4's `U3`
+(`a7b317f89`) — stayed empty.
 
-But a new QML-reachable type that is simply absent from `auditedTypes()` would be unguarded, and
-that would be a loophole. So the equivalent ratchet is implemented in
-`aerora/test/Security/AeroraSecurityStatusTest.cc` instead, in Tab 2's own suite, and it is
-*stricter* than the UI suite's:
+**This section previously said `AeroraUiSafetyTest.cc` was not edited and that adding the type to
+its audited set remained an open `HO-TAB2-02`. Both statements are now obsolete.** Tab 7 applied
+that change in `67f7137d0`, so the type is audited in the project-wide ratchet as well as in this
+module's own suite. The paragraph is corrected rather than deleted because the original reasoning —
+why a Security-module ratchet was written at all — is still what justifies keeping it.
 
-| UI suite | This suite |
+Verified against `aerora/test/UI/AeroraUiSafetyTest.cc` at `172291957`:
+
+| Source fact | Location |
 | --- | --- |
-| Writable set must equal a recorded list | Writable set must be **empty**, with no exception mechanism |
-| Non-signal methods must match a reviewed list | Non-signal methods must be **empty** — property getters are not slots and correctly never reach the meta-object |
-| Forbidden names must not appear | Same, over security-specific names |
-| — | **No property may be a pointer type**, asserted on `QMetaType` flags, so a pointer to a type nobody has written yet is caught too |
+| `&AeroraSecurityStatus::staticMetaObject` in `auditedTypes()` | `:66` |
+| `{QStringLiteral("AeroraSecurityStatus"), {}}` in `reviewedMethodsFor()` — empty method list | `:242` |
+| Audited-type count | **12** |
 
-`AeroraUiSafetyTest.cc` was not edited. It belongs to Tab 7 and already carried the one sanctioned
-cross-boundary edit this phase; adding this type to its audited set is `HO-TAB2-02`. **No assertion
-in it was weakened or modified.**
+The two suites are not redundant, and the division is worth stating precisely because it is the
+reason the narrower one survives:
+
+| Property | UI suite | This suite |
+| --- | --- | --- |
+| Scope | **All 12 QML-registered Aerora types**, plus the closure reachable from the `AeroraUi` root | This type alone |
+| Writable set | Must equal `recordedWritablePropertyDeviations()`, currently empty | Must be **empty** outright, with no exception mechanism |
+| Non-signal methods | Must match the `reviewedMethodsFor()` entry, `{}` for this type | Must be **empty** outright |
+| Forbidden names | Project-wide mutator list | Security-specific list — identity, roles, policy, sink, key material |
+| Registration | Asserts each audited type really carries `QML.Element` | — |
+| Pointer-typed property | — | **Prohibited**, asserted on `QMetaType` flags, so a pointer to a type nobody has written yet is caught |
+
+The last row is the one that makes this suite worth keeping: `QMetaType::IsPointer` appears once in
+`AeroraSecurityStatusTest.cc` and **not at all** in `AeroraUiSafetyTest.cc`, so the assertion that a
+type exposure is unrepresentable here exists in only one place. The first row is what the UI suite
+has and this one cannot: a complete registered-type set and a derived reachability closure.
+
+**No assertion in `AeroraUiSafetyTest` was weakened or modified** by either change. Its coverage
+went from 10 types to 12 and its writable-property expectation is still set equality against an
+empty list.
 
 ### 3.7 Acceptance criteria
 
@@ -461,18 +480,21 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | Status | **CLOSED.** Applied and committed by Tab 1 in `47c15feee`, together with Tab 3's two. Tab 2 did not edit `aerora/CMakeLists.txt`, and the change is not part of Tab 2's commit |
 | Still true | Registration is not execution. Both suites remain **written and never run** (`D-006`) |
 
-### `HO-TAB2-02` — add `AeroraSecurityStatus` to the audited type set
+### `HO-TAB2-02` — add `AeroraSecurityStatus` to the audited type set — **CLOSED**
 
 | Field | Content |
 | --- | --- |
 | Owner | **Tab 7** |
 | File | `aerora/test/UI/AeroraUiSafetyTest.cc`, `auditedTypes()` and `reviewedMethodsFor()` |
-| Change | Append `&AeroraSecurityStatus::staticMetaObject` to `auditedTypes()`, and `{QStringLiteral("AeroraSecurityStatus"), {}}` to `reviewedMethodsFor()` — the empty list is correct, the type declares no non-signal method |
-| Invariant at risk | `P7-AUTH-004`, `P7-SEC-004`. An eleventh QML-reachable Aerora type exists and is not in the UI suite's closure |
-| Blocks | Nothing. `AeroraSecurityStatusTest` B7–B10 covers the same surface more strictly in the meantime, so this is defence in depth, not a gap |
-| Tracked by | `AeroraSecurityStatusTest::_noPropertyIsQmlWritable`, `_theTypeDeclaresNoQmlCallableMethod`, `_noSecurityTypeIsReachableThroughAProperty` |
+| Change requested | Append `&AeroraSecurityStatus::staticMetaObject` to `auditedTypes()`, and `{QStringLiteral("AeroraSecurityStatus"), {}}` to `reviewedMethodsFor()` — the empty list is correct, the type declares no non-signal method |
+| Invariant at risk | `P7-AUTH-004`, `P7-SEC-004`. A QML-registered Aerora type existed outside the UI suite's audited set, so that suite's guarantee was narrower than it read |
+| Blocked | Nothing, while open. `AeroraSecurityStatusTest` B7–B10 covered the same surface more strictly throughout, so this was defence in depth rather than a gap |
+| **Change applied** | Exactly that, by Tab 7 in **`67f7137d0`** — *"test(UI): audit all twelve QML-registered types and derive the closure"*. Confirmed an ancestor of `172291957`. The same commit also added `AeroraFreshness`, which had been registered and unaudited since Phase 6 and was not part of this request |
+| **Static evidence** | `auditedTypes()` holds **12** entries including `&AeroraSecurityStatus::staticMetaObject` (`:66`); `reviewedMethodsFor()` carries `{QStringLiteral("AeroraSecurityStatus"), {}}` (`:242`), an empty method list as requested. A third site, `:422`, additionally uses this type as the read-only half of that suite's writable-property detector control |
+| **Evidence class** | **Static source inspection only.** The entries exist and read correctly. Neither `AeroraUiSafetyTest` nor `AeroraSecurityStatusTest` has been compiled or executed, so no assertion in either is known to pass — `D-006`. Closing this handoff records that the requested edit landed, **not** that the ratchet has been observed working |
+| Tracked by | `AeroraSecurityStatusTest::_noPropertyIsQmlWritable`, `_theTypeDeclaresNoQmlCallableMethod`, `_noSecurityTypeIsReachableThroughAProperty`, plus the UI suite's `_everyQmlReachableMethodIsOnTheReviewedList` and `_onlyTheRecordedPropertyDeviationIsWritable` now that the type is in its set |
 | No test entry to remove | — |
-| Note | **Do not add a writable-property deviation.** The set is empty after `U3` and this type adds none |
+| Note, still current | **Do not add a writable-property deviation.** The set is empty after `U3` and this type adds none |
 
 ### `HO-TAB2-03` — traceability and matrix rows
 
