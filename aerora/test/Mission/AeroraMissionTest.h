@@ -47,6 +47,7 @@ private slots:
     void _validationFailures();
     void _missionCommandSupportRunsOnlyWithADeclaredSet();
     void _resumeCarryForwardWithholdsItsVerdict();
+    void _validationConsumesASnapshotBuiltFromRealMissionItems();
     void _observerPresentsAnUncheckedUploadAsUnverified();
     void _observerMarksTheVehicleMissionIndeterminateAfterAFailedUpload();
     void _observerDistinguishesAFailedDownloadFromAnEmptyMission();

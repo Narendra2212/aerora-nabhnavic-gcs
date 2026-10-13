@@ -12,6 +12,7 @@
 #include "AeroraMissionSnapshot.h"
 #include "AeroraMissionValidationReport.h"
 #include "AeroraMissionValidator.h"
+#include "MissionItem.h"
 
 namespace {
 
@@ -911,13 +912,13 @@ void AeroraMissionTest::_missionCommandSupportRunsOnlyWithADeclaredSet()
 
     // Declared but empty. This is the trap FirmwarePlugin::supportedMissionCommands() contains -
     // it reads an empty list as "every command is supported" - and adopting it here would turn an
-    // unconfigured build into a clean report. Refused instead.
+    // unconfigured build into a clean report. Neither passed nor failed: a misconfigured set is
+    // not the mission's defect, so blaming every item as "undeclared command" would misreport it.
     inputs.missionCommandSetDeclared = true;
     inputs.declaredMissionCommandSet.clear();
-    expectLogMessage(kLogCategory, QtWarningMsg, QRegularExpression(QStringLiteral("declared but empty")));
     const AeroraMissionCheck onEmptySet = commandSupport(AeroraMissionValidator::validate(inputs));
-    verifyExpectedLogMessage();
     QVERIFY(!onEmptySet.isPassed());
+    QVERIFY(!onEmptySet.isFailed());
     QCOMPARE(onEmptySet.unavailableReason(), AeroraMissionCheck::NoDeclaredMissionCommandSet);
 
     // Declared and covering the mission: the check runs, which is what makes this gate testable
@@ -965,13 +966,80 @@ void AeroraMissionTest::_resumeCarryForwardWithholdsItsVerdict()
     QCOMPARE(withIndex.unavailableReason(), AeroraMissionCheck::NoDeclaredMissionCommandSet);
 
     // The count it could establish is carried, so a consumer can show the exposure without the
-    // module having classified it.
-    QVERIFY(withIndex.detail().contains(QStringLiteral("itemsNotCarriedForward=")));
+    // module having classified it. `classified=0` states the second half explicitly: the items
+    // were counted and none of them was categorised.
     QVERIFY(withIndex.detail().contains(QStringLiteral("resumeIndex=3")));
+    QVERIFY(withIndex.detail().contains(QStringLiteral("omittedItems=")));
+    QVERIFY(withIndex.detail().contains(QStringLiteral("classified=0")));
 
     // And the module still replays no payload state and assumes no payload retention.
     QVERIFY(!AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented);
     QVERIFY(!AeroraMissionResumeBoundary::kPayloadStatePersistenceEvidenced);
+}
+
+void AeroraMissionTest::_validationConsumesASnapshotBuiltFromRealMissionItems()
+{
+    // The mock appends fingerprints directly, so nothing else in this suite exercises the
+    // MissionItem -> fingerprint capture that both the plan and the vehicle side actually go
+    // through. This covers that chain and still needs no vehicle, link or event loop: MissionItem
+    // is the flat MAVLink record and constructs standalone.
+    //
+    // Every parameter is zero, matching this module's standing rule that no coordinate, altitude
+    // or speed is invented anywhere in its tests.
+    QObject itemParent;
+    QList<MissionItem *> items;
+    for (int sequenceNumber = 0; sequenceNumber < 3; sequenceNumber++) {
+        items.append(new MissionItem(sequenceNumber,
+                                     MAV_CMD_NAV_WAYPOINT,
+                                     MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     true /* autoContinue */,
+                                     sequenceNumber == 0 /* isCurrentItem */,
+                                     &itemParent));
+    }
+
+    AeroraMissionValidator::Inputs inputs;
+    inputs.mission = AeroraMissionSnapshot::fromMissionItems(AeroraMissionSnapshot::VehicleStore, items);
+    QCOMPARE(inputs.mission.itemCount(), 3);
+
+    const AeroraMissionValidationReport report = AeroraMissionValidator::validate(inputs);
+
+    QVERIFY(report.checks().at(int(AeroraMissionCheck::MissionPresence)).isPassed());
+    QVERIFY(report.checks().at(int(AeroraMissionCheck::SequenceNumbering)).isPassed());
+    QVERIFY(report.checks().at(int(AeroraMissionCheck::FrameValidity)).isPassed());
+    QVERIFY(report.checks().at(int(AeroraMissionCheck::CoordinateRange)).isPassed());
+    QVERIFY(report.checks().at(int(AeroraMissionCheck::ResumeCompatibility)).isPassed());
+    QCOMPARE(report.verdict(), AeroraMissionValidationReport::PassedWithGaps);
+
+    // And a real record carrying a DO_JUMP is caught. This is the one failure mode whose semantics
+    // come from reading upstream's resume path rather than from the record's own shape, so it is
+    // worth asserting against a real MissionItem rather than only against a fingerprint.
+    items.append(new MissionItem(3,
+                                 MAV_CMD_DO_JUMP,
+                                 MAV_FRAME_MISSION,
+                                 0.0,
+                                 0.0,
+                                 0.0,
+                                 0.0,
+                                 0.0,
+                                 0.0,
+                                 0.0,
+                                 true /* autoContinue */,
+                                 false /* isCurrentItem */,
+                                 &itemParent));
+
+    AeroraMissionValidator::Inputs withJump;
+    withJump.mission = AeroraMissionSnapshot::fromMissionItems(AeroraMissionSnapshot::VehicleStore, items);
+
+    const AeroraMissionValidationReport jumpReport = AeroraMissionValidator::validate(withJump);
+    QVERIFY(jumpReport.checks().at(int(AeroraMissionCheck::ResumeCompatibility)).isFailed());
+    QCOMPARE(jumpReport.verdict(), AeroraMissionValidationReport::Failed);
 }
 
 UT_REGISTER_TEST(AeroraMissionTest, TestLabel::Unit, TestLabel::MissionManager)

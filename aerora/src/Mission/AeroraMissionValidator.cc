@@ -34,6 +34,14 @@ AeroraMissionCheck::Unavailable AeroraMissionValidator::_perItemAvailability(con
         return AeroraMissionCheck::MissionNotCaptured;
     }
 
+    // Captured and empty is a different gap and gets its own reason, but the consequence is the
+    // same one: a per-item check over zero items is vacuously true and establishes nothing.
+    // Returning Passed here is precisely the "unchecked condition presented as passed" that
+    // P7-CHK-002 exists to prevent, so the gap is reported instead.
+    if (inputs.mission.itemCount() == 0) {
+        return AeroraMissionCheck::MissionEmpty;
+    }
+
     return AeroraMissionCheck::NothingMissing;
 }
 
@@ -130,6 +138,16 @@ AeroraMissionCheck AeroraMissionValidator::_checkCoordinateRange(const Inputs &i
         }
     }
 
+    if (examined == 0) {
+        // Every item was MAV_FRAME_MISSION, so this mission carries no coordinate at all. The
+        // check inspected no value, and "coordinateItems=0, passed" would assert something it
+        // never established - the same vacuous pass MissionEmpty guards against, one level down.
+        return AeroraMissionCheck::notPerformed(AeroraMissionCheck::CoordinateRange,
+                                                AeroraMissionCheck::NoApplicableItems,
+                                                QStringLiteral("itemCount=%1 coordinateItems=0")
+                                                    .arg(inputs.mission.itemCount()));
+    }
+
     return AeroraMissionCheck::passed(AeroraMissionCheck::CoordinateRange,
                                       QStringLiteral("coordinateItems=%1").arg(examined));
 }
@@ -193,6 +211,16 @@ AeroraMissionCheck AeroraMissionValidator::_checkMissionCommandSupport(const Inp
     if (!inputs.missionCommandSetDeclared) {
         return AeroraMissionCheck::notPerformed(AeroraMissionCheck::MissionCommandSupport,
                                                 AeroraMissionCheck::NoDeclaredMissionCommandSet);
+    }
+
+    // Declared and empty is a misconfigured build, not a mission defect. The registry never
+    // produces this state - isMissionCommandSetDeclared() is true only for a non-empty set - but
+    // Inputs is a public struct, and failing every item as "undeclared command" would blame the
+    // mission for a configuration error.
+    if (inputs.declaredMissionCommandSet.isEmpty()) {
+        return AeroraMissionCheck::notPerformed(AeroraMissionCheck::MissionCommandSupport,
+                                                AeroraMissionCheck::NoDeclaredMissionCommandSet,
+                                                QStringLiteral("declaredSetEmpty"));
     }
 
     const AeroraMissionCheck::Unavailable availability = _perItemAvailability(inputs);

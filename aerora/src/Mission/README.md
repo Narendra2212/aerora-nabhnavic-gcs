@@ -11,8 +11,8 @@ phase document and the current source disagree, the source wins and the differen
 
 | Item | Status |
 | --- | --- |
-| QGC mission architecture | `VERIFIED` — read at `9459a4b5`, cited below |
-| Integration seam selection | `VERIFIED` — no core edit required |
+| QGC mission architecture | `SOURCE-INSPECTED` — read at `9459a4b5`, cited below |
+| Integration seam selection | `SOURCE-INSPECTED` — no core edit required |
 | Source in this subtree | `IMPLEMENTED-UNCOMPILED` |
 | Tests in this subtree | `IMPLEMENTED-UNCOMPILED` |
 | QGC core modifications by this workstream | **NONE** |
@@ -21,7 +21,11 @@ phase document and the current source disagree, the source wins and the differen
 | Payload state persistence across mission interruption | `NOT-EVIDENCED` — unchanged |
 | Wiring into `aerora/CMakeLists.txt` | **DONE by M-Plugin** — aggregated and both tests registered; verified by reading that file, not by building |
 | `AeroraMissionBridge::attachTo()` caller | **DONE by M-Vehicle** — called from `AeroraFirmwarePlugin::attachDomainServices()`; contract verified by reading, not by building |
-| Aerora complex mission items | `CONTRACT-ONLY` — seam exists, no item implemented (Q-021) |
+| Aerora complex mission items | `CONTRACT-ONLY` — seam exists, no item implemented (Q-021). Integration contract: [coverage-mission-contract.md](coverage-mission-contract.md) |
+| Coverage mission integration approach | `DESIGNED` — [coverage-mission-contract.md](coverage-mission-contract.md) |
+| Mission validation result model | `IMPLEMENTED-UNCOMPILED` — `AeroraMissionValidationReport`, three outcomes, no boolean |
+| Mission validation pass | `IMPLEMENTED-UNCOMPILED` — `AeroraMissionValidator`, 5 checks performable, 4 reported unperformable |
+| Operating limits used by validation | **NONE.** No spacing, altitude, geofence or turn-radius threshold exists in this subtree |
 | Aerora mission command set | `OPEN / NOT-EVIDENCED` — Q-023 |
 | Mission verification depth | `OPEN` — Q-041; depth is reported, not chosen |
 | Aerora mission status beyond the standard index | `OPEN / NOT-EVIDENCED` — no dialect |
@@ -55,7 +59,7 @@ in this subtree.
 
 ## QGroundControl's mission architecture
 
-Source-verified. Class and member names are exact as they exist now, not as earlier phase documents
+Source-inspected. Class and member names are exact as they exist now, not as earlier phase documents
 describe them.
 
 ```text
@@ -164,8 +168,11 @@ no equivalent, not because Aerora will eventually have several products.
 | `AeroraMissionBridge.{h,cc}` | The only file here that touches `Vehicle` / `MissionManager`. Feeds the observer |
 | `AeroraMissionResumeBoundary.{h,cc}` | What resume carries and does not carry, as assertable facts |
 | `AeroraMissionExtension.{h,cc}` | Product-family mission seam and its registry. No extension implemented |
+| `AeroraMissionValidationReport.{h,cc}` | Check and report value types. Three outcomes, and deliberately no `isValid()` boolean |
+| `AeroraMissionValidator.{h,cc}` | The validation pass. Nine named checks, five performable, no invented threshold |
 | `AeroraMissionLog.{h,cc}` | `Aerora.Mission` logging category |
 | `Mission.cmake` | Variable-only source manifest. Defines no target and no `PARENT_SCOPE` |
+| [`coverage-mission-contract.md`](coverage-mission-contract.md) | Coverage-mission integration contract, reuse analysis, and the payload boundary |
 
 Under `aerora/test/Mission/`:
 
@@ -203,7 +210,7 @@ is the worst available failure on this path.
 
 ### The plan file remains authoritative
 
-`AERORA-MISSION-REQ-001`. Four source-verified reasons the vehicle store cannot be:
+`AERORA-MISSION-REQ-001`. Four source-inspected reasons the vehicle store cannot be:
 
 | Fact | Consequence |
 | --- | --- |
@@ -269,7 +276,7 @@ upstream either (see [Corrections](#corrections-to-earlier-phases)).
 
 ## Mission synchronisation
 
-Source-verified, reused unchanged. No conflict-resolution rule is invented.
+Source-inspected, reused unchanged. No conflict-resolution rule is invented.
 
 | Operation | Entry point | Wire | Completion |
 | --- | --- | --- | --- |
@@ -337,7 +344,7 @@ not reported as a difference.
 
 ## Mission replacement
 
-Source-verified, preserved, not modified.
+Source-inspected, preserved, not modified.
 
 | Element | Behaviour |
 | --- | --- |
@@ -631,6 +638,102 @@ What was implemented instead is three small enumerations over facts that *are* o
 that "nothing has been observed" is a value rather than a default that reads as a state. Everything
 else is left `OPEN`.
 
+## Mission validation
+
+`AeroraMissionValidationReport` + `AeroraMissionValidator`. `P7-CHK-002`, `P7-CHK-004`.
+
+### Why upstream's gate was not enough
+
+QGroundControl already has a mission readiness gate, and it is a different shape:
+`VisualMissionItem::readyForSaveState()` returns one of three per-item values, and
+`MissionController::readyForSaveState()` (`MissionController.cc:876-884`) returns the **first**
+non-ready item's state and stops.
+
+That answers "may this be saved". It cannot answer what was checked, what passed, or what could
+not be checked — and the third is the requirement. A check that silently did not run is
+indistinguishable from a check that passed, which is the false assurance `P7-CHK-002` exists to
+prevent.
+
+### Three outcomes, and no boolean
+
+```text
+Outcome::NotPerformed = 0     ← the default, so an unstated check is not a passed one
+Outcome::Passed
+Outcome::Failed
+```
+
+```text
+Verdict::NoChecksPerformed    nothing ran
+Verdict::Failed               at least one check failed
+Verdict::PassedWithGaps       everything that ran passed, and something could not run
+Verdict::Passed               every named check ran and passed
+```
+
+The report exposes **no `isValid()`**. A boolean would have to fold `PassedWithGaps` into `true` or
+`false`; `true` hides the gap and `false` reports a failure nothing found. That fold is the defect.
+
+Per `P7-CHK-004`, a check that could not be evaluated blocks nothing on its own.
+`kNotPerformedBlocksOperation = false` pins it as an assertable constant rather than a reading of
+`verdict()`.
+
+### Nine named checks, every one present in every report
+
+An omitted check is indistinguishable from a passed one, so all nine appear in enum order
+regardless of whether they ran.
+
+| Check | Runs | Semantics from |
+| --- | --- | --- |
+| `MissionPresence` | **yes** | A mission with no items has nothing to fly |
+| `SequenceNumbering` | **yes** | QGC renumbers densely from 0 on upload and on resume generation |
+| `FrameValidity` | **yes** | `MAV_FRAME_ENUM_END` is the fingerprint's unpopulated default and is not packable |
+| `CoordinateRange` | **yes** | `PlanManager` treats every frame except `MAV_FRAME_MISSION` as scaled lat/lon (`PlanManager.cc:404-405`, `:551-552`) |
+| `ResumeCompatibility` | **yes** | `generateResumeMission()` refuses outright on any `MAV_CMD_DO_JUMP` (`MissionManager.cc:84-86`) |
+| `ResumeStateCarryForward` | no — `Q-023` | Omissions are enumerable; classifying which ones matter needs the payload command set |
+| `MissionCommandSupport` | **branch exists** — `Q-023` | Runs the moment a command set is declared |
+| `VehicleCapabilityAgreement` | no — `Q3-009` + `Q-023` | Nothing reported, and no command-to-capability mapping defined |
+| `GeometryLimits` | no — product | No operating limit is approved |
+
+### No threshold is invented
+
+The validator contains exactly two numeric constants, and both are the domain of the
+latitude/longitude coordinate system rather than operating limits:
+
+```cpp
+constexpr double kLatitudeLimitDeg  = 90.0;
+constexpr double kLongitudeLimitDeg = 180.0;
+```
+
+A coordinate outside those cannot be a position on the Earth. There is no spacing minimum, no
+altitude floor or ceiling, no geofence margin, no turn radius and no consumable budget anywhere in
+the file, and `AeroraMissionTest::_validationPassesWithGapsOnACleanMission` asserts that feeding
+the validator every input it accepts still leaves `GeometryLimits` unperformed.
+
+### A vacuous pass is a gap, not a pass
+
+Three degenerate inputs would otherwise produce a clean-looking result from an examination that
+never happened, and each gets a named reason instead:
+
+| Input | Reason reported |
+| --- | --- |
+| No snapshot captured | `MissionNotCaptured` |
+| Captured and carrying no items | `MissionEmpty` |
+| Items present, none carrying a coordinate (all `MAV_FRAME_MISSION`) | `NoApplicableItems` |
+
+Returning `Passed` for any of them is the same defect as omitting the check. `SequenceNumbering`
+over zero items is true and establishes nothing.
+
+### The one verdict that is deliberately withheld
+
+`ResumeStateCarryForward` enumerates the items a resume would not carry forward and then reports
+`NotPerformed` anyway. That is not an oversight. Upstream deliberately does not carry forward a
+navigation item the aircraft already flew — that is what resuming means — while a state-setting
+item whose effect is silently lost is the exposure recorded as R-002. Telling the two apart needs
+the Aerora payload mission command set (`Q-023`).
+
+Reporting "0 problems" because the list was short would be false assurance; reporting a failure
+because the list was long would be a problem nothing established. So the count is carried in the
+check's detail and the verdict is withheld.
+
 ## Build and test
 
 Once the overlay root wires this module in:
@@ -663,16 +766,16 @@ to the production code. That is stricter than the core test tree and is intended
 
 | Check | Result |
 | --- | --- |
-| Upstream mission architecture, read at `9459a4b5` | **VERIFIED** — every citation in this document |
-| `includedResumeCommands` definition, content and sole call site | **VERIFIED** — 14 commands, one `.contains()` |
-| `includedResumeCommands` unmodified by this workstream | **VERIFIED** — `git status`/`git diff` report `src/MissionManager/` entirely untouched |
-| The resume mirror equals upstream's list, same commands and same order | **VERIFIED** — compared programmatically against `MissionManager.cc` at `9459a4b5`. This is a point-in-time check, not a standing guard; see [drift detection](#6-drift-detection-for-the-resume-mirror) |
+| Upstream mission architecture, read at `9459a4b5` | **SOURCE-INSPECTED** — every citation in this document |
+| `includedResumeCommands` definition, content and sole call site | **SOURCE-INSPECTED** — 14 commands, one `.contains()` |
+| `includedResumeCommands` unmodified by this workstream | **SOURCE-INSPECTED** — `git status`/`git diff` report `src/MissionManager/` entirely untouched |
+| The resume mirror equals upstream's list, same commands and same order | **SOURCE-INSPECTED** — compared programmatically against `MissionManager.cc` at `9459a4b5`. This is a point-in-time check, not a standing guard; see [drift detection](#6-drift-detection-for-the-resume-mirror) |
 | `vehicle_null_check.py` over both mission directories | **PASS**, exit 0, no violations |
 | Line endings, trailing whitespace, final newline, tabs, 120-column limit | **PASS** |
 | Every `#include "..."` resolves to a real header | **PASS** |
 | Brace, paren and bracket balance per file | **PASS** |
-| No payload/camera/gimbal state persistence or replay upstream | **VERIFIED** — searched `src/Camera`, `src/Gimbal`, `src/VideoManager`, `src/MissionManager` |
-| MAVLink enumerators named in tests exist in this tree | **VERIFIED** — each confirmed at a C++ use site |
+| No payload/camera/gimbal state persistence or replay upstream | **SOURCE-INSPECTED** — searched `src/Camera`, `src/Gimbal`, `src/VideoManager`, `src/MissionManager` |
+| MAVLink enumerators named in tests exist in this tree | **SOURCE-INSPECTED** — each confirmed at a C++ use site |
 | Banned patterns: `Q_ASSERT`, `QTest::ignoreMessage`, fixed `qWait`, uncategorized logging | **PASS** — none present |
 | `Mission.cmake` source list matches the files on disk, both directions | **PASS** |
 | `UT_REGISTER_TEST` names match `AERORA_MISSION_TEST_NAMES` | **PASS** |
@@ -682,9 +785,27 @@ to the production code. That is stricter than the core test tree and is intended
 | Test execution | **NOT RUN** |
 | `clang-format`, `clang-tidy`, `clazy`, `cmake-format` | **NOT RUN** — not installed |
 
-The honest status of this subtree is `IMPLEMENTED-UNCOMPILED`. No claim is made that any test
-passes, that the integration test's MockLink interaction behaves as expected, or that the module
-links.
+Re-run for the validation change, on the files it touches:
+
+| Check | Result |
+| --- | --- |
+| `.kiro/tools/aerora-manifest-check.ps1` | **PASS for this module** — 131 declared sources all resolve, the 4 new files among them. The 2 reported problems are another workstream's in-progress QML, not this module's |
+| `python tools/analyzers/vehicle_null_check.py` on the new production files | **PASS**, exit 0 |
+| `python tools/analyzers/qt_translate_noop_check.py` on all 6 changed files | **PASS**, exit 0 |
+| `Q_ASSERT`, `QTest::ignoreMessage`, `qWait`, uncategorized logging, `qCInfo` | **PASS** — 0 occurrences each |
+| 120-column limit, LF endings, no tabs, final newline, no trailing whitespace | **PASS** on all 6 files |
+| Every `Class::method` definition has a declaration in its header | **PASS** |
+| Every project `#include` resolves | **PASS** |
+| Brace balance per file | **PASS** |
+| Every `CheckId` / `Outcome` / `Unavailable` / `Verdict` enumerator has a `toString` case | **PASS** — checked programmatically against the header |
+| `MISSION_ITEM_REACHED` still handled nowhere in `src/` | **SOURCE-INSPECTED** — re-grepped `*.h`, `*.cc`, `*.qml` this pass, zero hits |
+| `includedResumeCommands` still unmodified | **SOURCE-INSPECTED** — `src/MissionManager/` untouched by this change |
+| `python tools/check_clang_format.py` | **NOT RUN** — the `clang-format` binary is absent on this host |
+| Compile, link, test execution | **NOT RUN** |
+
+The honest status of this subtree is `IMPLEMENTED-UNCOMPILED`. **Every test in this module is
+written and unexecuted.** No claim is made that any test passes, that the integration test's
+MockLink interaction behaves as expected, or that the module links.
 
 ## Corrections to earlier phases
 
@@ -757,34 +878,32 @@ endif()
 directory, so omitting the vehicle module fails the build on the missing header rather than silently
 producing a mission module that never attaches.
 
-### 2. Somebody must call `AeroraMissionBridge::attachTo(vehicle)`
+### 2. Somebody must call `AeroraMissionBridge::attachTo(vehicle)` — **CLOSED**
 
-**Required interface:** a per-vehicle hook that runs once per discovered vehicle, after
-`AeroraVehicleServices` is attached.
-**Reason:** mission observation attaches nothing by itself; there is no self-registering static in
-this module, by design.
-**Producer:** whichever of these the orchestrator chooses.
-**Consumer:** `AeroraMissionBridge::attachTo(Vehicle*)`.
+**Resolved by the vehicle workstream.** `AeroraFirmwarePlugin::attachDomainServices()` calls
+`AeroraMissionBridge::attachTo(vehicle)` once, last in its dependency-ordered composition, from
+`FirmwarePlugin::initializeVehicle()`. The contract and its verification are recorded under
+[How the composition root consumes this contract](#how-the-composition-root-consumes-this-contract).
 
-| Candidate seam | File | Owner |
-| --- | --- | --- |
-| `AeroraFirmwarePlugin::initializeVehicle()` — the natural place, since it already attaches the services object | `aerora/src/Vehicle/AeroraFirmwarePlugin.cc` | Vehicle workstream |
-| `AeroraCorePlugin::init()` + `MultiVehicleManager::vehicleAdded` | `aerora/src/AeroraCorePlugin.cc` | Security workstream |
-| A product profile's `attachToVehicle()` | a future profile file | Product workstream |
-
-The first is one line. This workstream did not make it, because both candidate files belong to other
-parallel agents.
+The lifecycle assertion is also in place and is **not duplicated here**: the vehicle workstream's
+`AeroraVehicleLifecycleTest` asserts the caller exists, that the bridge is present as a child of
+the observer rather than only the observer, and that a repeated `attachTo()` returns the same
+bridge instead of connecting a second one. That is the right home for it, because it needs a real
+MockLink-connected `Vehicle`. This module's `AeroraMissionSyncTest` covers the real `PlanManager`
+completion path instead, which is the part a vehicle lifecycle test does not reach.
 
 ### 3. Two `QGCCorePlugin` overrides, if Aerora complex items are ever added
 
 **Required interface:** `AeroraCorePlugin` overriding `complexMissionItemNames()` and
 `createComplexMissionItem()` to delegate to `AeroraMissionExtensionRegistry`.
 **Reason:** that is the no-core-edit factory seam for complex items.
-**Producer:** `aerora/src/AeroraCorePlugin.{h,cc}` — **owned by the security workstream**.
+**Producer:** `aerora/src/AeroraCorePlugin.{h,cc}` — **owned by the integration workstream**.
 **Consumer:** `MissionController::insertComplexMissionItem` / `_loadJsonMissionFileV2`.
 
 **Not needed yet**, and deliberately not done: no Aerora complex item is evidenced (Q-021), so the
-override would delegate to an empty registry. Recorded so the seam is known when Q-021 resolves.
+override would delegate to an empty registry and be dead code. Filed as `HO-TAB5-01` in
+[coverage-mission-contract.md § 9](coverage-mission-contract.md#9-handoff-aeroracoreplugin-must-consult-the-mission-extension-registry)
+so that registering the first extension does not silently fail to appear in the Plan view.
 
 ### 4. Mission command set declaration, when Q-023 resolves
 
@@ -855,14 +974,34 @@ Only genuine blockers. Nothing here is answerable from this repository.
 | **IF-MIS-014** | Whether the payload controller retains payload state across a mission interruption | R-002 mitigation. `NOT-EVIDENCED`; needs `BENCH` evidence |
 | **IF-MIS-013** | Aerora mission status beyond the standard index | Nothing. Degrades to the index, which is what is implemented |
 | **IF-MIS-004** | Whether an item-completion event exists at all | See [Corrections](#corrections-to-earlier-phases). Not handled upstream |
-| Bridge attachment | Nobody calls `AeroraMissionBridge::attachTo()` | The module attaching to any vehicle at runtime |
-| Overlay wiring | `aerora/CMakeLists.txt` does not include `src/Mission/Mission.cmake` | Building or running anything in this module |
+| **Q3-009** | Capability presence reporting | `VehicleCapabilityAgreement`. Nothing is reported, so the check cannot run |
+| Operating limits | No spacing, altitude, geofence or turn-radius limit is approved | `GeometryLimits`. Product + airframe decision; **no value is invented meanwhile** |
+| Applicator working envelope | Not evidenced | Coverage geometry, spacing semantics, and any coverage-quality claim |
+| Command-to-capability mapping | Undefined even if `Q-023` and `Q3-009` both resolved | `VehicleCapabilityAgreement`'s performable branch |
+| Coverage editor and map visual QML | Owned by the UI workstream | Only the *display* of a coverage item. See [coverage-mission-contract.md § 3](coverage-mission-contract.md#3-the-two-map-visual-seams) |
+| ~~Bridge attachment~~ | **Closed.** `AeroraFirmwarePlugin::attachDomainServices()` calls `attachTo()`, and the vehicle workstream's lifecycle test asserts it | — |
+| ~~Overlay wiring~~ | **Closed.** `aerora/CMakeLists.txt` aggregates this manifest and registers both tests | — |
 | Build host | No toolchain | Every compile, link and test claim in this document |
 
 ## Status vocabulary
 
-`CONTRACT-ONLY`, `IMPLEMENTATION-PLANNED`, `IMPLEMENTED`, `IMPLEMENTED-UNCOMPILED`, `VERIFIED`,
-`BLOCKED`, `OPEN`, `NOT-EVIDENCED`.
+`CONTRACT-ONLY`, `IMPLEMENTATION-PLANNED`, `IMPLEMENTED`, `IMPLEMENTED-UNCOMPILED`,
+`SOURCE-INSPECTED`, `BLOCKED`, `OPEN`, `NOT-EVIDENCED`.
 
-`VERIFIED` is used in this document only for facts read directly from QGC source at `9459a4b5`. It is
-not used for anything about this subtree's behaviour, because nothing here has run.
+Defined programme-wide in
+[05-product-completion/00-README.md](../../../.kiro/specs/05-product-completion/00-README.md#status-vocabulary).
+This document does not redefine any of them.
+
+`SOURCE-INSPECTED` is the status for a fact about existing source established by reading, grepping
+or mechanical comparison at a named commit. It says nothing about behaviour.
+
+**`VERIFIED` is deliberately absent.** Programme-wide it means built, executed and observed, and
+nothing in this subtree has been built or run. An earlier revision of this document used `VERIFIED`
+for source reading and scoped it locally, which collided with the programme definition — a reader
+grepping for `VERIFIED` would have found claims that look like execution evidence and are not. The
+weaker class now has its own name rather than borrowing the stronger one. Build, link, lint and
+test results here are **`NOT RUN`**.
+
+The one remaining occurrence of the word in this document is `GCS-VERIFIED` under
+[Corrections](#corrections-to-earlier-phases), which quotes another document's status string rather
+than making a claim.
