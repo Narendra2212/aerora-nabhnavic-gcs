@@ -150,9 +150,28 @@ list(APPEND _aerora_include_directories
 # (custom-example/CMakeLists.txt:143-172): qt_add_library STATIC, qgc_configure_target, then
 # qt_add_qml_module with NO_PLUGIN, and the resulting target appended to CUSTOM_LIBRARIES.
 #
-# Unlike custom-example this sets no QT_RESOURCE_ALIAS. Those aliases exist so overlay QML can
-# shadow stock QGroundControl files by basename; Aerora.Controls is a new URI that shadows nothing,
-# so aliasing would be inappropriate here rather than merely redundant.
+# Two lines in the block below are load-bearing and were missing from the first pass. Both are
+# specified in aerora/src/UI/Ui.cmake, which is Tab 7's manifest and the authority on this module:
+#
+#   * qgc_set_qt_resource_alias() (cmake/Helpers.cmake:13, in scope because the root CMakeLists.txt
+#     does include(Helpers) at :21, before it adds this directory at :403) aliases each file to its
+#     bare name. AERORA_UI_QML_FILES holds absolute paths, so without the alias the resource lands
+#     at qrc:/qml/Aerora/Controls/src/UI/Controls/<Name>.qml and the module does not resolve. It is
+#     called from this file rather than the manifest because source file properties are
+#     directory-scoped and must be set where the target is declared.
+#
+#     The first pass omitted it on the grounds that aliases exist to shadow stock QGroundControl
+#     files by basename and Aerora.Controls shadows nothing. That is true of shadowing and
+#     irrelevant here: the alias is doing path flattening, which this module needs either way.
+#
+#   * IMPORTS QGC is how Aerora's QML_ELEMENT C++ types resolve inside the module. They register
+#     into the application target's QML module, whose URI is QGC (root CMakeLists.txt:422), so a
+#     module that does not import it cannot see AeroraUi or AeroraTelemetryState. This mirrors
+#     src/CMakeLists.txt:15-26, where QGroundControlModule does exactly the same thing.
+#
+# No addImportPath() call is needed. The base QGCCorePlugin::createQmlApplicationEngine() already
+# adds qrc:/qml (src/API/QGCCorePlugin.cc:303) and a module at qrc:/qml/Aerora/Controls/ resolves
+# from it.
 #
 # The URI comes from AERORA_UI_QML_MODULE_URI - Tab 7 owns it and it is not restated here.
 # ----------------------------------------------------------------------------
@@ -161,26 +180,22 @@ if(AERORA_UI_QML_FILES)
     qt_add_library(AeroraControlsModule STATIC)
     qgc_configure_target(AeroraControlsModule)
 
+    qgc_set_qt_resource_alias(${AERORA_UI_QML_FILES})
+
     qt_add_qml_module(AeroraControlsModule
         URI ${AERORA_UI_QML_MODULE_URI}
         VERSION 1.0
         RESOURCE_PREFIX /qml
         QML_FILES ${AERORA_UI_QML_FILES}
+        IMPORTS
+            QGC
+            QGroundControl
+            QGroundControl.Controls
         NO_PLUGIN
     )
 
     list(APPEND _aerora_libraries AeroraControlsModule)
 endif()
-
-# ----------------------------------------------------------------------------
-# OUTSTANDING Tab 1 work for M-Ui
-#
-# Handoff HO-TAB7-02: AeroraQmlOverrides must be installed on the QML engine by overriding two
-# public virtuals on AeroraCorePlugin, which M-Plugin owns. Recorded in
-# .kiro/specs/04-ui-implementation/01-ui-foundation-closure.md and tracked in
-# 29-integration-status.md. Not done here: this pass is reproducibility and build-entry closure,
-# and that change alters runtime engine setup rather than the build graph.
-# ----------------------------------------------------------------------------
 
 list(APPEND _aerora_libraries
     ${AERORA_TELEMETRY_LIBRARIES}
