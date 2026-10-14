@@ -3,9 +3,20 @@ import QtQuick.Layouts
 
 import QGroundControl
 import QGroundControl.Controls
+import QGroundControl.AnalyzeView
 
-// AeroraSelfReportRow needs no import: the resource alias puts every AERORA_UI_QML_FILES entry
-// under one module, Aerora.Controls, and types within a module are mutually visible. Importing it
+// AnalyzePage is imported at file level, not left to this module's IMPORTS list. Qt documents
+// IMPORTS in the consumer direction only - "if a QML file imports this module, it also imports all
+// the modules listed under IMPORTS" - which is a guarantee for importers of Aerora.Controls, not
+// for its own members. HO-TAB1-13.
+//
+// AeroraSecurity and AeroraUi need no entry of their own: they register into the application
+// target's module (URI QGC), and the `import QGroundControl` above reaches it, because
+// QGroundControlModule declares IMPORTS QGC (src/CMakeLists.txt:22-23). That is the consumer
+// direction and is the documented one.
+//
+// AeroraSelfReportRow needs no import either: the resource alias puts every AERORA_UI_QML_FILES
+// entry in one flat module directory, so the implicit import covers it. Importing Aerora.Controls
 // here would be a module importing itself.
 
 /// `SCR-SHL-01` - the Aerora Operations Hub.

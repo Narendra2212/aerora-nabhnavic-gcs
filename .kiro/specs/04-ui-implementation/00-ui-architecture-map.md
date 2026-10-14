@@ -182,7 +182,7 @@ not match the checkout. Recorded rather than silently worked around.
 | "Four purpose-built empty QML seams", including `src/FlightMap/MapItems/CustomMapItems.qml` | `CustomMapItems.qml` is **not empty**. It is an `Instantiator` over `QGroundControl.corePlugin.customMapItems` that calls `Qt.createComponent(object.url)` and `map.addMapItem()` | **There are three tier-2 QML seams, not four.** Map items are a **tier-1 C++** seam. Overriding `CustomMapItems.qml` would replace a populated upstream file — a tier-3 fork taken by mistake |
 | "A C++ virtual on … `QGCFlyViewOptions`" implying `src/API/QGCFlyViewOptions.h` | No such file. `QGCFlyViewOptions` is declared inside `src/API/QGCOptions.h:11-41` | Documentation only |
 | Tier-3 override count is **1** | Nothing in the overlay overrides anything. The count is **0**, and the tool-strip entry is not yet needed | The architecture is currently cheaper than specified. Keep it there |
-| "Aerora QML modules … registered through `qt_add_qml_module` and exported as libraries" (`AERORA-UI-REQ-010`) | No Aerora QML module, QML file or `qt_add_qml_module` call exists. Aerora's `QML_ELEMENT` C++ types reach the application target through `CUSTOM_SOURCES` (`src/CMakeLists.txt:202-223`, `target_sources` at `:208`), and the application target is itself a QML module with **`URI QGC`** (root `CMakeLists.txt:422-428`) | See the registration question below |
+| "Aerora QML modules … registered through `qt_add_qml_module` and exported as libraries" (`AERORA-UI-REQ-010`) | **True as of `602b38a18`** — `AeroraControlsModule`, URI `Aerora.Controls`, seven QML files, exported through `CUSTOM_LIBRARIES` (`aerora/CMakeLists.txt:195-208`). It was *not* true when this row was written, which is what the row records. The C++ half is unchanged and separate: Aerora's `QML_ELEMENT` types reach the application target through `CUSTOM_SOURCES` (`src/CMakeLists.txt:202-223`, `target_sources` at `:208`), and that target is itself a QML module with **`URI QGC`** (root `CMakeLists.txt:422-428`) | QML half **closed**. C++ half: see the registration question below |
 
 ### Open: where do Aerora C++ QML types register?
 
@@ -195,19 +195,62 @@ QML module of their own:
 and the gadgets `AeroraTelemetrySource`, `AeroraMissionIndex`, `AeroraMissionSnapshot`,
 `AeroraMissionAgreement`, `AeroraMissionItemFingerprint`, `AeroraPayloadRequest`.
 
-Two facts make the registration outcome uncertain:
+Two facts were recorded as making the registration outcome uncertain. **One is now closed and the
+other is narrowed but still `NOT-EVIDENCED`.**
 
-1. Root `CMakeLists.txt` calls `add_subdirectory("${QGC_CUSTOM_DIR}")` at `:403`, then
-   `qt_add_qml_module(${CMAKE_PROJECT_NAME} URI QGC ...)` at `:422`, then `add_subdirectory(src)`
-   at `:442` — and `CUSTOM_SOURCES` are attached to the target at `src/CMakeLists.txt:208`, i.e.
-   **after** `qt_add_qml_module` has already run on that target, from a different directory scope.
-2. If they do register, they register under **`import QGC`**, not under an Aerora URI. That
-   contradicts `AERORA-UI-REQ-010`.
+**1. Configure ordering — still open, but weaker than first stated.** Root `CMakeLists.txt` calls
+`add_subdirectory("${QGC_CUSTOM_DIR}")` at `:403`, then
+`qt_add_qml_module(${CMAKE_PROJECT_NAME} URI QGC ...)` at `:422-428`, then `add_subdirectory(src)`
+at `:442` — and `CUSTOM_SOURCES` are attached at `src/CMakeLists.txt:208`, **after**
+`qt_add_qml_module` has run on that target, from a different directory scope.
 
-Neither can be settled by reading source. Recorded as **`Q7-001`**; it needs the build host
-(`D-006`). It is the first thing an Aerora UI build must check, because the failure is an import
-error rather than a wrong pixel, and it decides whether the Aerora UI module layout below needs a
-registration shim.
+What narrows it: Qt documents this registration as a **build-time** scan, not a configure-time one
+— the backing target's C++ sources are scanned at build time to generate the typeinfo file and the
+type-registration translation unit, which is then added back to the target as a source, and this
+requires `AUTOMOC`
+([qt_add_qml_module](https://doc.qt.io/qt-6/qt-add-qml-module.html)). `AUTOMOC` is on, via
+`qt_standard_project_setup` at root `:289`, which precedes both the target and the module call. A
+target's source list is finalised at generate time, after every `add_subdirectory`, so a build-time
+scan would see the `:208` additions. That is an argument from documented behaviour, not a
+measurement, so the question stays open — it is `SOURCE-INSPECTED` reasoning, nothing more.
+
+**2. The `QGC` URI — closed, and it is not a contradiction.** Two separate points, both settled by
+reading source:
+
+- `AERORA-UI-REQ-010` is satisfied by the **QML** module, not by the C++ types. Aerora QML *files*
+  go into a named module, `Aerora.Controls`. Aerora C++ types sharing `QGC` with upstream's is
+  upstream's own convention — see
+  [01 § Where Aerora types land](01-ui-foundation-closure.md#where-aerora-types-land-and-how-qml-reaches-them).
+  The "contradicts `AERORA-UI-REQ-010`" claim this section used to carry is withdrawn.
+- Registering under `QGC` does **not** put the types out of reach of Aerora QML. Every Aerora QML
+  file carries a file-level `import QGroundControl`, and `QGroundControlModule` declares
+  `IMPORTS QGC` (`src/CMakeLists.txt:22-23`). Qt documents `IMPORTS` as propagating to a module's
+  *importers* — if a file imports the module, it also imports everything under that module's
+  `IMPORTS`. So `AeroraSecurity`, `AeroraTelemetryState`, `AeroraStateValue` and `AeroraUi` are in
+  scope through a documented, consumer-direction chain, with no change to any file. This is the
+  evidence that collapsed the integration review's F1 from seven files to one; see `HO-TAB1-13`.
+
+### `Q7-001` — the experiment that resolves it
+
+Status **`BLOCKED`** on `D-006`. Not `CONTRACT-ONLY` and not `VERIFIED`: the contract is readable,
+the outcome is not. Owner Tab 8, since it is the first build. In order, stopping at the first
+failure:
+
+1. Configure only — `just configure`. A `qt_add_qml_module` warning about the backing target's
+   directory structure is expected and is not the failure being looked for.
+2. Grep the generated type-registration translation unit in the app target's binary directory for
+   `AeroraSecurityStatus` and `AeroraVehicleUiContext`. Present ⇒ the `:208` sources were scanned
+   and ordering is a non-issue.
+3. Grep the generated `QGC` `qmldir` and `QGC.qmltypes` for `AeroraSecurity`, `AeroraUi`,
+   `AeroraTelemetryState`, `AeroraStateValue`. Present ⇒ registered under the URI as expected.
+4. If 2 or 3 is empty, the ordering hazard is real. The fix is to register the Aerora QML-exposed
+   C++ through `qt_target_qml_sources()` on the app target from the overlay, rather than relying on
+   the already-executed `qt_add_qml_module` call to pick them up.
+5. Build, launch, open the Operations Hub from the Analyze menu and read the Fly View toolbar.
+   **Only this step licenses `VERIFIED`**, and only for what it actually exercised.
+
+Steps 1-4 are configuration and build evidence. None of them has been run: there is no CMake, no
+compiler and no Qt on the authoring host.
 
 ## The binding contract: what the backend actually exposes to QML
 

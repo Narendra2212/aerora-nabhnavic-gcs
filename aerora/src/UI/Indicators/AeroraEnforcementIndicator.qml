@@ -3,10 +3,14 @@ import QtQuick
 import QGroundControl
 import QGroundControl.Controls
 
-// AeroraSecurity needs no file-level import: it is a QML_SINGLETON registered into the
-// application target's QML module (URI QGC), which this module declares in its IMPORTS. That is
-// the same route AeroraOperationsHub.qml reaches AeroraSecurity by, and AeroraStateText.qml
-// AeroraTelemetryState.
+// AeroraSecurity needs no entry of its own. It is a QML_SINGLETON registered into the application
+// target's module (URI QGC), and the `import QGroundControl` above reaches it, because
+// QGroundControlModule declares IMPORTS QGC (src/CMakeLists.txt:22-23) and Qt documents IMPORTS as
+// propagating to a module's importers. That is the same route AeroraStateText.qml reaches
+// AeroraTelemetryState by.
+//
+// Not this module's own IMPORTS QGC: that is the member direction, which Qt does not document.
+// See HO-TAB1-13.
 
 /// `SCR-SHL-03` - the enforcement-state strip, as a non-vehicle toolbar indicator.
 ///

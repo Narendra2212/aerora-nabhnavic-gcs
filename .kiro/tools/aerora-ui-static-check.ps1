@@ -10,30 +10,38 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
+# Targets are discovered, not listed. The hand-maintained list this replaces silently skipped
+# aerora/src/UI/Indicators/AeroraEnforcementIndicator.qml from 602b38a18 until HO-TAB1-12 - the
+# same failure mode as HO-TAB1-05 and HO-TAB1-06, and the one a checker should not reproduce.
+#
+# .md is excluded deliberately: README.md is prose, and the 120-column and brace-balance checks
+# below are meaningless against it.
+$targetRoots = @('aerora/src/UI', 'aerora/test/UI')
+$targetExtensions = @('.h', '.cc', '.qml', '.cmake')
+
+$missingRoots = @($targetRoots | Where-Object { -not (Test-Path (Join-Path $root $_)) })
+
 $targets = @(
-    'aerora/src/UI/AeroraUiLog.h'
-    'aerora/src/UI/AeroraUiLog.cc'
-    'aerora/src/UI/AeroraQmlOverrides.h'
-    'aerora/src/UI/AeroraQmlOverrides.cc'
-    'aerora/src/UI/AeroraVehicleUiContext.h'
-    'aerora/src/UI/AeroraVehicleUiContext.cc'
-    'aerora/src/UI/Ui.cmake'
-    'aerora/src/UI/Controls/AeroraStateText.qml'
-    'aerora/src/UI/Controls/AeroraAgeLabel.qml'
-    'aerora/src/UI/Controls/AeroraTokenDisplay.qml'
-    'aerora/src/UI/Controls/AeroraValueDisplay.qml'
-    'aerora/src/UI/Controls/AeroraSelfReportRow.qml'
-    'aerora/src/UI/Screens/AeroraOperationsHub.qml'
-    'aerora/test/UI/AeroraUiFoundationTest.h'
-    'aerora/test/UI/AeroraUiFoundationTest.cc'
-    'aerora/test/UI/AeroraUiSafetyTest.h'
-    'aerora/test/UI/AeroraUiSafetyTest.cc'
-)
+    foreach ($dir in $targetRoots) {
+        $dirPath = Join-Path $root $dir
+        if (-not (Test-Path $dirPath)) { continue }
+        Get-ChildItem -Path $dirPath -Recurse -File |
+            Where-Object { $targetExtensions -contains $_.Extension } |
+            ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
+    }
+) | Sort-Object
 
 $CR = [char]13
 $LF = [char]10
 $TAB = [char]9
 $failures = 0
+
+# A vanished target root is a failure, not an empty pass: it would otherwise report "0 issues"
+# over nothing at all.
+foreach ($dir in $missingRoots) {
+    Write-Output ("MISSING   {0}  (target root absent; nothing checked under it)" -f $dir)
+    $failures++
+}
 
 foreach ($rel in $targets) {
     $path = Join-Path $root $rel
