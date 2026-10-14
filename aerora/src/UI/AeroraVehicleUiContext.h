@@ -88,6 +88,13 @@ class AeroraVehicleUiContext : public QObject
     QML_NAMED_ELEMENT(AeroraUi)
     QML_SINGLETON
 
+    Q_MOC_INCLUDE("AeroraMissionObserver.h")
+    Q_MOC_INCLUDE("AeroraPayloadModel.h")
+    Q_MOC_INCLUDE("AeroraPowerModel.h")
+    Q_MOC_INCLUDE("AeroraVehicleCapabilities.h")
+    Q_MOC_INCLUDE("AeroraVehicleIdentity.h")
+    Q_MOC_INCLUDE("Vehicle.h")
+
     Q_PROPERTY(bool available READ isAvailable NOTIFY servicesChanged)
     Q_PROPERTY(AeroraVehicleIdentity *identity READ identity NOTIFY servicesChanged)
     Q_PROPERTY(AeroraVehicleCapabilities *capabilities READ capabilities NOTIFY servicesChanged)

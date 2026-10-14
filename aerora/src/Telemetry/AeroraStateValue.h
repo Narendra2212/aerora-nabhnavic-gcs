@@ -98,6 +98,8 @@ class AeroraStateValue : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("AeroraStateValue is created by the fact group that owns its Fact")
 
+    Q_MOC_INCLUDE("Fact.h")
+
     Q_PROPERTY(Fact *fact READ fact CONSTANT)
     Q_PROPERTY(QString name READ name CONSTANT)
     Q_PROPERTY(AeroraTelemetryState::Kind declaredKind READ declaredKind CONSTANT)

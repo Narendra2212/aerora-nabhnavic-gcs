@@ -144,10 +144,10 @@ QString pointedToTypeName(const char *declaredTypeName)
 /// hand-maintained closure cannot catch.
 ///
 /// Deliberately keyed on the **declared type name** rather than on
-/// `QMetaProperty::metaType().metaObject()`. `AeroraVehicleUiContext` forward-declares its five
-/// service types, so without a `Q_MOC_INCLUDE` the generated meta-type for a pointer to an
-/// incomplete class can carry no meta-object, and a meta-type walk would quietly find nothing and
-/// pass. The declared name is present in the meta-object either way.
+/// `QMetaProperty::metaType().metaObject()`. The service types are forward-declared, so a pointer
+/// to one carries a meta-object only while its header's `Q_MOC_INCLUDE` is in place; a meta-type
+/// walk would quietly find nothing and pass if one were dropped. The declared name is present in
+/// the meta-object either way, so this walk cannot weaken that way.
 ///
 /// Recursion is only possible into types this suite already knows, which is sound because the
 /// assertion is that there is nothing reachable it does not know: an unaudited type is reported

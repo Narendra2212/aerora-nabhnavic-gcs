@@ -323,12 +323,21 @@ non-reachable registered type appears — that would make the residue a pattern 
 singletons.
 
 The walk is keyed on the **declared type name**, not on `QMetaProperty::metaType().metaObject()`.
-`AeroraVehicleUiContext` forward-declares its five service types and carries no `Q_MOC_INCLUDE`, so
-a pointer-to-incomplete-class meta-type can carry no meta-object; a meta-type walk could therefore
-find nothing and pass. Whether that is actually the case here is **unverified** — it needs a
-compiler — so the walk avoids depending on it either way. Worth confirming at first build, because
-if those meta-types are incomplete it is a latent issue in the production header rather than in the
-test.
+`AeroraVehicleUiContext` forward-declares its five service types, so a pointer-to-incomplete-class
+meta-type could carry no meta-object and a meta-type walk could find nothing and pass.
+
+The first build settled the open question, and it was a latent issue in the production headers
+rather than in the test: Qt 6.11 makes a `Q_PROPERTY` meta-type *force-complete*
+(`qtmochelpers.h`, `MetaTypeList<true, …>`), so a pointer to an incomplete class is no longer
+merely meta-object-less — it is a hard `static_assert` failure. The overlay's three affected
+headers now carry the `Q_MOC_INCLUDE` the convention already required
+([CODING_STYLE.md](../../../CODING_STYLE.md#exposing-c-to-qml)):
+`AeroraVehicleUiContext` (five service types), `AeroraVehicleServices`
+(`AeroraVehicleIdentity`, `AeroraVehicleCapabilities`) and `AeroraStateValue` (`Fact`).
+
+The walk still avoids depending on meta-objects. It reads the declared type name, which moc records
+whether or not the type is complete, so the ratchet does not quietly weaken if a future header
+regresses.
 
 ## Tier discipline
 

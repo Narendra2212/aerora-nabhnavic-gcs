@@ -39,6 +39,8 @@ class AeroraVehicleServices : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("Attached to a vehicle by the Aerora vehicle integration layer")
 
+    Q_MOC_INCLUDE("AeroraVehicleCapabilities.h")
+    Q_MOC_INCLUDE("AeroraVehicleIdentity.h")
     Q_MOC_INCLUDE("Vehicle.h")
 
 public:
