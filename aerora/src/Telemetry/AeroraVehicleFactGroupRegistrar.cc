@@ -13,6 +13,11 @@ AeroraVehicleFactGroupRegistrar::AeroraVehicleFactGroupRegistrar(Vehicle *vehicl
 
 AeroraVehicleFactGroupRegistrar::~AeroraVehicleFactGroupRegistrar() = default;
 
+Vehicle *AeroraVehicleFactGroupRegistrar::vehicle() const
+{
+    return _vehicle;
+}
+
 bool AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()
 {
 #ifdef AERORA_VEHICLE_FACTGROUP_FRIENDSHIP

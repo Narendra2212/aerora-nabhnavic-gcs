@@ -327,13 +327,36 @@ The walk is keyed on the **declared type name**, not on `QMetaProperty::metaType
 meta-type could carry no meta-object and a meta-type walk could find nothing and pass.
 
 The first build settled the open question, and it was a latent issue in the production headers
-rather than in the test: Qt 6.11 makes a `Q_PROPERTY` meta-type *force-complete*
-(`qtmochelpers.h`, `MetaTypeList<true, …>`), so a pointer to an incomplete class is no longer
-merely meta-object-less — it is a hard `static_assert` failure. The overlay's three affected
-headers now carry the `Q_MOC_INCLUDE` the convention already required
-([CODING_STYLE.md](../../../CODING_STYLE.md#exposing-c-to-qml)):
-`AeroraVehicleUiContext` (five service types), `AeroraVehicleServices`
-(`AeroraVehicleIdentity`, `AeroraVehicleCapabilities`) and `AeroraStateValue` (`Fact`).
+rather than in the test. It turned out to be **two** distinct defects, both about an incomplete
+pointee and each needing a different remedy.
+
+**1. Force-complete `Q_PROPERTY` meta-types.** Qt 6.11 makes a `Q_PROPERTY` meta-type
+force-complete (`qtmochelpers.h`, `MetaTypeList<true, …>`), so a pointer to an incomplete class is
+no longer merely meta-object-less — it is a hard `static_assert` in the generated moc translation
+unit. Two headers now carry the `Q_MOC_INCLUDE` the convention already required
+([CODING_STYLE.md](../../../CODING_STYLE.md#exposing-c-to-qml)): `AeroraVehicleUiContext` (its five
+service types, plus `Vehicle` for the slot parameter) and `AeroraVehicleServices`
+(`AeroraVehicleIdentity`, `AeroraVehicleCapabilities`).
+
+**2. `QPointer<T>` converted to `T *` in an inline body.** Independent of moc, and it is why the
+overlay still failed after the first fix. `QPointer<T>::operator T *` instantiates
+`static_cast<T *>(QObject *)`, a downcast needing the complete `T` in **every** translation unit
+that compiles the inline body — not just in the `.cc` that includes the pointee. Upstream's
+`Fact *` accessors are immune because they return a raw `Fact *` member, which is an identity
+conversion; the overlay holds `QPointer` deliberately, so a destroyed target reads null instead of
+dangling. Ten overlay translation units were affected:
+
+- `AeroraStateValue::fact()` — `Fact` is now a real `#include`, not a forward declaration. The
+  class is definitionally a `Fact` binding and the include also covers defect 1 for its
+  `Fact *` property, so the `Q_MOC_INCLUDE` is redundant and removed.
+- `AeroraVehicleFactGroupRegistrar::vehicle()` — defined out of line instead. That header keeps
+  `Vehicle` an opaque handle it never dereferences, and `Vehicle.h` is far too heavy to push into
+  every consumer for one accessor.
+
+`AeroraFactGroupBase::_freshnessEvaluator()` has the same shape for `QPointer<AeroraFreshness>` but
+no affected translation unit — every file reaching that header also includes `AeroraFreshness.h`.
+Left as-is rather than pre-emptively changed, and recorded here because the next include-order
+change could expose it.
 
 The walk still avoids depending on meta-objects. It reads the declared type name, which moc records
 whether or not the type is complete, so the ratchet does not quietly weaken if a future header

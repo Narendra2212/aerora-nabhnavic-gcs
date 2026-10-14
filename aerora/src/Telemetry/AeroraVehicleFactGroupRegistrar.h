@@ -59,7 +59,12 @@ public:
     [[nodiscard]] static bool isRegistrationAvailable();
 
     /// \return The vehicle, or nullptr if it was never supplied or has been destroyed.
-    [[nodiscard]] Vehicle *vehicle() const { return _vehicle; }
+    ///
+    /// Defined out of line so this header keeps \c Vehicle an opaque handle. The conversion from
+    /// \c QPointer<Vehicle> instantiates \c static_cast<Vehicle *>(QObject *), which needs the
+    /// complete type; inline, that would force every including translation unit to pull in
+    /// \c Vehicle.h for an accessor this class never dereferences.
+    [[nodiscard]] Vehicle *vehicle() const;
 
     /// Names accepted into the vehicle's map, in the order they were accepted.
     [[nodiscard]] QStringList registeredNames() const { return _registeredNames; }

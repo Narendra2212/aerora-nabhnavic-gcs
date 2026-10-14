@@ -9,9 +9,13 @@
 
 #include "AeroraTelemetrySource.h"
 #include "AeroraTelemetryState.h"
+// Not forward-declared: fact() below converts QPointer<Fact> to Fact *, which instantiates
+// static_cast<Fact *>(QObject *) and so needs the complete type in every including translation
+// unit. It also satisfies the force-complete meta-type behind the Fact * Q_PROPERTY, which would
+// otherwise need a separate Q_MOC_INCLUDE.
+#include "Fact.h"
 
 class AeroraFreshness;
-class Fact;
 class ScheduledTask;
 
 /// \brief Binds one Fact to its state class: the value triple, as a consumable object.
@@ -97,8 +101,6 @@ class AeroraStateValue : public QObject
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("AeroraStateValue is created by the fact group that owns its Fact")
-
-    Q_MOC_INCLUDE("Fact.h")
 
     Q_PROPERTY(Fact *fact READ fact CONSTANT)
     Q_PROPERTY(QString name READ name CONSTANT)
