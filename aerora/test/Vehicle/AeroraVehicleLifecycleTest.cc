@@ -1,6 +1,7 @@
 #include "AeroraVehicleLifecycleTest.h"
 
 #include <QtCore/QList>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QStringList>
 #include <QtCore/QUrl>
 #include <QtTest/QTest>
@@ -21,6 +22,35 @@
 #include "MissionManager.h"
 #include "Vehicle.h"
 #include "VehicleComponent.h"
+
+void AeroraVehicleLifecycleTest::init()
+{
+    VehicleTest::init();
+
+    // Suppressed rather than expected, and not by preference. Both warnings are emitted by the
+    // vehicle connect inside VehicleTest::init() above, which has already returned by the time
+    // this line runs, and expectLogMessage() only matches messages captured *after* the call that
+    // registers it - it records the captured-message count as its start index (UnitTest.h).
+    // VehicleTest::init() calls UnitTest::init(), which clears the expectation lists, and connects
+    // in the same step, so a subclass has no seam in which to register an expectation first.
+    // ignoreLogMessage() carries no index and is applied in cleanup() to every captured message,
+    // which is why it works from here. Without both, every function in this suite fails strict
+    // log checking even though its assertions pass.
+
+    // Unexpectable on its own terms as well: latched once per process by
+    // AeroraCorePlugin::_warnedUnconfigured, so it fires on the first command the first connect
+    // queues and never again. Only whichever function runs first observes it, so asserting it
+    // would be asserting something absent for every later function.
+    ignoreLogMessage("Aerora.CorePlugin", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("allowing commands without authorization")));
+
+    // Emitted on every connect - the generic MockLink serves no component metadata. Upstream
+    // suppresses this same warning at all of its generic-autopilot call sites, including ones that
+    // do have a seam, because the metadata request completes asynchronously with respect to
+    // initialConnectComplete and so cannot be tied to a precise call site.
+    ignoreLogMessage("ComponentInformation.RequestMetaDataTypeStateMachine", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("failed to load metadata")));
+}
 
 void AeroraVehicleLifecycleTest::_aeroraServicesAttachToADiscoveredVehicle()
 {

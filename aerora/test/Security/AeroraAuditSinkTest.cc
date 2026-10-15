@@ -364,12 +364,18 @@ void AeroraAuditSinkTest::_lossCountersAreMonotonicAcrossSinkReplacement()
     QCOMPARE(authorizer->lostAuditRecordCount(), lostAfterFailure);
 
     // And removing the sink entirely resumes counting from where it was, rather than restarting.
+    //
+    // Only the sink is removed here: the allowing chain installed above is still in place, so the
+    // command is still allowed and nothing is denied. Its records simply have nowhere to go and
+    // are counted as drops. The allow is asserted rather than assumed, because it is also what
+    // makes the absence of a denial here correct rather than a missing log.
     authorizer->setAuditSink(nullptr);
-    expectLogMessage(kAuthorizationLogCategory, QtWarningMsg, denialWarningPattern());
-    (void) AeroraCommandAuthorizer::instance()->authorize(armOperation());
-    verifyExpectedLogMessage();
+    QVERIFY(authorizer->isAuthorized(armOperation()));
 
-    QVERIFY(authorizer->lostAuditRecordCount() > lostAfterFailure);
+    // The exact sum, not merely an increase. "Resumes from where it was" is the property under
+    // test, and a counter that reset on sink removal and then counted this command's records would
+    // satisfy an increase while failing this.
+    QCOMPARE(authorizer->lostAuditRecordCount(), lostAfterFailure + kRecordsPerAllowedAuthorize);
 }
 
 void AeroraAuditSinkTest::_dropAndFailureAreCountedSeparately()

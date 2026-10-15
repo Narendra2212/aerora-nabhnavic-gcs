@@ -23,6 +23,9 @@ public:
         setWaitForInitialConnect(false);
     }
 
+protected slots:
+    void init() override;
+
 private slots:
     void _aeroraServicesAttachToADiscoveredVehicle();
     void _domainServicesAttachToADiscoveredVehicle();

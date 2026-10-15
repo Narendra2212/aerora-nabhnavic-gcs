@@ -30,6 +30,9 @@ public:
         setWaitForInitialConnect(false);
     }
 
+protected slots:
+    void init() override;
+
 private slots:
     void _missionObservationAttachesToARealVehicle();
     void _aRealUploadReplacesTheVehicleMissionAndResetsTheCurrentIndex();

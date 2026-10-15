@@ -68,6 +68,17 @@ env:
   # Matches windows.yml: Qt 6.11.1 on Windows needs an unreleased aqtinstall fix.
   AQT_SOURCE: 'git+https://github.com/miurahr/aqtinstall.git@8d961e61720b3c06583517fbc68d57ec0a4e9f95'
 
+  # Without this a failing test on this leg reports no reason at all. QGroundControl is linked as a
+  # Windows GUI application (src/CMakeLists.txt: qt_add_executable(... WIN32)), so a test process
+  # started by CTest has no console and its stdout is a pipe. Qt's QPlainTestLogger routes to
+  # OutputDebugStringA whenever `stream == stdout && !shouldLogToStderr()`, and the same predicate
+  # gates qCWarning/qCInfo, so every QTest incident line and every log message is written to the
+  # debugger instead of to the pipe CTest captures. The only output that survived was the QML
+  # debugger's own fprintf(stderr). QT_FORCE_STDERR_LOGGING makes shouldLogToStderr() true, which
+  # puts the failure text back in aerora-*-output.txt and in the JUnit <system-out>.
+  # Linux and macOS need nothing here: stderr is a POSIX stream there and this path does not exist.
+  QT_FORCE_STDERR_LOGGING: '1'
+
 jobs:
   build:
     name: Aerora Overlay x64 Debug
