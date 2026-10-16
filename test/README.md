@@ -448,3 +448,17 @@ QGC_TEST_VERBOSE=1 ./QGroundControl --unittest:MyTest
    (e.g. "SDL didn't expose a second virtual joystick"), cache the probe result in a
    test-class member so subsequent skipping tests don't each burn a full timeout.
    See `JoystickManagerTest::_multiJoysticksSupported()` for the pattern.
+7. **No test output at all on Windows**: a failing test reports nothing — not even the
+   assertion that failed, just the QML debugger's notice. QGroundControl links as a GUI
+   application (`qt_add_executable(... WIN32)` in `src/CMakeLists.txt`), so a CTest-spawned
+   test process has no console and a piped stdout. Qt's `QPlainTestLogger::outputMessage`
+   then writes to `OutputDebugStringA` instead of the pipe CTest captures, and
+   `qCWarning`/`qCInfo` take the same branch via `win_message_handler` — both gate on
+   `QtPrivate::shouldLogToStderr()`, which on Windows is `GetConsoleWindow()`. Set
+   `QT_FORCE_STDERR_LOGGING=1` in the environment to put the output back on stderr;
+   `.github/workflows/aerora-windows.yml` sets it at workflow level, and CTest's per-test
+   `ENVIRONMENT` property adds to the inherited environment rather than replacing it, so no
+   CMake change is needed. Linux and macOS have a POSIX stderr and never take this path.
+
+   Note that `ctest --output-junit` truncates each `<system-out>` at 1024 bytes, so read the
+   full failure text from the `--output-on-failure` console log rather than the JUnit XML.
