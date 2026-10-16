@@ -1,5 +1,6 @@
 #include "AeroraUiFoundationTest.h"
 
+#include <QtCore/QByteArray>
 #include <QtCore/QMetaClassInfo>
 #include <QtCore/QMetaEnum>
 #include <QtCore/QMetaMethod>
@@ -9,6 +10,9 @@
 #include <QtCore/QUrl>
 #include <QtQml/QQmlApplicationEngine>
 
+#include "AeroraMissionIndex.h"
+#include "AeroraMissionObserver.h"
+#include "AeroraMissionSnapshot.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
 #include "AeroraVehicleUiContext.h"
@@ -28,6 +32,24 @@ constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyView
 /// the category string literally, so a mismatch here is a silent test failure rather than a
 /// compile error - which is why it is a named constant checked against the production definition.
 constexpr const char *kUiLogCategory = "Aerora.Ui";
+
+/// Resolves one of the three meta-objects AeroraMissionProgressPage.qml binds to, by class name.
+///
+/// A name lookup rather than a `const QMetaObject *` data column: the set is closed, and naming
+/// the class in the data table is what makes a failure message say which binding broke.
+const QMetaObject *missionMetaObjectFor(const QByteArray &className)
+{
+    if (className == "AeroraMissionObserver") {
+        return &AeroraMissionObserver::staticMetaObject;
+    }
+    if (className == "AeroraMissionIndex") {
+        return &AeroraMissionIndex::staticMetaObject;
+    }
+    if (className == "AeroraMissionSnapshot") {
+        return &AeroraMissionSnapshot::staticMetaObject;
+    }
+    return nullptr;
+}
 
 } // namespace
 
@@ -321,6 +343,95 @@ void AeroraUiFoundationTest::_enforcementIndicatorBindingNamesResolve()
 
     QVERIFY2(resolved,
              "AeroraEnforcementIndicator.qml compares against AeroraSecurity.EnforcedAtCommandGate");
+}
+
+void AeroraUiFoundationTest::_missionProgressEnumeratorsResolve_data()
+{
+    QTest::addColumn<QByteArray>("enumName");
+    QTest::addColumn<QByteArray>("enumeratorName");
+
+    // Exactly the enumerators AeroraMissionProgressPage.qml names, and no others. The page reads
+    // transferActivity, lastOperation and lastOutcome by matching the positive values; it never
+    // compares against a NotEvidenced* enumerator, so none is asserted here.
+    QTest::newRow("transfer in progress") << QByteArray("TransferActivity") << QByteArray("InProgress");
+    QTest::newRow("transfer idle") << QByteArray("TransferActivity") << QByteArray("Idle");
+    QTest::newRow("operation download") << QByteArray("LastOperation") << QByteArray("Download");
+    QTest::newRow("operation upload") << QByteArray("LastOperation") << QByteArray("Upload");
+    QTest::newRow("operation remove all") << QByteArray("LastOperation") << QByteArray("RemoveAll");
+    QTest::newRow("outcome succeeded") << QByteArray("LastOutcome") << QByteArray("Succeeded");
+    QTest::newRow("outcome failed") << QByteArray("LastOutcome") << QByteArray("Failed");
+}
+
+void AeroraUiFoundationTest::_missionProgressEnumeratorsResolve()
+{
+    QFETCH(QByteArray, enumName);
+    QFETCH(QByteArray, enumeratorName);
+
+    const QMetaObject *const meta = &AeroraMissionObserver::staticMetaObject;
+
+    const int enumIndex = meta->indexOfEnumerator(enumName.constData());
+    QVERIFY2(enumIndex >= 0, qPrintable(QStringLiteral("AeroraMissionObserver.%1 does not resolve")
+                                            .arg(QString::fromUtf8(enumName))));
+
+    // The page matches every one of these positively and renders anything unmatched as "not
+    // evidenced". That direction is the honest one - a broken name cannot make the screen claim a
+    // transfer state nobody observed - but it is therefore also silent, so this test is what
+    // notices. Same reasoning as the enforcement strip above, with more names to lose.
+    bool resolved = false;
+    (void) meta->enumerator(enumIndex).keyToValue(enumeratorName.constData(), &resolved);
+
+    QVERIFY2(resolved,
+             qPrintable(QStringLiteral("AeroraMissionProgressPage.qml compares against "
+                                       "AeroraMissionObserver.%1")
+                            .arg(QString::fromUtf8(enumeratorName))));
+}
+
+void AeroraUiFoundationTest::_missionProgressPropertiesResolve_data()
+{
+    QTest::addColumn<QByteArray>("className");
+    QTest::addColumn<QByteArray>("propertyName");
+
+    // The observer's own properties, read through AeroraUi.mission.
+    const QByteArray observer("AeroraMissionObserver");
+    QTest::newRow("vehicleCurrentIndex") << observer << QByteArray("vehicleCurrentIndex");
+    QTest::newRow("resumeCandidate") << observer << QByteArray("resumeCandidate");
+    QTest::newRow("vehicleMission") << observer << QByteArray("vehicleMission");
+    QTest::newRow("gcsPlan") << observer << QByteArray("gcsPlan");
+    QTest::newRow("transferActivity") << observer << QByteArray("transferActivity");
+    QTest::newRow("lastOperation") << observer << QByteArray("lastOperation");
+    QTest::newRow("lastOutcome") << observer << QByteArray("lastOutcome");
+    QTest::newRow("vehicleMissionIndeterminate") << observer << QByteArray("vehicleMissionIndeterminate");
+
+    // The gadget properties reached one level further in. These are the page's substitute for the
+    // gadget enumerators, which it cannot name: AeroraMissionIndex and AeroraMissionSnapshot carry
+    // no QML value-type registration, so the bool convenience properties are the whole mechanism
+    // by which the page distinguishes "nothing observed" from "observed and absent".
+    const QByteArray index("AeroraMissionIndex");
+    QTest::newRow("index attributed") << index << QByteArray("attributed");
+    QTest::newRow("index known") << index << QByteArray("known");
+    QTest::newRow("index vehicleAuthoritative") << index << QByteArray("vehicleAuthoritative");
+    QTest::newRow("index sequenceNumber") << index << QByteArray("sequenceNumber");
+
+    const QByteArray snapshot("AeroraMissionSnapshot");
+    QTest::newRow("snapshot captured") << snapshot << QByteArray("captured");
+    QTest::newRow("snapshot itemCount") << snapshot << QByteArray("itemCount");
+}
+
+void AeroraUiFoundationTest::_missionProgressPropertiesResolve()
+{
+    QFETCH(QByteArray, className);
+    QFETCH(QByteArray, propertyName);
+
+    const QMetaObject *const meta = missionMetaObjectFor(className);
+    QVERIFY2(meta != nullptr, qPrintable(QStringLiteral("unmapped class name %1 in the data table")
+                                             .arg(QString::fromUtf8(className))));
+
+    // Asserted positively, like the AeroraUi property set: a renamed or dropped property makes a
+    // QML binding evaluate to undefined, which the page renders as a benign-looking row rather
+    // than as an error.
+    QVERIFY2(meta->indexOfProperty(propertyName.constData()) != -1,
+             qPrintable(QStringLiteral("AeroraMissionProgressPage.qml reads %1.%2")
+                            .arg(QString::fromUtf8(className), QString::fromUtf8(propertyName))));
 }
 
 UT_REGISTER_TEST(AeroraUiFoundationTest, TestLabel::Unit)

@@ -73,4 +73,13 @@ private slots:
     // singleton. The strip's own rendering is QML and is not reachable from this harness; this
     // covers only the part that is, which is the half that fails silently.
     void _enforcementIndicatorBindingNamesResolve();
+
+    // SCR-LIV-06 - the names AeroraMissionProgressPage.qml binds to. Same reason as the row above
+    // and a sharper case of it: that page matches every enumerator positively and renders anything
+    // unmatched as "not evidenced", so a renamed enumerator degrades to a plausible-looking screen
+    // rather than to an error.
+    void _missionProgressEnumeratorsResolve_data();
+    void _missionProgressEnumeratorsResolve();
+    void _missionProgressPropertiesResolve_data();
+    void _missionProgressPropertiesResolve();
 };

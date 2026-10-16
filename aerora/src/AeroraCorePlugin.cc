@@ -106,6 +106,12 @@ const QVariantList &AeroraCorePlugin::analyzePages()
             tr("Aerora Operations"),
             QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraOperationsHub.qml")))));
 
+        // Also vehicle-independent, and for the same reason: the page reports whether a mission
+        // observer is attached at all, so "no vehicle is connected" is one of its readings.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Mission Progress"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraMissionProgressPage.qml")))));
+
         return list;
     }();
 

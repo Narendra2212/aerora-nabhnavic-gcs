@@ -140,6 +140,7 @@ set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraTokenDisplay.qml
     ${AERORA_UI_DIR}/Controls/AeroraValueDisplay.qml
     ${AERORA_UI_DIR}/Indicators/AeroraEnforcementIndicator.qml
+    ${AERORA_UI_DIR}/Screens/AeroraMissionProgressPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
 )
 
