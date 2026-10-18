@@ -3,15 +3,20 @@
 Owner: **Tab 7 (`M-Ui`)**. Inventory and classification. **No UI was implemented by this
 document.**
 
-Verified by reading the checkout. No build, launch, lint or test was executed; see
-[Verification status](#verification-status).
+Originally verified by reading the checkout, with no build, launch, lint or test executed. As of
+2026-10-18 the overlay compiles and its tests pass in Windows CI; **no launch and no `qmllint` run
+has happened**, so nothing about rendering or QML lint is evidenced. See
+[Verification status](#verification-status) for what each claim rests on.
 
 > **Superseded in part.** The UI foundation pass that followed closed Q7-001, Q7-002 and Q7-003 and
 > added the first `aerora/src/UI/` module. Where this document and
 > [01-ui-foundation-closure.md](01-ui-foundation-closure.md) disagree, **the closure document is
 > authoritative**. Specifically: Q7-002 needs no Tab 3 change, and the Q7-001 ordering question is
-> answered by in-tree precedent. The area map, the classification scheme and the seam inventory
-> below are unchanged and remain current.
+> informed by in-tree precedent. Read that narrowly: precedent indicates the **expected**
+> configuration order, and it does not by itself prove that registration and type-name resolution
+> actually occur in the running Aerora application. That measurement stays `NOT-EVIDENCED` — see
+> *Open: where do Aerora C++ QML types register?* below. The area map, the classification scheme
+> and the seam inventory below are unchanged and remain current.
 
 ## Contents
 
@@ -214,6 +219,14 @@ target's source list is finalised at generate time, after every `add_subdirector
 scan would see the `:208` additions. That is an argument from documented behaviour, not a
 measurement, so the question stays open — it is `SOURCE-INSPECTED` reasoning, nothing more.
 
+The overlay has since been built: Windows CI run 39146146397, commit `915dd09ae`, 2026-10-18. That
+removes the `D-006` precondition for the `Q7-001` experiment below, but it does **not** answer this
+question, and the status stays `NOT-EVIDENCED`. Two reasons. The experiment was never performed —
+nobody inspected the generated type-registration translation unit, `qmldir` or `QGC.qmltypes`, and
+the run uploaded only test results. And a green build is not evidence either way: a registration
+that did not happen is silent at build time and surfaces only when QML resolves a type **by name**,
+which no Aerora test does.
+
 **2. The `QGC` URI — closed, and it is not a contradiction.** Two separate points, both settled by
 reading source:
 
@@ -232,9 +245,9 @@ reading source:
 
 ### `Q7-001` — the experiment that resolves it
 
-Status **`BLOCKED`** on `D-006`. Not `CONTRACT-ONLY` and not `VERIFIED`: the contract is readable,
-the outcome is not. Owner Tab 8, since it is the first build. In order, stopping at the first
-failure:
+Status **`NOT-EVIDENCED`**, no longer `BLOCKED` on `D-006`: CI now builds the overlay, so steps 1-4
+are runnable. Not `CONTRACT-ONLY` and not `VERIFIED`: the contract is readable, the outcome is not.
+Owner Tab 8. In order, stopping at the first failure:
 
 1. Configure only — `just configure`. A `qt_add_qml_module` warning about the backing target's
    directory structure is expected and is not the failure being looked for.
@@ -249,8 +262,11 @@ failure:
 5. Build, launch, open the Operations Hub from the Analyze menu and read the Fly View toolbar.
    **Only this step licenses `VERIFIED`**, and only for what it actually exercised.
 
-Steps 1-4 are configuration and build evidence. None of them has been run: there is no CMake, no
-compiler and no Qt on the authoring host.
+Steps 1-4 are configuration and build evidence. None of them has been run. The reason has changed:
+it is no longer that no build is possible — the Windows CI leg configures and builds the overlay —
+but that the steps inspect generated files on the build host and nothing collects or publishes
+them. Step 5 still requires a launch, which has not happened. The authoring host itself remains
+without a compiler or Qt; see `D-006`.
 
 ## The binding contract: what the backend actually exposes to QML
 
@@ -572,10 +588,10 @@ visibility test and should be followed rather than replaced with a new harness.
 | ~~`Q7-002`~~ | **`CLOSED`.** `AeroraVehicleUiContext` reaches the services through public C++ and exposes typed read-only properties. No vehicle-layer change needed; the Tab 3 handoff is withdrawn | — | — |
 | ~~`Q7-001`~~ | **`CLOSED`.** The ordering is the same one `src/QmlControls/CMakeLists.txt:6-75` uses for 38 upstream types including the `QGroundControl` singleton. Aerora types register under URI `QGC`, reached via `IMPORTS QGC` | — | — |
 | ~~`Q7-003`~~ | **`CLOSED`.** Both hooks are public virtuals and the allow-listed interceptor is installed on the engine — U1, `84bbb3a6e`. The allow-list is still empty, so nothing is overridden yet; the seam works | — | — |
-| ~~HO-TAB7-03~~ | **`CLOSED`.** The `Aerora.Controls` module target exists with `IMPORTS QGC` and the resource alias — U2, `a73699796`. Six QML files are registered, not four | — | — |
+| ~~HO-TAB7-03~~ | **`CLOSED`.** The `Aerora.Controls` module target exists with `IMPORTS QGC` and the resource alias — U2, `a73699796`. Six QML files were registered at that commit, not four; the manifest now lists eight (`aerora/src/UI/Ui.cmake`) | — | — |
 | ~~HO-TAB7-01~~ | **`CLOSED`.** `AeroraStateValue::capability` is read-only in QML — U3, `a7b317f89`. `setCapability()` remains public C++ for the capability model | — | — |
-| HO-TAB7-05 | `analyzePages()` is not overridden, so `SCR-SHL-01` is compiled into the resource and no menu entry reaches it | **Tab 1** | The Operations Hub, and every Aerora screen that would be reached from it |
-| `D-006` | **No build environment.** `cmake`, `ninja`, `qmllint`, `qmlformat`, `pre-commit`, `just`, Qt, and a C++ compiler are all absent; `C:\Qt` does not exist | User / Tab 8 | Every compile, lint, test and runtime claim |
+| ~~HO-TAB7-05~~ | **`CLOSED`.** `AeroraCorePlugin::analyzePages()` overrides the seam — `39406ff5f` — and registers `SCR-SHL-01` and `SCR-LIV-06` at `qrc:/qml/Aerora/Controls/`. `toolBarIndicators()` is overridden too, for the enforcement strip — `b77bc4e8e`, HO-TAB7-06. That the menu entries *appear* still needs a launch; see `D-006` | — | — |
+| `D-006` | **Narrowed, not closed.** CI builds and tests the overlay (Windows leg, Qt 6.11.1 + MSVC 2022), so compile and test claims are no longer blocked. The **authoring host** still has no C++ compiler and no Qt — `cl`, `g++`, `clang++`, `qmake`, `qmllint`, `qmlformat` and `just` are absent and `C:\Qt` does not exist — while `cmake`, `ninja`, `ctest` and `pre-commit` are available from the repository's own `tools/.venv/Scripts` rather than the default `PATH`. As first written this row said all of them were absent; that was true of the authoring host at the time and `tools/.venv` has since been populated | User / Tab 8 | Local build, lint and test; `qmllint` anywhere; every runtime and launch claim |
 | `Q-029` | Operator role set | Product + operations | Area 7 beyond placeholders |
 | ADR-014 | Outbound authorization scope | Architecture | Any claim that an operator action is authorised |
 | Aerora dialect | No fact name, unit, range or enumeration member for any Aerora item | Firmware + product | Areas 2, 4, 5, 6, 8, 13 — **no Aerora value can populate any panel** |
@@ -597,8 +613,8 @@ After the foundation pass, one blocker dominates and it is not Tab 7's.
 | Blocker | Kind | Reach |
 | --- | --- | --- |
 | Absent Aerora dialect | Neither small nor Tab 7's | Areas 2, 4, 5, 6, 8, 13 have **no value to display**. No fact name, unit, range or enumeration member exists for any Aerora item |
-| HO-TAB7-02 and HO-TAB7-03 | Two small, verified CMake and C++ changes in Tab 1's files | QML overrides and Aerora QML type registration. Both have the exact change written out |
-| `D-006` | Environment | Every compile, lint, test and runtime claim |
+| ~~HO-TAB7-02 and HO-TAB7-03~~ | **Both applied.** The interceptor is installed on the engine (`84bbb3a6e`) and the `Aerora.Controls` module target exists (`a73699796`) | Closed. Recorded here because the row below was written when they were the second-largest blocker |
+| `D-006` | Environment, **narrowed** | Local build, lint and test; `qmllint` anywhere; every runtime and launch claim. No longer blocks compile and test claims, which CI now supplies |
 
 Stated plainly: **Aerora UI can be built and tested against the state model before any Aerora
 telemetry exists, and that is the correct order.** The state-class contract is what is expensive to
@@ -608,16 +624,29 @@ retrofit; the panels are not.
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| Compiles | **`BLOCKED`** | No `cmake`, `ninja`, `cl`, `g++` or Qt in the environment |
-| `just lint` / `pre-commit` / `qmllint` | **`BLOCKED`** | `just`, `pre-commit`, `qmllint`, `qmlformat` all absent |
-| Tests executed | **`BLOCKED`** | Requires a build. No Aerora UI test exists to run |
-| Runtime / override resolution | **`BLOCKED`** | Requires a launch |
+| Compiles | **`VERIFIED`** (CI only) | Windows CI run 39146146397, commit `915dd09ae`, 2026-10-18: Qt 6.11.1 + MSVC 2022 Debug, overlay active (the run's own `Assert the Aerora overlay is active` step passed), `aerora/test/UI/AeroraUiFoundationTest.cc` among the compiled translation units. Not reproducible on the authoring host — see `D-006` |
+| Tests executed | **`VERIFIED`** (CI only) | Same run: 15/15 reported Aerora unit tests passed, 3/3 reported Aerora integration tests passed, 0 failures and 0 skips. Includes `AeroraUiFoundationTest` and `AeroraUiSafetyTest`. The leg is scoped to tests matching `^Aerora`; it is not the full upstream suite |
+| `Q_GADGET` access from a QML engine | **`VERIFIED`** (CI only) | Same run, via `AeroraUiFoundationTest`. `_missionGadgetValuesAreReadableFromQml` reads `AeroraMissionIndex` and `AeroraMissionSnapshot` properties, and `_missionAgreementVerdictIsReadableFromQml` calls `AeroraMissionAgreement::isVerified()`, both through a live `QQmlEngine`. **Scope:** the observer is reached as a `QQmlContext` **context property**, so this evidences gadget property and invokable reachability only — not that any Aerora type resolves by QML type name under URI `QGC` (`Q7-001`), and not anything about the pages |
+| `qmllint` on Aerora QML | **`BLOCKED`** | `qmllint` ships with Qt and is absent from the authoring host. No CI leg runs it on an `aerora/**` push either: `aerora-windows.yml` has no `qmllint` step, and the `pre-commit` workflow's push trigger is restricted to `master` / `Stable*`. A pull request would run it |
+| `just lint` / full `pre-commit` sweep | **`BLOCKED`** | `just` is absent. `pre-commit` is available from `tools/.venv/Scripts`, but the hooks that matter for this workstream shell out to `qmllint`, `clang-tidy` and `clazy`, none of which is installed, and several invoke `python3`, which this host does not provide |
+| Runtime / override resolution | **`BLOCKED`** | Requires a launch, which has not happened. Nothing is evidenced about whether any Aerora screen renders, whether its menu entry appears, how it presents missing data, or whether it stays read-only in a live scene. No test loads a `.qml` file: `AeroraUiFoundationTest` contains no `QQmlComponent`, `setSource` or `loadFromModule` call, and `Q7-004` still leaves the overlay without a Qt Quick Test target |
 | Upstream seam inventory | **Source-verified** | `QGCCorePlugin.h`, `QGCOptions.h`, `FlyViewCustomLayer.qml`, `CustomGuidedActionsController.qml`, `FlyViewAdditionalCustomActionsList.qml`, `CustomMapItems.qml`, `FlyViewToolStripActionList.qml`, `FlyViewToolBarIndicators.qml`, `FirmwarePlugin.{h,cc}`, `Vehicle.{h,cc}`, `custom-example/CMakeLists.txt`, `custom-example/src/CustomPlugin.cc`, root and `src/CMakeLists.txt` |
 | Aerora QML-facing surface | **Source-verified** | Every `aerora/src/**/*.h` grepped for `Q_GADGET`, `QML_ELEMENT`, `QML_SINGLETON`, `QML_UNCREATABLE`, `Q_INVOKABLE`, `Q_DECLARE_METATYPE` |
-| Aerora QML file count | **Verified zero** | No `.qml` file exists under `aerora/` |
-| Aerora overrides of any UI seam | **Verified zero** | `aerora/**` grepped for `toolIndicators`, `toolBarIndicators`, `customMapItems`, `paletteOverride`, `createQmlApplicationEngine`, `QGCOptions`, `QGCFlyViewOptions`, `analyzePages`, `registerCustomSettings`, `complexMissionItemNames`, `planCreators` — the only matches are the mission extension registry's own interface, not a `QGCCorePlugin` override |
+| Aerora QML file count | **Verified eight** | Eight `.qml` files exist under `aerora/`, and all eight are listed in `AERORA_UI_QML_FILES` (`aerora/src/UI/Ui.cmake`). As first written this row read "verified zero", which was true before the UI foundation pass |
+| Aerora overrides of a `QGCCorePlugin` seam | **Verified four** | `AeroraCorePlugin` overrides `createQmlApplicationEngine()` and `destroyQmlApplicationEngine()` (`84bbb3a6e`), `analyzePages()` (`39406ff5f`) and `toolBarIndicators()` (`b77bc4e8e`). `toolIndicators`, `customMapItems`, `paletteOverride`, `QGCOptions`, `registerCustomSettings`, `complexMissionItemNames` and `planCreators` remain un-overridden. As first written this row read "verified zero", which was true before the UI foundation pass |
+| Tier-3 populated-file overrides | **Verified zero** | The interceptor's allow-list is empty, so no upstream populated file is replaced. `AeroraUiFoundationTest::_noOverrideIsDeclared` holds this at zero |
 | Test harness surface | **Source-verified** | `test/README.md`, `test/UnitTestFramework/QmlTesting/CMakeLists.txt`, `tests/tst_Example.qml`, `test/QmlUITests/`, `.pre-commit-config.yaml`, `justfile` |
-| Build tooling absence | **Verified** | `cmake`, `ninja`, `qmllint`, `qmlformat`, `pre-commit`, `just`, `cl`, `g++` all absent from `PATH`; `C:\Qt` does not exist |
+| Build tooling on the authoring host | **Verified, re-checked 2026-10-18** | Absent from the default `PATH` and from the host entirely: `cl`, `g++`, `clang++` (no MSVC install, no `vswhere`), Qt (`qmake` absent, `C:\Qt` does not exist), `qmllint`, `qmlformat`, `just`. Present in the repository's `tools/.venv/Scripts`, not on the default `PATH`: `cmake` 3.31.10, `ninja` 1.13.0, `ctest` 3.31.10, `pre-commit` 4.6.0, `gcovr`. `clang-format` 23.1.0 exists only inside the `pre-commit` hook environment cache. As first written this row listed `cmake`, `ninja` and `pre-commit` as absent, which was true of the host at the time |
 | `includedResumeCommands` untouched | **Verified** | Sole definition and call site remain `src/MissionManager/MissionManager.cc:110-134`; no Aerora file modifies it |
 
-**No claim is made that any UI compiles, renders, lints or passes a test.** Nothing is implemented.
+**Status as of 2026-10-18, baseline commit `915dd09ae`** (Windows CI run 39146146397). The overlay
+**compiles** and its tests **pass** — 15/15 unit, 3/3 integration, including
+`AeroraUiFoundationTest` — and `Q_GADGET` property and invokable access through a `QQmlEngine` is
+exercised there. That is compile-and-unit-test evidence and nothing more.
+
+**No claim is made that any Aerora UI renders, navigates, presents missing data correctly, stays
+read-only in a live scene, or passes `qmllint`.** No launch has happened, no test loads a `.qml`
+file, and `qmllint` has not been run on any Aerora QML. Screens exist and are registered with
+`analyzePages()`; whether an operator can reach and read them is unevidenced. Every status gated on
+`Q-029`, `ADR-014`, `D-007`, the absent Aerora dialect, `Q-036`, `Q3-009`/F3.1-05, `Q4-002`,
+`Q-021`/`Q-023`, `Q-040` or `Q7-004` is unchanged by this run.
