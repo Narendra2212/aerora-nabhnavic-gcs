@@ -82,4 +82,29 @@ private slots:
     void _missionProgressEnumeratorsResolve();
     void _missionProgressPropertiesResolve_data();
     void _missionProgressPropertiesResolve();
+
+    // Gadget value access through a real QML engine, not through the meta-object.
+    //
+    // This is the mechanism AeroraMissionProgressPage.qml actually depends on, and the one a name
+    // lookup cannot prove. AeroraMissionIndex and AeroraMissionSnapshot carry no QML value-type
+    // registration, so whether a binding resolves `.known` or `.itemCount` is a question about
+    // QQmlValueTypeWrapper rather than about the headers. Qt documents Q_GADGET attributes as
+    // accessible from QML; this asserts it for the specific types the page reads, so the page's
+    // reliance on it stops being an assumption.
+    //
+    // The enum half is deliberately absent: an unregistered gadget's Q_ENUM is not reachable by
+    // type name from QML at all, which is why the page names no enumerator of AeroraMissionIndex,
+    // AeroraMissionSnapshot or AeroraMissionAgreement.
+    void _missionGadgetValuesAreReadableFromQml_data();
+    void _missionGadgetValuesAreReadableFromQml();
+
+    // The agreement verdict, read the one way the page can read it.
+    //
+    // AeroraMissionAgreement::isVerified() is a Q_INVOKABLE on an unregistered Q_GADGET, so
+    // whether a QML binding can call it at all is the open question - and it is the whole
+    // verification half of SCR-LIV-06, because Verdict::Matches cannot be named from QML. Both
+    // directions are asserted from one fixture: NotCompared must read false before a comparison,
+    // and the same expression must read true after one matched. Without the second half the first
+    // would pass for a call that never resolved.
+    void _missionAgreementVerdictIsReadableFromQml();
 };

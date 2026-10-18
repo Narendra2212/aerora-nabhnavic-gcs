@@ -8,7 +8,11 @@
 #include <QtCore/QRegularExpression>
 #include <QtCore/QStringList>
 #include <QtCore/QUrl>
+#include <QtCore/QVariant>
 #include <QtQml/QQmlApplicationEngine>
+#include <QtQml/QQmlContext>
+#include <QtQml/QQmlEngine>
+#include <QtQml/QQmlExpression>
 
 #include "AeroraMissionIndex.h"
 #include "AeroraMissionObserver.h"
@@ -395,6 +399,7 @@ void AeroraUiFoundationTest::_missionProgressPropertiesResolve_data()
     const QByteArray observer("AeroraMissionObserver");
     QTest::newRow("vehicleCurrentIndex") << observer << QByteArray("vehicleCurrentIndex");
     QTest::newRow("resumeCandidate") << observer << QByteArray("resumeCandidate");
+    QTest::newRow("planViewSelection") << observer << QByteArray("planViewSelection");
     QTest::newRow("vehicleMission") << observer << QByteArray("vehicleMission");
     QTest::newRow("gcsPlan") << observer << QByteArray("gcsPlan");
     QTest::newRow("transferActivity") << observer << QByteArray("transferActivity");
@@ -432,6 +437,119 @@ void AeroraUiFoundationTest::_missionProgressPropertiesResolve()
     QVERIFY2(meta->indexOfProperty(propertyName.constData()) != -1,
              qPrintable(QStringLiteral("AeroraMissionProgressPage.qml reads %1.%2")
                             .arg(QString::fromUtf8(className), QString::fromUtf8(propertyName))));
+}
+
+void AeroraUiFoundationTest::_missionGadgetValuesAreReadableFromQml_data()
+{
+    QTest::addColumn<QByteArray>("expression");
+    QTest::addColumn<QString>("expected");
+
+    // Compared as strings so an int property arriving as a JavaScript number still matches. Each
+    // row asserts that the value resolved and carried the right content, not which numeric type
+    // happened to carry it.
+    QTest::newRow("index attributed") << QByteArray("observer.vehicleCurrentIndex.attributed")
+                                      << QStringLiteral("true");
+    QTest::newRow("index known") << QByteArray("observer.vehicleCurrentIndex.known") << QStringLiteral("true");
+    QTest::newRow("index sequence number")
+        << QByteArray("observer.vehicleCurrentIndex.sequenceNumber") << QStringLiteral("7");
+    QTest::newRow("index vehicle authoritative")
+        << QByteArray("observer.vehicleCurrentIndex.vehicleAuthoritative") << QStringLiteral("true");
+
+    // Never reported, so this is the page's "not evidenced" path. It must read false rather than
+    // anything an operator could mistake for a proposal.
+    QTest::newRow("resume candidate unattributed")
+        << QByteArray("observer.resumeCandidate.attributed") << QStringLiteral("false");
+    QTest::newRow("plan view selection unattributed")
+        << QByteArray("observer.planViewSelection.attributed") << QStringLiteral("false");
+
+    QTest::newRow("vehicle mission captured")
+        << QByteArray("observer.vehicleMission.captured") << QStringLiteral("true");
+    QTest::newRow("vehicle mission item count")
+        << QByteArray("observer.vehicleMission.itemCount") << QStringLiteral("1");
+
+    // The plan side has no production feed at all, so an uncaptured snapshot is the state the page
+    // renders in every session. Absent must not read as an empty plan.
+    QTest::newRow("gcs plan not captured") << QByteArray("observer.gcsPlan.captured") << QStringLiteral("false");
+
+    QTest::newRow("determinacy") << QByteArray("observer.vehicleMissionIndeterminate") << QStringLiteral("false");
+
+    // Negative control, so the rows above are not tautologies: a property that does not exist must
+    // not come back looking like a value. A null expected string selects this branch.
+    QTest::newRow("nonexistent property") << QByteArray("observer.vehicleCurrentIndex.noSuchProperty") << QString();
+}
+
+void AeroraUiFoundationTest::_missionGadgetValuesAreReadableFromQml()
+{
+    QFETCH(QByteArray, expression);
+    QFETCH(QString, expected);
+
+    // Only qCDebug fires on these paths, so strict log checking is not engaged. The qCWarning
+    // paths - a transfer error, a wrong-origin plan, an append to an unattributed snapshot - are
+    // all deliberately avoided here.
+    AeroraMissionObserver observer;
+    observer.reportVehicleCurrentIndex(7);
+
+    AeroraMissionSnapshot vehicleMission = AeroraMissionSnapshot::empty(AeroraMissionSnapshot::VehicleStore);
+    AeroraMissionItemFingerprint item;
+    item.sequenceNumber = 0;
+    item.command = MAV_CMD_NAV_WAYPOINT;
+    vehicleMission.append(item);
+    observer.reportDownloadComplete(vehicleMission);
+
+    QQmlEngine engine;
+    QQmlContext context(&engine);
+    context.setContextProperty(QStringLiteral("observer"), &observer);
+
+    QQmlExpression expr(&context, nullptr, QString::fromUtf8(expression));
+    const QVariant actual = expr.evaluate();
+
+    if (expected.isNull()) {
+        QVERIFY2(actual.toString().isEmpty(),
+                 qPrintable(QStringLiteral("a nonexistent gadget property returned %1").arg(actual.toString())));
+        return;
+    }
+
+    QVERIFY2(!expr.hasError(), qPrintable(expr.error().toString()));
+    QCOMPARE(actual.toString(), expected);
+}
+
+void AeroraUiFoundationTest::_missionAgreementVerdictIsReadableFromQml()
+{
+    AeroraMissionItemFingerprint item;
+    item.sequenceNumber = 0;
+    item.command = MAV_CMD_NAV_WAYPOINT;
+
+    AeroraMissionObserver observer;
+
+    AeroraMissionSnapshot vehicleMission = AeroraMissionSnapshot::empty(AeroraMissionSnapshot::VehicleStore);
+    vehicleMission.append(item);
+    observer.reportDownloadComplete(vehicleMission);
+
+    QQmlEngine engine;
+    QQmlContext context(&engine);
+    context.setContextProperty(QStringLiteral("observer"), &observer);
+
+    // The exact expression AeroraMissionProgressPage.qml evaluates, spelled out rather than
+    // assembled, so a change to the page's reading has to be mirrored here deliberately.
+    const QString reading = QStringLiteral("observer.agreement.isVerified()");
+
+    QQmlExpression beforeComparison(&context, nullptr, reading);
+    const QVariant unverified = beforeComparison.evaluate();
+    QVERIFY2(!beforeComparison.hasError(), qPrintable(beforeComparison.error().toString()));
+    QCOMPARE(unverified.toString(), QStringLiteral("false"));
+
+    AeroraMissionSnapshot plan = AeroraMissionSnapshot::empty(AeroraMissionSnapshot::GcsPlan);
+    plan.append(item);
+    observer.reportGcsPlan(plan);
+
+    // From C++, because the page must never call verify(): the comparison is the observer's, and
+    // a screen that triggers it is a screen that decides when the answer is current.
+    QCOMPARE(observer.verify(AeroraMissionAgreement::DepthItemCount).verdict(), AeroraMissionAgreement::Matches);
+
+    QQmlExpression afterComparison(&context, nullptr, reading);
+    const QVariant verified = afterComparison.evaluate();
+    QVERIFY2(!afterComparison.hasError(), qPrintable(afterComparison.error().toString()));
+    QCOMPARE(verified.toString(), QStringLiteral("true"));
 }
 
 UT_REGISTER_TEST(AeroraUiFoundationTest, TestLabel::Unit)

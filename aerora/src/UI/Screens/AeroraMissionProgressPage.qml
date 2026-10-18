@@ -30,19 +30,24 @@ import QGroundControl.AnalyzeView
 /// set-current - and nothing here acquires one. Mission commanding stays in `PlanMasterController`
 /// / `MissionController` / `MissionManager`, which Aerora reuses unchanged.
 ///
-/// \section notverified Why there is no agreement verdict
+/// \section notverified Why the agreement row is not a verification result
 ///
-/// `AeroraMissionObserver.agreement` is deliberately not read. `AeroraMissionAgreement` is a
-/// `Q_GADGET` with no QML value-type registration, so `AeroraMissionAgreement.Matches` does not
-/// resolve and the verdict cannot be compared by name. Mirroring the enumerator as an integer
-/// literal here would put a silent "verified" one enum reorder away, which is the one failure
-/// direction `AERORA-MISSION-REQ-007` forbids.
+/// `AeroraMissionAgreement` is a `Q_GADGET` with no QML value-type registration, so
+/// `AeroraMissionAgreement.Matches` does not resolve and the verdict cannot be compared by name.
+/// Mirroring the enumerator as an integer literal here would put a silent "verified" one enum
+/// reorder away, which is the one failure direction `AERORA-MISSION-REQ-007` forbids.
 ///
-/// Nothing in this build calls `verify()` anyway, so the verdict is `NotCompared` in every
-/// session. The row therefore states plainly that this screen verifies nothing, in the same shape
-/// as the hub's "Paths not covered" row - an explicit absence rather than a quiet omission.
-/// Registering the three mission gadgets as QML value types is the prerequisite for the
-/// verification half, and it is a Tab 5 change.
+/// What is reachable without that registration is `isVerified()`, a `Q_INVOKABLE` on the gadget
+/// that is true for `Verdict::Matches` alone. That is what the row reads, and it is the direction
+/// `AERORA-MISSION-REQ-007` cares about: an upload nobody compared reads as not verified.
+///
+/// It still does not make the row a verification result, and the row says so. The gadget carries
+/// the comparison depth *as part of* the verdict precisely because "matches" means something
+/// materially different at each depth, and `Depth` is an enumerator this screen cannot name
+/// either. A true reading is therefore reported as a match whose depth is unreadable, not as
+/// verification. Registering the three mission gadgets as QML value types is the prerequisite for
+/// the depth, and it is a Tab 5 change. Nothing in this build calls `verify()` and the plan side
+/// is never captured, so `NotCompared` is the state in every session regardless.
 ///
 /// \section unfed Rows that are structurally not evidenced
 ///
@@ -97,6 +102,22 @@ AnalyzePage {
                                            && root._mission.lastOutcome === AeroraMissionObserver.Succeeded
     readonly property bool _lastFailed: root._attached
                                         && root._mission.lastOutcome === AeroraMissionObserver.Failed
+
+    /// Positive match again, and the only agreement member reachable without QML value-type
+    /// registration. See \section notverified for what it does and does not establish.
+    ///
+    /// Guarded with `typeof` rather than called straight. `AeroraMissionAgreement` is an
+    /// unregistered `Q_GADGET`; an unguarded call on an invokable that did not resolve throws
+    /// instead of returning, which would leave the row with no reading at all. Guarded, an
+    /// unresolved invokable reads false - not verified, which is the safe direction.
+    readonly property bool _agreementMatched: {
+        if (!root._attached) {
+            return false
+        }
+        const agreement = root._mission.agreement
+        const readable = agreement && (typeof agreement.isVerified === "function")
+        return readable ? agreement.isVerified() : false
+    }
 
     Component {
         id: pageComponent
@@ -192,6 +213,28 @@ AnalyzePage {
                     }
                     basis: qsTr("AeroraUi.mission.resumeCandidate. No production code calls "
                                 + "reportResumeCandidate(), so this is not evidenced in this build.")
+                }
+
+                AeroraSelfReportRow {
+                    Layout.fillWidth: true
+                    label: qsTr("Plan editor selection")
+                    unchecked: !root._attached
+                    // Not a warning either. An editor selection is the operator's own cursor; its
+                    // absence says nothing about the aircraft, and presenting it as a gap would
+                    // imply this screen expected one.
+                    statusText: {
+                        if (!root._attached) {
+                            return ""
+                        }
+                        const selection = root._mission.planViewSelection
+                        return selection.known
+                               ? qsTr("Item %1 selected in the plan editor. Never transmitted and never the "
+                                      + "aircraft's position.").arg(selection.sequenceNumber)
+                               : qsTr("No editor selection reported.")
+                    }
+                    basis: qsTr("AeroraUi.mission.planViewSelection. A plan belongs to a view rather than to a "
+                                + "vehicle and no production code calls reportPlanViewSelection(), so this is "
+                                + "not evidenced in this build.")
                 }
 
                 // ------------------------------------------------------------ Mission on board
@@ -338,14 +381,25 @@ AnalyzePage {
                 AeroraSelfReportRow {
                     Layout.fillWidth: true
                     label: qsTr("Plan/vehicle agreement")
-                    // A warning regardless of state, because this screen reaches no verdict and
-                    // must not be read as reassurance that the two agree.
+                    unchecked: !root._attached
+                    // A warning in both directions, which is the unusual part. False is plainly a
+                    // gap. True is incomplete rather than reassuring: a match whose depth cannot
+                    // be read is not verification, so neither reading may be presented as one.
                     warning: true
-                    statusText: qsTr("Not verified. This screen reports no agreement verdict.")
-                    basis: qsTr("AeroraUi.mission.agreement is deliberately not read: AeroraMissionAgreement has "
-                                + "no QML value-type registration, so its verdict cannot be compared by name. "
-                                + "Nothing in this build calls verify(), so the verdict is NotCompared in every "
-                                + "session.")
+                    statusText: {
+                        if (!root._attached) {
+                            return ""
+                        }
+                        return root._agreementMatched
+                               ? qsTr("A comparison matched, but the depth it matched at cannot be read here, so "
+                                      + "this is not presented as verification.")
+                               : qsTr("Not verified. No comparison has matched.")
+                    }
+                    basis: qsTr("AeroraUi.mission.agreement.isVerified(), the one member of AeroraMissionAgreement "
+                                + "reachable without QML value-type registration. True for Matches alone, so "
+                                + "NotCompared and Differs both read as not verified and cannot be told apart "
+                                + "here. Nothing in this build calls verify() and the plan side is never "
+                                + "captured, so NotCompared is the state in every session.")
                 }
 
                 // ------------------------------------------------------------ Scope of this screen
