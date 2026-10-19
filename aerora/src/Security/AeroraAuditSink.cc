@@ -54,7 +54,14 @@ quint64 AeroraAuditEvent::nowMonotonicUs()
 
     // nsecsElapsed() rather than elapsed(): elapsed() is milliseconds, which is the resolution
     // `utc` already has and too coarse to order records composed within one authorize() call.
-    return static_cast<quint64>(processTimer.nsecsElapsed() / 1000);
+    //
+    // Plus one, for the same reason nextSequence() above adds one: zero is the documented
+    // "unstamped" sentinel. The timer starts on first use and the division truncates, so the first
+    // call in a process - which starts and reads the timer within the same microsecond - would
+    // otherwise stamp a real record with the sentinel and make it indistinguishable from an
+    // unstamped one. A constant offset cancels in every difference and leaves the sequence
+    // non-decreasing, so ordering is unaffected.
+    return static_cast<quint64>(processTimer.nsecsElapsed() / 1000) + 1;
 }
 
 void AeroraAuditEvent::stampNow()
