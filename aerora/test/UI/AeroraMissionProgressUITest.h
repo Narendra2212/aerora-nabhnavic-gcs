@@ -1,71 +1,78 @@
 #pragma once
 
-#include "QmlUITestBase.h"
+#include "BaseClasses/VehicleTest.h"
 
-class PlanMasterController;
+class QQmlApplicationEngine;
 
-/// Runtime coverage of the mission-progress production path, in a booted application scene.
+/// Runtime coverage of the mission-progress page against a real QML engine.
 ///
-/// Every other Aerora mission test asserts a piece in isolation: `AeroraMissionTest` the snapshot
-/// logic with no vehicle, `AeroraPlanBridgeTest` the bridge against controllers it constructs
-/// itself, `AeroraUiFoundationTest` the bound names through a bare `QQmlEngine` and a context
-/// property. None of them exercises the path the application actually takes, and a green build
-/// says nothing about it:
+/// Every other Aerora mission test asserts a piece without ever loading the page:
+/// `AeroraMissionTest` the snapshot logic with no vehicle, `AeroraPlanBridgeTest` the bridge
+/// against controllers it constructs itself, `AeroraUiFoundationTest` the bound names through a
+/// bare `QQmlEngine` and a **context property**. A context property needs no QML type
+/// registration at all, so none of them can tell whether the page's document actually compiles.
 ///
-/// \code
-/// QGCApplication loads MainWindow.qml
-///     -> AeroraCorePlugin::createQmlApplicationEngine()
-///         -> QQmlApplicationEngine::objectCreated
-///             -> AeroraPlanBridge::attachToQmlScene(root)
-///                 -> finds PlanView's and FlyView's PlanMasterController
-///                     -> observations reach AeroraMissionObserver
-///                         -> AeroraMissionProgressPage.qml renders them
-/// \endcode
+/// This one loads `AeroraMissionProgressPage.qml` from the resource URL `analyzePages()` publishes,
+/// on an engine built by `QGCCorePlugin::createQmlApplicationEngine()` so the import paths and the
+/// Aerora QML module are the application's own. A successful `create()` therefore establishes
+/// several things that were previously `NOT-EVIDENCED`:
 ///
-/// `QmlUITestBase::startUI()` boots that whole chain, so the assertions below are about the real
-/// scene rather than a reconstruction of it. In particular this is the first test that resolves
-/// Aerora QML types **by type name** from a loaded document - `AeroraUi`, `AeroraMissionObserver`,
-/// `AeroraSelfReportRow`, `AnalyzePage` - which is the `Q7-001` registration question that a
-/// context property cannot answer.
+/// \li the resource alias puts the page where the registered URL says it is,
+/// \li every import in the document resolves, including `QGroundControl.AnalyzeView`,
+/// \li `AnalyzePage`, `AeroraUi`, `AeroraMissionObserver` and `AeroraSelfReportRow` all resolve
+///     **by QML type name**, which is the `Q7-001` registration question,
+/// \li and the page's own readings derive from live singleton state rather than literals.
 ///
-/// \section notcovered What this still does not cover
+/// \section nowindow Why no window is booted
 ///
-/// Pixels. The page is instantiated and its rendered row text is read, but nothing here asserts
-/// that two states are visually distinguishable - that is `Q-040` and `DEMO` verification. It also
-/// does not click through the Analyze menu to the page; it asserts the page is registered in
-/// `analyzePages()` with a URL that resolves to a real resource, and instantiates that URL on the
-/// live engine.
-class AeroraMissionProgressUITest : public QmlUITestBase
+/// An earlier revision derived from `QmlUITestBase` and called `startUI()` to boot MainWindow,
+/// which would additionally have proven that the core plugin's `objectCreated` hook finds the
+/// *application's* two controllers. That harness aborts inside Qt's own `qnumeric.h` saturation
+/// assert on the Windows runner, which is the only runner this overlay has; upstream deliberately
+/// runs just the `Portable` suite there, so the QML UI harness has never executed on Windows.
+/// Rather than ship a test that cannot run, the window dependency is dropped: `AnalyzePage` roots
+/// on an `Item`, and an `Item` instantiates without a window.
+///
+/// What that costs is recorded rather than hidden - see the class comment on
+/// `AeroraPlanBridge::attachToQmlScene()`. Attachment and role assignment are covered against real
+/// `PlanMasterController` instances by `AeroraPlanBridgeTest`, including repeat discovery; what
+/// stays unevidenced is specifically that the *booted application scene* yields those two
+/// controllers to the hook.
+class AeroraMissionProgressUITest : public VehicleTest
 {
     Q_OBJECT
 
 public:
-    AeroraMissionProgressUITest() = default;
+    explicit AeroraMissionProgressUITest(QObject* parent = nullptr)
+        : VehicleTest(parent)
+    {
+        // Generic rather than PX4-flavoured: the observer is reached through
+        // AeroraVehicleServices, which only exists on a vehicle routed to the Aerora firmware
+        // plugin. A PX4 MockLink would resolve to a different plugin, the observer would be null
+        // and the assertions below would hold vacuously.
+        setAutopilotType(MAV_AUTOPILOT_GENERIC);
+        setWaitForInitialConnect(false);
+    }
 
 protected slots:
     void init() override;
+    void cleanup() override;
 
 private slots:
-    // The production attachment path: did the core plugin's objectCreated hook actually find the
-    // application's own controllers, and bind each to the right role?
-    void _planBridgeAttachesToTheLiveSceneControllers();
+    // Reachability: the page is in the Analyze registry and its URL resolves to a real resource.
+    void _missionProgressPageIsRegisteredWithAResolvableUrl();
 
-    // Reachability and loadability of the page itself, including every import and the resource
-    // alias the URL depends on.
-    void _missionProgressPageIsRegisteredAndInstantiates();
+    // The page's document compiles and instantiates on an application engine.
+    void _missionProgressPageInstantiatesOnAnApplicationEngine();
 
-    // With no vehicle there is no observer, and the page must say so rather than render an empty
-    // mission as a captured one.
-    void _missionProgressPageReportsNoObserverWithNoVehicle();
-
-    // Discovery is wired to a signal that can fire more than once per engine.
-    void _repeatedSceneDiscoveryCreatesNoDuplicateBridges();
-
-    // End to end on a connected vehicle: edit the live Plan view plan, and the observer reached
-    // through AeroraUi.mission must show it.
-    void _livePlanAndSelectionChangesReachTheObserver();
+    // End to end: edit the plan on a real controller bound to the connected vehicle, and the
+    // page's readings follow.
+    void _livePlanAndSelectionReachTheObserverAndThePage();
 
 private:
-    /// @return The live scene's controller for @a flyView, or nullptr when absent.
-    PlanMasterController* _sceneController(bool flyView);
+    /// Builds an engine through the production factory, so import paths and the Aerora QML module
+    /// are the application's. Owned by the test and released in cleanup().
+    QQmlApplicationEngine* _applicationEngine();
+
+    QQmlApplicationEngine* _engine = nullptr;
 };
