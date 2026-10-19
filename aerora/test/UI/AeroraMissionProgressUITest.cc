@@ -13,6 +13,7 @@
 #include <QtQml/QQmlApplicationEngine>
 #include <QtQml/QQmlComponent>
 #include <QtQuick/QQuickItem>
+#include <QtQuick/QQuickWindow>
 #include <QtTest/QTest>
 
 #include "AeroraMissionBridge.h"
