@@ -1,15 +1,30 @@
 #include "AeroraSceneBootOnlyTest.h"
 
+#include <QtCore/QRegularExpression>
 #include <QtQuick/QQuickItem>
 #include <QtTest/QTest>
 
 UT_REGISTER_TEST(AeroraSceneBootOnlyTest, TestLabel::Integration)
 
+void AeroraSceneBootOnlyTest::init()
+{
+    QmlUITestBase::init();
+
+    // The same three suppressions every Aerora scene suite carries, and for the same reason:
+    // AeroraCorePlugin::init() emits them once per process and latches them, and
+    // QmlUITestBase::startUI() calls that init(). Without these the first probe run on Linux
+    // exited 255 on both platforms - strict-mode log failures, not boot failures - which is
+    // precisely the ambiguity this payload exists to remove.
+    ignoreLogMessage("Aerora.CorePlugin", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("no platform key protector available")));
+    ignoreLogMessage("Aerora.CorePlugin", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("command authorization is NOT being enforced")));
+    ignoreLogMessage("Aerora.CorePlugin", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("allowing commands without authorization")));
+}
+
 void AeroraSceneBootOnlyTest::_theProductionSceneBoots()
 {
-    // No log suppressions beyond what QmlUITestBase::startUI() installs itself. Adding any here
-    // would risk this exiting zero on a host that logged something unexpected during the boot,
-    // which is exactly the signal the probe reads this exit code for.
     startUI();
     if (QTest::currentTestFailed()) {
         return;

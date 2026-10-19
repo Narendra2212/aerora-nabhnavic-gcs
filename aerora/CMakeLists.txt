@@ -328,35 +328,28 @@ if(QGC_BUILD_TESTING)
         add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
         add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
         add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
-    else()
-        # ------------------------------------------------------------------------------------
-        # Windows: one scene suite is restored, on the `minimal` platform plugin.
-        #
-        # AeroraSceneHarnessProbeTest run 39265133278 measured both headless plugins by booting
-        # the scene in a child process. The results split cleanly:
-        #
-        #   offscreen  aborts on the FIRST scene boot
-        #              (qnumeric.h:523 qt_saturate, exit 0xc0000409, 8.06s in)
-        #   minimal    boots the scene - "Totals: 3 passed, 1 failed". The two slots that only
-        #              boot and inspect passed; the one that aborted, at 12.46s, is
-        #              _missionProgressPageIsReachableFromTheAnalyzeMenu, which drives mouse
-        #              clicks through the tool-select dropdown.
-        #
-        # So the boot is fixed by the plugin and the residual abort is in the click/popup path,
-        # not in scene construction. AeroraFlyViewOverlayUITest is the suite that never clicks -
-        # it boots, reads properties and connects a MockLink - so it is the one the evidence
-        # supports registering here.
-        #
-        # AeroraSceneAttachmentUITest and AeroraVehicleConfigUITest stay withheld on Windows
-        # because both click. Registering them on this evidence would knowingly add two failing
-        # tests; the click path needs its own diagnosis first.
-        #
-        # ENV_MODIFICATION rather than changing the platform for every test: CTest applies it
-        # after the ENVIRONMENT property, so this overrides QT_QPA_PLATFORM=offscreen for this
-        # one entry and leaves every other Windows test on the configuration it has today.
-        add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300
-                     ENV_MODIFICATION "QT_QPA_PLATFORM=set:minimal")
     endif()
+
+    # ----------------------------------------------------------------------------------------
+    # Windows: no scene suite is registered, and the reason is now specific.
+    #
+    # AeroraSceneHarnessProbeTest boots the production scene in a child process once per
+    # candidate headless plugin. Both are unusable on Windows, for *different* reasons:
+    #
+    #   offscreen  aborts during scene construction - qnumeric.h:523 qt_saturate, exit
+    #              0xc0000409, ~8s in (run 39265133278)
+    #   minimal    constructs the scene but lays nothing out: the window's root item comes up
+    #              zero-sized, so every geometry assertion fails and anything that reads a size
+    #              takes a fatal error (run 39272899314)
+    #
+    # AeroraFlyViewOverlayUITest was registered here under `minimal` on the strength of the
+    # earlier run, where that suite reported "3 passed, 1 failed". That reading was too
+    # generous: the slots that passed only look up objects, and none of them checks a size. The
+    # registration is withdrawn until a plugin produces a laid-out scene.
+    #
+    # The suites stay compiled on Windows, so none of them rots, and none is reported as
+    # passing.
+    # ----------------------------------------------------------------------------------------
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
     add_qgc_test(AeroraVehicleSetupTest LABELS Unit)

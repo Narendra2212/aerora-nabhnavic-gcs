@@ -23,6 +23,9 @@ class AeroraSceneBootOnlyTest : public QmlUITestBase
 {
     Q_OBJECT
 
+protected slots:
+    void init() override;
+
 private slots:
     void _theProductionSceneBoots();
 };
