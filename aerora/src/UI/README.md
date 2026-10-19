@@ -28,6 +28,7 @@ Full design records, evidence and handoffs:
 | `Indicators/AeroraEnforcementIndicator.qml` | `SCR-SHL-03`. The toolbar strip that says command authorization is not enforced |
 | `Screens/AeroraOperationsHub.qml` | `SCR-SHL-01`. The overlay's honest self-report: services attached, enforcement state, audit posture |
 | `Screens/AeroraMissionProgressPage.qml` | `SCR-LIV-06`. An `AnalyzePage`: what the vehicle is flying, what the ground station holds, and whether the two agree |
+| `Screens/AeroraIdentityPage.qml` | `SCR-VEH-02`. A `SetupPage`: the vehicle's protocol identity, its absent fleet identity, and why one is not the other |
 | `Screens/AeroraServiceDiagnosticsPage.qml` | `SCR-VEH-06`. A `SetupPage`: which Aerora services attached to this vehicle, and why a classification is not an identification |
 | `Ui.cmake` | Source manifest, and the integration instructions for `aerora/CMakeLists.txt` |
 

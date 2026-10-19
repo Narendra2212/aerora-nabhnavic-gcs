@@ -284,8 +284,12 @@ if(QGC_BUILD_TESTING)
     # The source stays in AERORA_UI_TEST_SOURCES and keeps compiling, so it cannot rot, and the
     # test registers and runs as soon as a non-Windows Aerora leg exists. Registering it on Windows
     # today reports a harness defect as an overlay failure on every push.
+    # AeroraVehicleConfigUITest shares the constraint: it derives from VehicleConfigUITestBase,
+    # which derives from QmlUITestBase. Its longer timeout covers two scene boots plus a MockLink
+    # parameter load each.
     if(NOT WIN32)
         add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
+        add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
     endif()
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)

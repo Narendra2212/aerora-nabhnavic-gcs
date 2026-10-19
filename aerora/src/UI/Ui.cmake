@@ -29,6 +29,7 @@
 #       # registration site in aerora/CMakeLists.txt.
 #       if(NOT WIN32)
 #           add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
+#           add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
 #       endif()
 #   endif()
 #
@@ -147,6 +148,7 @@ set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraTokenDisplay.qml
     ${AERORA_UI_DIR}/Controls/AeroraValueDisplay.qml
     ${AERORA_UI_DIR}/Indicators/AeroraEnforcementIndicator.qml
+    ${AERORA_UI_DIR}/Screens/AeroraIdentityPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraMissionProgressPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
     ${AERORA_UI_DIR}/Screens/AeroraServiceDiagnosticsPage.qml
@@ -200,10 +202,13 @@ set(AERORA_UI_TEST_SOURCES
     ${AERORA_UI_TEST_DIR}/AeroraUiFoundationTest.h
     ${AERORA_UI_TEST_DIR}/AeroraUiSafetyTest.cc
     ${AERORA_UI_TEST_DIR}/AeroraUiSafetyTest.h
+    ${AERORA_UI_TEST_DIR}/AeroraVehicleConfigUITest.cc
+    ${AERORA_UI_TEST_DIR}/AeroraVehicleConfigUITest.h
 )
 
 # test/QmlUITests carries QmlUITestBase, which AeroraSceneAttachmentUITest derives from to boot a
-# real application scene. Its .cc is already compiled into the application target by
+# real application scene, and VehicleConfigUITestBase, which AeroraVehicleConfigUITest derives from
+# to drive the Configure view. Both .cc files are already compiled into the application target by
 # test/QmlUITests/CMakeLists.txt, so only the header path is needed here - the overlay builds no
 # second copy of the harness and modifies no core file to reach it.
 set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
@@ -218,4 +223,5 @@ set(AERORA_UI_TEST_NAMES
     AeroraSceneAttachmentUITest
     AeroraUiFoundationTest
     AeroraUiSafetyTest
+    AeroraVehicleConfigUITest
 )

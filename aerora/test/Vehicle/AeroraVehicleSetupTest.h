@@ -33,7 +33,7 @@ private slots:
 
     void _aPageIsPublishableOnlyWhenEveryDeclaredResourceExists();
     void _pagePublishabilityFollowsItsQmlResource();
-    void _serviceDiagnosticsIsPublishedAndTheRemainingPagesAreWithheld();
+    void _publishedPagesAreNamedAndTheRestAreWithheld();
 
     void _indicatorGateRequiresCapabilityReportedAvailable_data();
     void _indicatorGateRequiresCapabilityReportedAvailable();

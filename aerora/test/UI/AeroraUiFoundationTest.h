@@ -93,12 +93,19 @@ private slots:
     void _serviceDiagnosticsEnumeratorsResolve_data();
     void _serviceDiagnosticsEnumeratorsResolve();
 
-    // And the document itself. A name lookup proves the C++ side of a binding exists; it says
-    // nothing about whether the QML file that reads it can be loaded at all. The setup page is
+    // SCR-VEH-02 - the names AeroraIdentityPage.qml reads through AeroraUi.identity. Same reason
+    // as the rows above: the page renders an unresolved property as "not checked", so a rename
+    // degrades to a plausible screen rather than to an error.
+    void _identityPagePropertiesResolve_data();
+    void _identityPagePropertiesResolve();
+
+    // And the documents themselves. A name lookup proves the C++ side of a binding exists; it says
+    // nothing about whether the QML file that reads it can be loaded at all. A setup page is
     // published purely on its resource existing, so a document that does not compile would be
     // offered in the Vehicle Configuration view and fail when clicked, with nothing upstream of
     // the click able to report it.
-    void _serviceDiagnosticsPageDocumentCompiles();
+    void _setupPageDocumentsCompile_data();
+    void _setupPageDocumentsCompile();
 
     // Gadget value access through a real QML engine, not through the meta-object.
     //

@@ -641,10 +641,14 @@ So both seams gate on the resource being present. This is the declared-intent-pl
 of intent, and `unresolvedPageResources()` names what is declared but absent, so an absent page is
 reportable rather than silent. A page appears with no C++ change once its QML lands.
 
-`SCR-VEH-06` is the first page to do exactly that: adding
-`aerora/src/UI/Screens/AeroraServiceDiagnosticsPage.qml` to `AERORA_UI_QML_FILES` published it, with
-no edit to this module. The honest result today is therefore **one Aerora setup page, three still
-withheld, and no Aerora indicator**.
+`SCR-VEH-06` was the first page to do exactly that, and `SCR-VEH-02` followed the same way: adding
+the QML file to `AERORA_UI_QML_FILES` published each one with no edit to this module. The honest
+result today is therefore **two Aerora setup pages, two still withheld, and no Aerora indicator**.
+
+Both published pages are driven through the real Configure view by `AeroraVehicleConfigUITest`,
+which is the only test that can show they render — `SetupPage` reads `globals` and
+`vehicleComponent` from context that only `VehicleConfigView`'s `Loader` supplies, so a page that
+compiles and draws nothing passes every other check.
 
 The resource root is `:/qml/Aerora/Controls`, which is not a guess: it follows
 `AERORA_UI_QML_MODULE_URI` and `RESOURCE_PREFIX /qml` from `aerora/src/UI/Ui.cmake:133`, and the
@@ -656,7 +660,7 @@ withheld — rather than publishing a panel that cannot load.
 | Screen | Treatment |
 | --- | --- |
 | `SCR-VEH-01` page index | `AeroraAutoPilotPlugin::vehicleComponents()`. The list itself, not a page |
-| `SCR-VEH-02` identity and profile | Declared, QML absent. Backed by `AeroraVehicleIdentity` and the resolved profile |
+| `SCR-VEH-02` identity and profile | **PUBLISHED.** `AeroraIdentityPage.qml`, backed by `AeroraVehicleIdentity` and the resolved profile. Holds the protocol/fleet identity boundary on screen: the fleet row reads *not reported* and never borrows the system id |
 | `SCR-VEH-03` capability report | Declared, QML absent. Backed by `AeroraVehicleCapabilities`' three-state model |
 | `SCR-VEH-04` sensor and health | Declared, QML absent, with the `vehicleConfigJson()` seam implemented and empty |
 | `SCR-VEH-05` calibration | **WITHHELD.** See below |

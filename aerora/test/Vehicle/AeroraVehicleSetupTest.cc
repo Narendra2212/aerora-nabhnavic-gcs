@@ -200,44 +200,39 @@ void AeroraVehicleSetupTest::_pagePublishabilityFollowsItsQmlResource()
     }
 }
 
-void AeroraVehicleSetupTest::_serviceDiagnosticsIsPublishedAndTheRemainingPagesAreWithheld()
+void AeroraVehicleSetupTest::_publishedPagesAreNamedAndTheRestAreWithheld()
 {
-    // The state of U4 in this build, named rather than derived. SCR-VEH-06 has its QML and
-    // publishes; the other three are declared and waiting for theirs.
+    // The state of U4 in this build, named rather than derived. SCR-VEH-02 and SCR-VEH-06 have
+    // their QML and publish; the other two are declared and waiting for theirs.
     //
     // Naming it is the point. Publishability is "does this resource exist", so the failure that
     // matters most here is the one where the resource moves - a changed RESOURCE_PREFIX, a dropped
     // qgc_set_qt_resource_alias() call, a file removed from AERORA_UI_QML_FILES. Any of those
     // withholds the page, and every other test in this fixture is written as a matched pair that
-    // moves with it. This one does not move: the path is spelled out, so the Aerora setup surface
-    // cannot disappear from the Vehicle Configuration view without a test failing.
-    constexpr const char* kServiceDiagnosticsResource = ":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
-
-    // Screen ids rather than Page values, so a failure prints which page rather than an integer.
+    // moves with it. This one does not move: the paths are spelled out, so the Aerora setup
+    // surface cannot disappear from the Vehicle Configuration view without a test failing.
+    // Screen ids as well as resources: the ids say which screen the operator gets, the resources
+    // say which file the Loader opens, and only asserting both catches a descriptor that publishes
+    // the right screen id against the wrong QML.
     QStringList publishedScreenIds;
+    QStringList publishedResources;
     for (const PageDescriptor& descriptor : AeroraVehicleComponent::pageDescriptors()) {
         if (!AeroraVehicleComponent::isPublishable(descriptor)) {
             continue;
         }
         publishedScreenIds.append(descriptor.screenId);
-
-        if (descriptor.page == Page::ServiceDiagnostics) {
-            QCOMPARE(descriptor.setupResource, QString::fromUtf8(kServiceDiagnosticsResource));
-
-            // The URL the Loader in VehicleConfigView is handed. A resource path that exists but
-            // resolves to a URL the engine cannot open is a blank panel with no error on screen.
-            QCOMPARE(AeroraVehicleComponent::resolvedQmlUrl(descriptor.setupResource),
-                     QUrl(QStringLiteral("qrc") + QString::fromUtf8(kServiceDiagnosticsResource)));
-        }
+        publishedResources.append(descriptor.setupResource);
     }
 
-    QCOMPARE(publishedScreenIds, QStringList({QStringLiteral("SCR-VEH-06")}));
-
-    // And the three that are still waiting say so, by resource, so this fails when one of them
-    // lands rather than letting the published set grow unremarked.
-    QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(),
+    QCOMPARE(publishedScreenIds, QStringList({QStringLiteral("SCR-VEH-02"), QStringLiteral("SCR-VEH-06")}));
+    QCOMPARE(publishedResources,
              QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraIdentityPage.qml"),
-                          QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
+                          QStringLiteral(":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml")}));
+
+    // And the two that are still waiting say so, by resource, so this fails when one of them lands
+    // rather than letting the published set grow unremarked.
+    QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(),
+             QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
                           QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml")}));
 }
 

@@ -21,6 +21,7 @@
 #include "AeroraMissionSnapshot.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
+#include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleServices.h"
 #include "AeroraVehicleUiContext.h"
 #include "QGCCorePlugin.h"
@@ -41,12 +42,12 @@ constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyView
 /// compile error - which is why it is a named constant checked against the production definition.
 constexpr const char *kUiLogCategory = "Aerora.Ui";
 
-/// The SCR-VEH-06 setup page, as the engine URL and as the resource path behind it. Flat under the
-/// module prefix because qgc_set_qt_resource_alias() aliases every AERORA_UI_QML_FILES entry to its
-/// bare name. Spelled out rather than read from AeroraVehicleComponent::pageDescriptors(), so that
-/// the catalogue and the engine's view of the same file cannot drift in step.
-constexpr const char* kServiceDiagnosticsPageUrl = "qrc:/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
-constexpr const char* kServiceDiagnosticsResource = ":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
+/// The Aerora setup pages' bare module names. Flat under the module prefix because
+/// qgc_set_qt_resource_alias() aliases every AERORA_UI_QML_FILES entry to its bare name. Spelled
+/// out rather than read from AeroraVehicleComponent::pageDescriptors(), so that the catalogue and
+/// the engine's view of the same file cannot drift in step.
+constexpr const char* kIdentityPageFile = "AeroraIdentityPage.qml";
+constexpr const char* kServiceDiagnosticsPageFile = "AeroraServiceDiagnosticsPage.qml";
 
 /// Resolves one of the three meta-objects AeroraMissionProgressPage.qml binds to, by class name.
 ///
@@ -509,10 +510,47 @@ void AeroraUiFoundationTest::_serviceDiagnosticsEnumeratorsResolve()
                                       .arg(QString::fromUtf8(enumeratorName))));
 }
 
-void AeroraUiFoundationTest::_serviceDiagnosticsPageDocumentCompiles()
+void AeroraUiFoundationTest::_identityPagePropertiesResolve_data()
 {
-    QVERIFY2(QFile::exists(QString::fromUtf8(kServiceDiagnosticsResource)),
-             "the setup page must be compiled into the resource at the flat module path");
+    QTest::addColumn<QByteArray>("propertyName");
+
+    // Exactly what AeroraIdentityPage.qml reads through AeroraUi.identity. The page renders an
+    // unresolved property as "not checked", which is the honest direction and therefore the silent
+    // one - a renamed property leaves a plausible-looking screen rather than an error.
+    QTest::newRow("mavlinkSystemId") << QByteArray("mavlinkSystemId");
+    QTest::newRow("mavlinkComponentId") << QByteArray("mavlinkComponentId");
+    QTest::newRow("fleetIdentityKnown") << QByteArray("fleetIdentityKnown");
+    QTest::newRow("fleetIdentity") << QByteArray("fleetIdentity");
+}
+
+void AeroraUiFoundationTest::_identityPagePropertiesResolve()
+{
+    QFETCH(QByteArray, propertyName);
+
+    const QMetaObject* const meta = &AeroraVehicleIdentity::staticMetaObject;
+
+    QVERIFY2(
+        meta->indexOfProperty(propertyName.constData()) != -1,
+        qPrintable(
+            QStringLiteral("AeroraIdentityPage.qml reads AeroraUi.identity.%1").arg(QString::fromUtf8(propertyName))));
+}
+
+void AeroraUiFoundationTest::_setupPageDocumentsCompile_data()
+{
+    QTest::addColumn<QByteArray>("pageFile");
+
+    QTest::newRow("identity") << QByteArray(kIdentityPageFile);
+    QTest::newRow("service diagnostics") << QByteArray(kServiceDiagnosticsPageFile);
+}
+
+void AeroraUiFoundationTest::_setupPageDocumentsCompile()
+{
+    QFETCH(QByteArray, pageFile);
+
+    const QString resource = QStringLiteral(":/qml/Aerora/Controls/") + QString::fromUtf8(pageFile);
+    QVERIFY2(QFile::exists(resource),
+             qPrintable(QStringLiteral("%1 must be compiled into the resource at the flat module path")
+                            .arg(QString::fromUtf8(pageFile))));
 
     // The production factory rather than a bare QQmlEngine: it is what adds the qrc:/qml import
     // path that `import QGroundControl` and the flat Aerora.Controls module resolve from, and it is
@@ -527,7 +565,7 @@ void AeroraUiFoundationTest::_serviceDiagnosticsPageDocumentCompiles()
     // back-pointer to the engine and reads it on destruction, so the reverse order is a
     // use-after-free rather than merely untidy.
     {
-        QQmlComponent component(engine, QUrl(QString::fromUtf8(kServiceDiagnosticsPageUrl)));
+        QQmlComponent component(engine, QUrl(QStringLiteral("qrc") + resource));
 
         // Compilation, which is more than it sounds: Qt resolves every referenced type and every
         // property name on a QML-declared type at this point. So this covers the resource alias,
@@ -544,11 +582,12 @@ void AeroraUiFoundationTest::_serviceDiagnosticsPageDocumentCompiles()
 
     QVERIFY2(compiled, qPrintable(errors));
 
-    // What this does *not* cover, stated because the gap is easy to miss: no binding is evaluated,
-    // because create() is never called. SetupPage.qml reads `globals` and `vehicleComponent` from
-    // context that only VehicleConfigView's Loader supplies, so instantiating the page here would
-    // report that absence as a failure of the page - and supplying a stand-in would assert the
-    // stand-in. Binding evaluation and rendering are evidenced by neither this test nor CI.
+    // What this does *not* cover: no binding is evaluated, because create() is never called.
+    // SetupPage.qml reads `globals` and `vehicleComponent` from context that only
+    // VehicleConfigView's Loader supplies, so instantiating a page here would report that absence
+    // as a failure of the page, and supplying a stand-in would assert the stand-in. Binding
+    // evaluation and rendering are covered instead by AeroraVehicleConfigUITest, which loads both
+    // pages through the real Configure view in a booted scene.
 }
 
 void AeroraUiFoundationTest::_missionGadgetValuesAreReadableFromQml_data()
