@@ -22,6 +22,7 @@
 #       list(APPEND _aerora_sources ${AERORA_UI_TEST_SOURCES})
 #       list(APPEND _aerora_include_directories ${AERORA_UI_TEST_INCLUDE_DIRECTORIES})
 #       add_qgc_test(AeroraScreenMetricsTest LABELS Unit)
+#       add_qgc_test(AeroraSceneHarnessProbeTest LABELS Integration NoSanitizer SERIAL TIMEOUT 600)
 #       add_qgc_test(AeroraUiFoundationTest LABELS Unit)
 #       add_qgc_test(AeroraUiSafetyTest LABELS Unit)
 #       add_qgc_test(AeroraMissionProgressUITest LABELS Integration Vehicle)
@@ -234,6 +235,8 @@ cmake_path(NORMAL_PATH AERORA_UI_TEST_DIR)
 set(AERORA_UI_TEST_SOURCES
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.cc
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.h
+    ${AERORA_UI_TEST_DIR}/AeroraSceneHarnessProbeTest.cc
+    ${AERORA_UI_TEST_DIR}/AeroraSceneHarnessProbeTest.h
     ${AERORA_UI_TEST_DIR}/AeroraScreenMetricsTest.cc
     ${AERORA_UI_TEST_DIR}/AeroraScreenMetricsTest.h
     ${AERORA_UI_TEST_DIR}/AeroraMissionProgressUITest.cc
@@ -263,6 +266,7 @@ set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
 set(AERORA_UI_TEST_NAMES
     AeroraFlyViewOverlayUITest
     AeroraMissionProgressUITest
+    AeroraSceneHarnessProbeTest
     AeroraScreenMetricsTest
     AeroraSceneAttachmentUITest
     AeroraUiFoundationTest

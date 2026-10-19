@@ -1,5 +1,6 @@
 #include "AeroraScreenMetricsTest.h"
 
+#include <cstdio>
 #include <memory>
 
 #include <QtCore/QByteArray>
@@ -137,6 +138,16 @@ void AeroraScreenMetricsTest::_screenAndFontMetricsAreUsableNumbers()
     // Released before asserting, so a failure cannot leave the URL interceptor installed for the
     // rest of the run - it is process-wide file-static state and a second install is refused.
     QGCCorePlugin::instance()->destroyQmlApplicationEngine(engine);
+
+    // Emitted on success as well as failure, which is the whole point: a passing run previously
+    // established only that the metrics were not degenerate, not what they actually were - and the
+    // numbers are the diagnostic. Written with fprintf rather than a Qt logging macro on purpose:
+    // Qt messages go through the strict-mode check and an unexpected one fails the test, while raw
+    // stderr does not. CTest's --output-junit captures <system-out> for every test, pass or fail,
+    // so this reaches the uploaded JUnit artifact. Kept to one short line because that capture is
+    // truncated at 1024 bytes.
+    fprintf(stderr, "AeroraScreenMetrics: %s\n", qPrintable(readings.join(QStringLiteral(" "))));
+    fflush(stderr);
 
     QVERIFY2(failures.isEmpty(),
              qPrintable(QStringLiteral("degenerate UI metrics: %1 | all readings: %2")

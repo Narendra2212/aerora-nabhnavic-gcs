@@ -286,6 +286,11 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraSigningKeyStoreTest LABELS Unit)
     add_qgc_test(AeroraTelemetryAttachmentTest LABELS Unit)
     add_qgc_test(AeroraScreenMetricsTest LABELS Unit)
+    # Boots the production scene in a child process, once per candidate headless platform, so an
+    # abort is recorded rather than fatal. Registered on every platform: Linux is what proves the
+    # probe itself works, because there the answer is already known. NoSanitizer because the child
+    # boots a QML scene; SERIAL because two instances of the application fight over settings.
+    add_qgc_test(AeroraSceneHarnessProbeTest LABELS Integration NoSanitizer SERIAL TIMEOUT 600)
     add_qgc_test(AeroraUiFoundationTest LABELS Unit)
     add_qgc_test(AeroraUiSafetyTest LABELS Unit)
     # Loads the mission progress page on a real application engine, so it needs a connected
