@@ -547,12 +547,36 @@ widget. That is only possible because `AeroraTelemetrySet` enumerates its groups
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `DESIGNED` | 7 | `P7-VID-004` |
+| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `BLOCKED` | 7 | no video overlay seam — see below |
 
 The three video C++ seams (`createVideoReceiver`, `createVideoSink`, `releaseVideoSink`) are **not**
 overridden and should stay that way: the sink is an opaque `void *` whose lifetime belongs to
 whichever plugin created it, so the three must be overridden as a set or not at all. Aerora has no
 reason to.
+
+#### `SCR-VID-01` is blocked, and not by `P7-VID-004`
+
+The recorded blocker was wrong and is corrected here. `P7-VID-004` ("a video overlay never displays
+a safety value without its state class") is a **content constraint**, not a gate: it is satisfied by
+rendering any safety value through `AeroraValueDisplay` / `AeroraStateText`, which already carry the
+class label, and satisfied trivially by an overlay that displays no safety value. It blocks nothing.
+
+The real obstacle is structural. Both named precedents are instantiated **inside**
+`src/FlyView/FlyViewVideo.qml` (`ProximityRadarVideoView` at :157, `ObstacleDistanceOverlayVideo` at
+:162), and that file is populated upstream and offers no child seam. Reaching the video surface the
+way the precedents do therefore requires a `Tier::PopulatedFile` override of the file that carries
+the whole video pipeline wiring, which needs the `Q-038` / `IF-UIS-012` fork-point, reason and owner
+process before it can be declared.
+
+`FlyView.qml` confirms there is no alternative route: the widget layer (`:142`), the Aerora custom
+layer (`:151`) and the bottom-right column (`:206`) are all bound `visible:
+!QGroundControl.videoManager.fullScreen`. So in fullscreen video the only thing still drawn is what
+lives inside `FlyViewVideo.qml` — which is exactly why upstream put its two video overlays there.
+
+What is already delivered without that fork: whenever the widget layer is visible — including when
+video is the main window item and the map is in PiP — `SCR-LIV-01`'s overlay is drawn over the video
+surface, because `FlyViewCustomLayer` fills the widget layer above it. The uncovered case is
+fullscreen video alone.
 
 ### Review & export — 2 screens
 
