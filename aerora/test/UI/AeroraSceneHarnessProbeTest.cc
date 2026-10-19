@@ -15,10 +15,14 @@ UT_REGISTER_TEST(AeroraSceneHarnessProbeTest, TestLabel::Integration)
 
 namespace {
 
-/// The scene suite the probe boots. Chosen because it is the cheapest of the three - it connects no
-/// MockLink - so a successful boot is attributable to the platform plugin rather than to link
-/// timing.
-constexpr const char* kProbedSuite = "AeroraSceneAttachmentUITest";
+/// The payload the probe boots: a suite that boots the scene and asserts nothing else.
+///
+/// Pointing this at a real suite was the first version and it was wrong. A child running a real
+/// suite exits non-zero when any of its assertions fails, which is indistinguishable from the scene
+/// failing to boot - and the first probe run demonstrated it, reporting `offscreen` as failing on
+/// Linux, where offscreen boots the scene perfectly well, because an unrelated slot in that suite
+/// was broken at the time. The exit code has to mean one thing.
+constexpr const char* kProbedSuite = "AeroraSceneBootOnlyTest";
 
 /// The headless plugins Qt ships, in the order worth trying: the one the harness uses today, then
 /// the alternative.

@@ -290,6 +290,12 @@ if(QGC_BUILD_TESTING)
     # abort is recorded rather than fatal. Registered on every platform: Linux is what proves the
     # probe itself works, because there the answer is already known. NoSanitizer because the child
     # boots a QML scene; SERIAL because two instances of the application fight over settings.
+    #
+    # Its payload, AeroraSceneBootOnlyTest, is deliberately NOT registered here. It is the probe's
+    # instrument rather than a suite: it boots the scene and asserts nothing else, so its exit code
+    # means "the scene booted" and cannot be moved by an unrelated assertion. UT_REGISTER_TEST is
+    # what makes it reachable as --unittest:AeroraSceneBootOnlyTest; a CTest entry would run it a
+    # second time for no added coverage.
     add_qgc_test(AeroraSceneHarnessProbeTest LABELS Integration NoSanitizer SERIAL TIMEOUT 600)
     add_qgc_test(AeroraUiFoundationTest LABELS Unit)
     add_qgc_test(AeroraUiSafetyTest LABELS Unit)
@@ -322,6 +328,34 @@ if(QGC_BUILD_TESTING)
         add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
         add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
         add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
+    else()
+        # ------------------------------------------------------------------------------------
+        # Windows: one scene suite is restored, on the `minimal` platform plugin.
+        #
+        # AeroraSceneHarnessProbeTest run 39265133278 measured both headless plugins by booting
+        # the scene in a child process. The results split cleanly:
+        #
+        #   offscreen  aborts on the FIRST scene boot
+        #              (qnumeric.h:523 qt_saturate, exit 0xc0000409, 8.06s in)
+        #   minimal    boots the scene - "Totals: 3 passed, 1 failed". The two slots that only
+        #              boot and inspect passed; the one that aborted, at 12.46s, is
+        #              _missionProgressPageIsReachableFromTheAnalyzeMenu, which drives mouse
+        #              clicks through the tool-select dropdown.
+        #
+        # So the boot is fixed by the plugin and the residual abort is in the click/popup path,
+        # not in scene construction. AeroraFlyViewOverlayUITest is the suite that never clicks -
+        # it boots, reads properties and connects a MockLink - so it is the one the evidence
+        # supports registering here.
+        #
+        # AeroraSceneAttachmentUITest and AeroraVehicleConfigUITest stay withheld on Windows
+        # because both click. Registering them on this evidence would knowingly add two failing
+        # tests; the click path needs its own diagnosis first.
+        #
+        # ENV_MODIFICATION rather than changing the platform for every test: CTest applies it
+        # after the ENVIRONMENT property, so this overrides QT_QPA_PLATFORM=offscreen for this
+        # one entry and leaves every other Windows test on the configuration it has today.
+        add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300
+                     ENV_MODIFICATION "QT_QPA_PLATFORM=set:minimal")
     endif()
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)

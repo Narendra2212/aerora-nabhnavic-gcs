@@ -173,16 +173,29 @@ void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEvery
 
     // The rows are built by a Repeater over the class list, so an empty list would still load a
     // page with a heading and a scope note - a screen that looks like it works and teaches nothing.
-    // AeroraStateText is the per-row sample, so counting those counts rendered rows.
-    const QList<QQuickItem*> samples = flickable->findChildren<QQuickItem*>();
-    int stateTextSamples = 0;
-    for (QQuickItem* const item : samples) {
-        if (item->inherits("QQuickLabel") && item->property("classLabel").isValid()) {
-            ++stateTextSamples;
+    // AeroraStateText is the per-row sample, so counting those counts rendered rows, and it is
+    // identified by its own classLabel property rather than by type name: QGCLabel's concrete Qt
+    // class is an implementation detail of the control, and the property is the contract.
+    //
+    // Polled, because Repeater delegates instantiate over following frames rather than during the
+    // click that loaded the page.
+    const auto sampleCount = [flickable]() {
+        int count = 0;
+        const QList<QQuickItem*> items = flickable->findChildren<QQuickItem*>();
+        for (QQuickItem* const item : items) {
+            if (item->property("classLabel").isValid()) {
+                ++count;
+            }
         }
-    }
+        return count;
+    };
 
     // One per class, including UNAVAILABLE - whose sample is instantiated and deliberately
-    // invisible, so it is found here by existence rather than by visibility.
-    QCOMPARE(stateTextSamples, kStateClassCount);
+    // invisible, so it is counted by existence rather than by visibility.
+    QVERIFY2(
+        UnitTest::waitForCondition([&sampleCount]() { return sampleCount() == kStateClassCount; },
+                                   TestTimeout::mediumMs(), QStringLiteral("every state class to render a sample")),
+        qPrintable(QStringLiteral("expected %1 rendered state-class samples, found %2")
+                       .arg(kStateClassCount)
+                       .arg(sampleCount())));
 }

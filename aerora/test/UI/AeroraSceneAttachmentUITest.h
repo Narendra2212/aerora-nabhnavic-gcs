@@ -28,20 +28,23 @@ class PlanMasterController;
 /// `AeroraMissionProgressUITest` and confines the expensive scene boot to the three questions that
 /// genuinely require it.
 ///
-/// \section windows Not registered on Windows
+/// \section windows Still not registered on Windows: the click path
 ///
-/// `QmlUITestBase::startUI()` aborts partway through the scene boot on the Windows offscreen
-/// platform - `ASSERT: "value < maximalPlusOne" in qnumeric.h`, process exit `0xc0000409` - and
-/// that is a property of the shared harness, not of this suite: `windows.yml` runs
-/// `include-labels: Portable` only, so none of the QML UI tests in `test/QmlUITests` has ever run
-/// on Windows either.
+/// The scene boot itself is no longer the obstacle. `AeroraSceneHarnessProbeTest` measured both
+/// headless plugins on Windows (run `39265133278`): `offscreen` aborts on the first boot
+/// (`qnumeric.h:523`, exit `0xc0000409`), but `minimal` boots the scene and this suite reported
+/// "3 passed, 1 failed" under it.
 ///
-/// An empty offscreen font database was the first hypothesis and is ruled out; `QT_QPA_FONTDIR` is
-/// set in `cmake/QGCTest.cmake` and the abort is unchanged with fonts present.
+/// The one that failed is `_missionProgressPageIsReachableFromTheAnalyzeMenu`, which drives mouse
+/// clicks through the tool-select dropdown - so what remains unfixed on Windows is the click and
+/// popup path, not scene construction. Two of the three slots here already pass under `minimal`.
 ///
-/// So the registration is guarded in `aerora/CMakeLists.txt` and this file still compiles, which
-/// is what keeps it honest in both directions: nothing here is weakened to make Windows pass, and
-/// nothing here rots while it waits for a leg that can run it.
+/// The suite stays withheld rather than registered-and-failing, because registering it would add a
+/// known failure for the sake of the two slots that would pass. `AeroraFlyViewOverlayUITest`, which
+/// never clicks, is registered on Windows under `minimal` instead.
+///
+/// Nothing here is weakened to make Windows pass, and nothing here rots while it waits: the file
+/// compiles on every platform.
 class AeroraSceneAttachmentUITest : public QmlUITestBase
 {
     Q_OBJECT

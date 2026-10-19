@@ -235,6 +235,8 @@ cmake_path(NORMAL_PATH AERORA_UI_TEST_DIR)
 set(AERORA_UI_TEST_SOURCES
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.cc
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.h
+    ${AERORA_UI_TEST_DIR}/AeroraSceneBootOnlyTest.cc
+    ${AERORA_UI_TEST_DIR}/AeroraSceneBootOnlyTest.h
     ${AERORA_UI_TEST_DIR}/AeroraSceneHarnessProbeTest.cc
     ${AERORA_UI_TEST_DIR}/AeroraSceneHarnessProbeTest.h
     ${AERORA_UI_TEST_DIR}/AeroraScreenMetricsTest.cc
@@ -266,6 +268,7 @@ set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
 set(AERORA_UI_TEST_NAMES
     AeroraFlyViewOverlayUITest
     AeroraMissionProgressUITest
+    AeroraSceneBootOnlyTest
     AeroraSceneHarnessProbeTest
     AeroraScreenMetricsTest
     AeroraSceneAttachmentUITest
