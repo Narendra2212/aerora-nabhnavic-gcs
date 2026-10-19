@@ -51,7 +51,13 @@ private slots:
     void _nonResourceUrlPassesThroughUnchanged();
     void _undeclaredResourceUrlIsNeverIntercepted_data();
     void _undeclaredResourceUrlIsNeverIntercepted();
+    void _aPresentMirrorIsStillNotInterceptedWithoutADeclaration();
     void _selfCheckPassesWhenNothingIsDeclared();
+
+    // SCR-LIV-01 - the Fly View overlay mirror. Registered under the /Aerora override prefix and
+    // inert until its stock path is declared, so nothing loads it yet and no other test would
+    // notice if it stopped compiling.
+    void _flyViewOverlayMirrorDocumentCompiles();
 
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
     // startup self-check reads, so an interface quietly missing its Aerora layer is detectable

@@ -208,6 +208,31 @@ if(AERORA_UI_QML_FILES)
     list(APPEND _aerora_libraries AeroraControlsModule)
 endif()
 
+# ----------------------------------------------------------------------------
+# QML override mirrors
+#
+# Registered on the application target rather than on AeroraControlsModule: these are documents the
+# QML engine loads by URL through the AeroraQmlOverrides interceptor, not importable types, so they
+# want a plain resource at a fixed path rather than module membership. See the "Override mirrors"
+# section of src/UI/Ui.cmake for why the alias has to preserve the stock nested path.
+#
+# The alias list is index-matched with the file list, so a mismatched length is a configure error
+# rather than a mirror that lands at the wrong path and silently never loads.
+# ----------------------------------------------------------------------------
+
+if(AERORA_UI_OVERRIDE_QML_FILES)
+    # One explicit alias per mirror, as custom-example/CMakeLists.txt:80-96 does. The alias is the
+    # stock path relative to the prefix, so the mirror lands exactly where
+    # AeroraQmlOverrides::mirroredResourcePath() will look for it.
+    set_source_files_properties(${AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER}
+        PROPERTIES QT_RESOURCE_ALIAS "QGroundControl/FlyView/FlyViewCustomLayer.qml")
+
+    qt_add_resources(${CMAKE_PROJECT_NAME} aerora_qml_overrides
+        PREFIX "${AERORA_UI_OVERRIDE_PREFIX}"
+        FILES ${AERORA_UI_OVERRIDE_QML_FILES}
+    )
+endif()
+
 list(APPEND _aerora_libraries
     ${AERORA_TELEMETRY_LIBRARIES}
     ${AERORA_MISSION_LIBRARIES}

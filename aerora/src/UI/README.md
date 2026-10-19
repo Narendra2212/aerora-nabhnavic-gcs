@@ -25,6 +25,9 @@ Full design records, evidence and handoffs:
 | `Controls/AeroraTokenDisplay.qml` | One `AeroraReportedValue`: name, token, class label, age |
 | `Controls/AeroraValueDisplay.qml` | One `AeroraStateValue`: Fact value, units, class label, age |
 | `Controls/AeroraSelfReportRow.qml` | One self-report line. Carries three outcomes, so "not checked" cannot render as a finding |
+| `Controls/AeroraOverlayValueRow.qml` | One compact label/value line for a Fly View panel. Keeps "unknown" a distinct state from a value, and outranking a caution |
+| `Controls/AeroraMissionProgressPanel.qml` | The in-flight mission readout. Readings only; the basis for each lives on the `SCR-LIV-06` Analyze page |
+| `Overrides/FlyViewCustomLayer.qml` | `SCR-LIV-01`. The Live Operations overlay, mirrored under the `/Aerora` override prefix. **Inert until its stock path is declared** in `AeroraQmlOverrides::overrideEntries()` |
 | `Indicators/AeroraEnforcementIndicator.qml` | `SCR-SHL-03`. The toolbar strip that says command authorization is not enforced |
 | `Screens/AeroraOperationsHub.qml` | `SCR-SHL-01`. The overlay's honest self-report: services attached, enforcement state, audit posture |
 | `Screens/AeroraMissionProgressPage.qml` | `SCR-LIV-06`. An `AnalyzePage`: what the vehicle is flying, what the ground station holds, and whether the two agree |
@@ -35,6 +38,11 @@ Full design records, evidence and handoffs:
 `Controls/`, `Indicators/` and `Screens/` are a source-tree split only. The resource alias flattens
 every QML file to `qrc:/qml/Aerora/Controls/<Name>.qml` in one module, which is why the hub needs no
 import to reach `AeroraSelfReportRow` and why its registration URL carries no `Screens/` segment.
+
+`Overrides/` is the exception and is not part of that module. An override mirror has to keep the
+stock nested path so `AeroraQmlOverrides::mirroredResourcePath()` can find it, so those files are
+registered separately under the `/Aerora` prefix — and being outside the module directory, they
+must `import Aerora.Controls` to reach the controls above.
 
 ## What is deliberately not here
 

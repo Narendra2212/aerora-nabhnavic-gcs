@@ -35,6 +35,9 @@ constexpr const char *kCustomMapItemsPath = "/qml/QGroundControl/FlightMap/MapIt
 
 /// A stock seam path Aerora has pre-approved but has not declared. Used to assert that approval is
 /// not the same thing as declaration: an undeclared path is never intercepted.
+///
+/// SCR-LIV-01's mirror is compiled in at the corresponding `:/Aerora` path, which is what makes
+/// that assertion non-vacuous - see _aPresentMirrorIsStillNotInterceptedWithoutADeclaration().
 constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml";
 
 /// Exact logging category of AeroraQmlOverrides, from AeroraUiLog.cc. expectLogMessage() matches
@@ -160,6 +163,64 @@ void AeroraUiFoundationTest::_undeclaredResourceUrlIsNeverIntercepted()
     // Aerora keys it on an explicit declaration instead. This test is that difference: a path
     // nobody declared is returned unchanged no matter what resources the build happens to contain.
     QCOMPARE(AeroraQmlOverrides::interceptedUrlFor(url), url);
+}
+
+void AeroraUiFoundationTest::_aPresentMirrorIsStillNotInterceptedWithoutADeclaration()
+{
+    const QString stockPath = QString::fromUtf8(kUndeclaredSeamPath);
+    const QString mirrored = AeroraQmlOverrides::mirroredResourcePath(stockPath);
+
+    // The row above covers this path in the data table, but it covered it vacuously while no
+    // mirrored resource existed anywhere in the build: "not intercepted" and "nothing to intercept
+    // to" were indistinguishable. SCR-LIV-01's mirror is now compiled in, so the distinction is
+    // real and this is the assertion that uses it.
+    QVERIFY2(QFile::exists(mirrored),
+             qPrintable(QStringLiteral("this test needs the mirror to exist to mean anything: %1").arg(mirrored)));
+
+    // QGroundControl's reference overlay would intercept here, because it keys on
+    // QFile::exists(":/Custom" + path). Aerora keys on the allow-list, so a mirror that is present
+    // and undeclared is not loaded - which is what makes "no unintended interception" a property
+    // of a data structure rather than of whatever resources the build happens to contain.
+    QVERIFY(!AeroraQmlOverrides::overridePaths().contains(stockPath));
+    QVERIFY(!AeroraQmlOverrides::isOverrideCandidate(stockPath));
+
+    const QUrl stockUrl(QStringLiteral("qrc:%1").arg(stockPath));
+    QCOMPARE(AeroraQmlOverrides::interceptedUrlFor(stockUrl), stockUrl);
+}
+
+void AeroraUiFoundationTest::_flyViewOverlayMirrorDocumentCompiles()
+{
+    const QString mirrored = AeroraQmlOverrides::mirroredResourcePath(QString::fromUtf8(kUndeclaredSeamPath));
+    QVERIFY2(QFile::exists(mirrored),
+             qPrintable(QStringLiteral("the Fly View overlay mirror must be compiled in at %1").arg(mirrored)));
+
+    QQmlApplicationEngine* const engine = QGCCorePlugin::instance()->createQmlApplicationEngine(this);
+    QVERIFY(engine);
+
+    bool compiled = false;
+    QString errors;
+
+    // Scoped so the component is destroyed while its engine is still alive; QQmlComponent reads its
+    // engine back-pointer on destruction.
+    {
+        QQmlComponent component(engine, QUrl(QStringLiteral("qrc") + mirrored));
+
+        // More than a syntax check. The mirror sits outside the Aerora.Controls module directory,
+        // so it reaches the overlay's controls through `import Aerora.Controls` rather than the
+        // implicit import every Aerora screen relies on - and whether that URI resolves from the
+        // engine's qrc:/qml import path is the question this answers. It also resolves
+        // AeroraMissionProgressPanel, AeroraOverlayValueRow and every property assigned on them.
+        compiled = !component.isError();
+        errors = component.errorString();
+    }
+
+    QGCCorePlugin::instance()->destroyQmlApplicationEngine(engine);
+
+    QVERIFY2(compiled, qPrintable(errors));
+
+    // Not covered here: that the overlay loads into a real Fly View, positions itself and
+    // publishes its occluder rect. That needs the booted scene and the allow-list declaration, and
+    // lives in the Fly View scene test.
 }
 
 void AeroraUiFoundationTest::_selfCheckPassesWhenNothingIsDeclared()

@@ -143,6 +143,8 @@ set(AERORA_UI_QML_MODULE_URI "Aerora.Controls")
 
 set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraAgeLabel.qml
+    ${AERORA_UI_DIR}/Controls/AeroraMissionProgressPanel.qml
+    ${AERORA_UI_DIR}/Controls/AeroraOverlayValueRow.qml
     ${AERORA_UI_DIR}/Controls/AeroraSelfReportRow.qml
     ${AERORA_UI_DIR}/Controls/AeroraStateText.qml
     ${AERORA_UI_DIR}/Controls/AeroraTokenDisplay.qml
@@ -177,6 +179,39 @@ set(AERORA_UI_QML_FILES
 # Splitting the module per surface was considered and declined: the URI is the module boundary and
 # a second URI would need its own qt_add_qml_module target in Tab 1's file, for one screen.
 # ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Override mirrors
+#
+# These are NOT part of the Aerora.Controls module and must not be added to AERORA_UI_QML_FILES.
+# A module member is aliased to its bare name under RESOURCE_PREFIX /qml; an override mirror has to
+# keep the stock nested path under the /Aerora prefix, because AeroraQmlOverrides derives the
+# mirrored path mechanically:
+#
+#   mirroredResourcePath("/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml")
+#     == ":/Aerora/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml"
+#
+# So the aggregation point sets each mirror's resource alias to its stock path explicitly, which is
+# the shape custom-example/CMakeLists.txt:80-96 uses for its own /Custom/qml mirrors. Each mirror is
+# therefore exported under its own variable as well as in the list: the list drives
+# qt_add_resources(), the named variable is what the alias is set on.
+#
+# A mirror is inert until AeroraQmlOverrides::overrideEntries() declares its stock path. That is the
+# whole point of the allow-list: Aerora keys interception on declaration, not on resource existence,
+# so a mirror present in the build and absent from the list is never loaded.
+#
+# These files are outside the module directory, so unlike the Aerora screens they must
+# `import Aerora.Controls` to reach the overlay's own controls.
+# ----------------------------------------------------------------------------
+
+set(AERORA_UI_OVERRIDE_PREFIX "/Aerora/qml")
+
+# SCR-LIV-01. Stock path: /qml/QGroundControl/FlyView/FlyViewCustomLayer.qml
+set(AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER ${AERORA_UI_DIR}/Overrides/FlyViewCustomLayer.qml)
+
+set(AERORA_UI_OVERRIDE_QML_FILES
+    ${AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER}
+)
 
 # ----------------------------------------------------------------------------
 # Test sources
