@@ -24,7 +24,12 @@
 #       add_qgc_test(AeroraUiFoundationTest LABELS Unit)
 #       add_qgc_test(AeroraUiSafetyTest LABELS Unit)
 #       add_qgc_test(AeroraMissionProgressUITest LABELS Integration Vehicle)
-#       add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
+#       # Withheld on Windows: QmlUITestBase::startUI() aborts in the offscreen scene boot there.
+#       # The reason, and the evidence it is the harness rather than this test, is recorded at the
+#       # registration site in aerora/CMakeLists.txt.
+#       if(NOT WIN32)
+#           add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
+#       endif()
 #   endif()
 #
 # ----------------------------------------------------------------------------

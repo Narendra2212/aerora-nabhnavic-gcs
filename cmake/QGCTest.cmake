@@ -215,16 +215,17 @@ function(add_qgc_test test_name)
             #   QFontDatabase: Cannot find font directory <qt>/lib/fonts.
             #   Note that Qt no longer ships fonts.
             #
-            # An empty database yields degenerate font metrics, ScreenTools feeds those into QML
-            # sizes, and the first qreal->int size conversion trips Qt's own saturating cast in a
-            # debug build:
+            # An empty database yields degenerate font metrics, which ScreenTools then feeds into
+            # every QML size on the platform where the fewest tests exercise that path. Pointing at
+            # the system font directory is enough - Windows always has one, and it is the same set
+            # the native plugin would have used. Linux needs nothing here because the offscreen
+            # plugin picks up fontconfig.
             #
-            #   ASSERT: "value < maximalPlusOne" in qnumeric.h
-            #
-            # which fast-fails the process with 0xc0000409 before any assertion in the test runs.
-            # Pointing at the system font directory is enough - Windows always has one, and it is
-            # the same set the native plugin would have used. Linux needs nothing here because the
-            # offscreen plugin picks up fontconfig.
+            # Scope, because the obvious guess is wrong: this does **not** fix the
+            # `ASSERT: "value < maximalPlusOne" in qnumeric.h` abort that kills a QmlUITestBase
+            # scene boot on Windows. That was the hypothesis this variable was added for, and run
+            # 39215341862 disproved it - the font warning is gone and the abort is unchanged. See
+            # the AeroraSceneAttachmentUITest registration in aerora/CMakeLists.txt.
             list(APPEND _test_env "QT_QPA_FONTDIR=$ENV{SystemRoot}/Fonts")
         endif()
     endif()

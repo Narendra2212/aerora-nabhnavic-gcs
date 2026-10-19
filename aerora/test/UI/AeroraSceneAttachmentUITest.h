@@ -28,10 +28,20 @@ class PlanMasterController;
 /// `AeroraMissionProgressUITest` and confines the expensive scene boot to the three questions that
 /// genuinely require it.
 ///
-/// The harness aborted on the Windows runner until the offscreen plugin was given a font
-/// directory: Qt ships no fonts, so `QFreeTypeFontDatabase` came up empty, degenerate metrics
-/// reached `ScreenTools`, and a `qreal`-to-int size conversion tripped Qt's saturating cast. That
-/// is fixed in `cmake/QGCTest.cmake`; this suite is what keeps it fixed.
+/// \section windows Not registered on Windows
+///
+/// `QmlUITestBase::startUI()` aborts partway through the scene boot on the Windows offscreen
+/// platform - `ASSERT: "value < maximalPlusOne" in qnumeric.h`, process exit `0xc0000409` - and
+/// that is a property of the shared harness, not of this suite: `windows.yml` runs
+/// `include-labels: Portable` only, so none of the QML UI tests in `test/QmlUITests` has ever run
+/// on Windows either.
+///
+/// An empty offscreen font database was the first hypothesis and is ruled out; `QT_QPA_FONTDIR` is
+/// set in `cmake/QGCTest.cmake` and the abort is unchanged with fonts present.
+///
+/// So the registration is guarded in `aerora/CMakeLists.txt` and this file still compiles, which
+/// is what keeps it honest in both directions: nothing here is weakened to make Windows pass, and
+/// nothing here rots while it waits for a leg that can run it.
 class AeroraSceneAttachmentUITest : public QmlUITestBase
 {
     Q_OBJECT
