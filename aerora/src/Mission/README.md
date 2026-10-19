@@ -921,16 +921,33 @@ guessed list.
 because a plan belongs to a `PlanMasterController` in a view rather than to a vehicle. Binding them
 to a vehicle would invent a relationship QGroundControl does not have.
 
-Whoever owns the plan view should call them, with
-`AeroraMissionSnapshot::fromMissionItems(AeroraMissionSnapshot::GcsPlan, ...)` built from the same
-flattening `MissionController::_convertToMissionItems()` performs. Until then `gcsPlan()` is
-uncaptured and every comparison honestly returns `NotCompared`.
+**Closed.** `AeroraPlanBridge` does this. It is the plan-side counterpart to `AeroraMissionBridge`
+and the only file in this module that includes `MissionController.h` or `PlanMasterController.h`.
 
-Reach the observer through `AeroraMissionBridge::observerFor(masterController->managerVehicle())`
-and **null-check the result**. It is nullptr in two legitimate cases: a vehicle not routed to the
-Aerora firmware plugin, and the offline editing vehicle, which the composition root deliberately
-skips. Offline there is no vehicle mission to compare against in any case, so nothing is lost by
-having nowhere to report the plan.
+The role follows the controller's own `flyView` property rather than being passed in, because
+getting it wrong is the worst available failure: the Fly view's controller is a reconstruction of
+the vehicle's own mission, so reporting it as `GcsPlan` would make the observer compare the vehicle
+against itself. The Plan view's controller reports the plan and the editor selection; the Fly
+view's reports the resume candidate, which `resumeMissionIndex()` only yields there.
+
+The snapshot is built from `MissionController::flattenForUpload()`, a narrow public const accessor
+added upstream that shares `_convertToMissionItems()` with the upload path. A second flattener was
+rejected: it would drift from the real one and the comparison would then report differences the
+vehicle cannot see, which is the one failure `AeroraMissionSnapshot` exists to prevent.
+
+The observer is reached through `AeroraMissionBridge::observerFor(controller->managerVehicle())`
+and **re-resolved on every report**, never cached: the observer dies with its `Vehicle` while the
+controllers live for the whole session. nullptr is the normal case, not an error - no vehicle
+connected, a vehicle not routed to the Aerora firmware plugin, or the offline editing vehicle,
+which the composition root deliberately skips. Offline there is no vehicle mission to compare
+against in any case, so nothing is lost by having nowhere to report the plan.
+
+Attachment happens in `AeroraCorePlugin::createQmlApplicationEngine()`, on
+`QQmlApplicationEngine::objectCreated`. `PlanMasterController` is `QML_ELEMENT` with no C++
+factory, registry or singleton, so the QML object tree is the only route to one.
+`QGCCorePlugin::planCreators()` was rejected as a discovery seam: it is handed only the Plan view's
+controller, and capturing a pointer from it would be a side effect in a function whose contract is
+to return a list.
 
 ### 6. Drift detection for the resume mirror
 

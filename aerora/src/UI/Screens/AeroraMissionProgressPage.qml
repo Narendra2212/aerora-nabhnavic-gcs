@@ -51,12 +51,17 @@ import QGroundControl.AnalyzeView
 ///
 /// \section unfed Rows that are structurally not evidenced
 ///
-/// `AeroraMissionBridge` feeds the vehicle side from real `MissionManager` signals, so execution
-/// position, the on-board mission, transfer activity and the last outcome are live. The plan side
-/// is not: `reportGcsPlan()`, `reportPlanViewSelection()` and `reportResumeCandidate()` have no
-/// production caller anywhere in the overlay - only `AeroraMissionMock` calls them. The
-/// ground-station plan row says so rather than rendering an empty plan as a captured one, because
-/// "absent" and "empty" are different facts and `AeroraMissionSnapshot` keeps them apart.
+/// Both sides are now fed. `AeroraMissionBridge` feeds the vehicle side from real `MissionManager`
+/// signals, so execution position, the on-board mission, transfer activity and the last outcome are
+/// live. `AeroraPlanBridge` feeds the plan side from the two session `PlanMasterController`
+/// instances: the Plan view's reports the ground-station plan and the editor selection, the Fly
+/// view's reports the resume candidate.
+///
+/// A row can still read as not captured, and that is a reading rather than a structural gap: the
+/// plan side reports nothing while no vehicle carries an Aerora mission observer, which covers a
+/// disconnected station and the offline editing vehicle. The rows say which of the two it is
+/// instead of rendering an empty plan as a captured one, because "absent" and "empty" are
+/// different facts and `AeroraMissionSnapshot` keeps them apart.
 ///
 /// \section enums How the enum comparisons are written
 ///
@@ -211,8 +216,10 @@ AnalyzePage {
                                       + "position.").arg(candidate.sequenceNumber)
                                : qsTr("None proposed.")
                     }
-                    basis: qsTr("AeroraUi.mission.resumeCandidate. No production code calls "
-                                + "reportResumeCandidate(), so this is not evidenced in this build.")
+                    basis: qsTr("AeroraUi.mission.resumeCandidate, reported by AeroraPlanBridge from the Fly "
+                                + "view's plan controller. 'No candidate' and 'none computed' are both shown "
+                                + "as no proposal: item 0 is never rendered as one, because upstream returns 0 "
+                                + "for 'no resume available'.")
                 }
 
                 AeroraSelfReportRow {
@@ -232,9 +239,9 @@ AnalyzePage {
                                       + "aircraft's position.").arg(selection.sequenceNumber)
                                : qsTr("No editor selection reported.")
                     }
-                    basis: qsTr("AeroraUi.mission.planViewSelection. A plan belongs to a view rather than to a "
-                                + "vehicle and no production code calls reportPlanViewSelection(), so this is "
-                                + "not evidenced in this build.")
+                    basis: qsTr("AeroraUi.mission.planViewSelection, reported by AeroraPlanBridge from the Plan "
+                                + "view's controller - the only one that maintains a selection. Reported only "
+                                + "while a vehicle carries an Aerora mission observer.")
                 }
 
                 // ------------------------------------------------------------ Mission on board
@@ -373,9 +380,10 @@ AnalyzePage {
                                ? qsTr("%1 item(s), flattened as an upload would flatten them.").arg(plan.itemCount)
                                : qsTr("Not captured. The plan side has not been reported to the observer.")
                     }
-                    basis: qsTr("AeroraUi.mission.gcsPlan. A plan belongs to a PlanMasterController in a view "
-                                + "rather than to a vehicle, and no production code calls reportGcsPlan(), so "
-                                + "this side is structurally not captured in this build.")
+                    basis: qsTr("AeroraUi.mission.gcsPlan, reported by AeroraPlanBridge from the Plan view's "
+                                + "controller and flattened by the upload path's own converter, so it matches "
+                                + "what an upload would send. Uncaptured means no vehicle carries an Aerora "
+                                + "mission observer, not that the plan is empty.")
                 }
 
                 AeroraSelfReportRow {

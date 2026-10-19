@@ -26,6 +26,7 @@
 #       include(QGCTest)
 #       add_qgc_test(AeroraMissionTest LABELS Unit MissionManager)
 #       add_qgc_test(AeroraMissionSyncTest LABELS Integration Vehicle MissionManager)
+#       add_qgc_test(AeroraPlanBridgeTest LABELS Integration Vehicle MissionManager)
 #   endif()
 #
 # The list(APPEND ...) calls must come before the existing set(CUSTOM_SOURCES ... PARENT_SCOPE),
@@ -63,10 +64,20 @@
 # registration precisely to avoid one, and nothing currently registers an extension because no
 # Aerora complex item or mission command set is evidenced (Q-021, Q-023).
 #
-# The one call the application must make is AeroraMissionBridge::attachTo(vehicle), which has no
-# caller yet. Reporting that integration point rather than wiring it is deliberate: every seam that
-# could invoke it (the Aerora firmware plugin's initializeVehicle, the Aerora core plugin, or
-# MultiVehicleManager::vehicleAdded) lives in a file owned by another workstream. See README.md.
+# Two calls the application must make, both now wired:
+#
+#   * AeroraMissionBridge::attachTo(vehicle), from AeroraFirmwarePlugin::initializeVehicle() - the
+#     per-vehicle side.
+#   * AeroraPlanBridge::attachToQmlScene(rootObject), from
+#     AeroraCorePlugin::createQmlApplicationEngine() via QQmlApplicationEngine::objectCreated - the
+#     plan side. PlanMasterController is QML_ELEMENT with no C++ factory or registry, so the QML
+#     object tree is the only route to one.
+#
+# AeroraPlanBridge.cc is the only file here that includes MissionController.h or
+# PlanMasterController.h, the same way AeroraMissionBridge.cc is the only one that includes
+# Vehicle.h or MissionManager.h. It depends on one narrow upstream accessor,
+# MissionController::flattenForUpload(), which shares the upload path's own conversion so the
+# captured plan cannot drift from what an upload would send.
 #
 # ----------------------------------------------------------------------------
 # One note on include(QGCTest) in the snippet above
@@ -120,6 +131,8 @@ set(AERORA_MISSION_SOURCES
     ${AERORA_MISSION_DIR}/AeroraMissionValidationReport.h
     ${AERORA_MISSION_DIR}/AeroraMissionValidator.cc
     ${AERORA_MISSION_DIR}/AeroraMissionValidator.h
+    ${AERORA_MISSION_DIR}/AeroraPlanBridge.cc
+    ${AERORA_MISSION_DIR}/AeroraPlanBridge.h
 )
 
 set(AERORA_MISSION_INCLUDE_DIRECTORIES ${AERORA_MISSION_DIR})
@@ -149,6 +162,8 @@ set(AERORA_MISSION_TEST_SOURCES
     ${AERORA_MISSION_TEST_DIR}/AeroraMissionSyncTest.h
     ${AERORA_MISSION_TEST_DIR}/AeroraMissionTest.cc
     ${AERORA_MISSION_TEST_DIR}/AeroraMissionTest.h
+    ${AERORA_MISSION_TEST_DIR}/AeroraPlanBridgeTest.cc
+    ${AERORA_MISSION_TEST_DIR}/AeroraPlanBridgeTest.h
 )
 
 set(AERORA_MISSION_TEST_INCLUDE_DIRECTORIES
@@ -158,4 +173,4 @@ set(AERORA_MISSION_TEST_INCLUDE_DIRECTORIES
 )
 
 # CTest names, so the aggregation point can register them without reading this file.
-set(AERORA_MISSION_TEST_NAMES AeroraMissionTest AeroraMissionSyncTest)
+set(AERORA_MISSION_TEST_NAMES AeroraMissionTest AeroraMissionSyncTest AeroraPlanBridgeTest)

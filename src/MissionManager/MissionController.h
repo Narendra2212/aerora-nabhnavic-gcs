@@ -232,6 +232,16 @@ public:
     /// Sends the mission items to the specified vehicle
     static void sendItemsToVehicle(Vehicle* vehicle, QmlObjectListModel* visualMissionItems);
 
+    /// Flattens the current plan into MissionItems exactly as sendToVehicle() would, without sending.
+    ///     @param rgMissionItems Appended to. Items are allocated with @a missionItemParent as parent,
+    ///         so the caller owns them through it.
+    ///     @param missionItemParent QObject parent for the newly allocated MissionItems. Must not be null.
+    /// Shares the upload path's conversion rather than reproducing it, so a consumer comparing the
+    /// result against a downloaded mission is comparing like with like. Includes sendToVehicle()'s
+    /// settings-item-only special case: a plan holding nothing but the MissionSettingsItem flattens
+    /// to nothing, matching the empty model that path uploads so no bogus home position is written.
+    void flattenForUpload(QList<MissionItem*>& rgMissionItems, QObject* missionItemParent) const;
+
     bool loadTextFile(QFile& file, QString& errorString);
 
     QGCGeoBoundingCube* travelBoundingCube  () { return &_travelBoundingCube; }

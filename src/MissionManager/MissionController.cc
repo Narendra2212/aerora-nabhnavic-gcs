@@ -232,6 +232,22 @@ bool MissionController::_convertToMissionItems(QmlObjectListModel* visualMission
     return endActionSet;
 }
 
+void MissionController::flattenForUpload(QList<MissionItem*>& rgMissionItems, QObject* missionItemParent) const
+{
+    if (!_visualItems || !missionItemParent) {
+        return;
+    }
+
+    if (_visualItems->count() <= 1) {
+        // Matches sendToVehicle(), which uploads an empty model when only the MissionSettingsItem
+        // is present. Flattening it here instead would report a plan containing a home position
+        // that no upload would ever send.
+        return;
+    }
+
+    _convertToMissionItems(_visualItems, rgMissionItems, missionItemParent);
+}
+
 void MissionController::addMissionToKML(KMLPlanDomDocument& planKML)
 {
     QObject*            deleteParent = new QObject();

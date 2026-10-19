@@ -6,6 +6,7 @@
 #include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraCommandAuthorizer.h"
+#include "AeroraPlanBridge.h"
 #include "AeroraPlatformKeyProtector.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
@@ -59,6 +60,26 @@ QQmlApplicationEngine *AeroraCorePlugin::createQmlApplicationEngine(QObject *par
     }
 
     AeroraQmlOverrides::installOn(qmlEngine);
+
+    // Plan observation is attached from here because PlanMasterController is QML_ELEMENT with no
+    // C++ factory, registry or singleton: a pointer to one exists only inside the QML object tree.
+    // objectCreated is the first moment the Plan view's and Fly view's controllers exist. The
+    // connection is not single-shot - the engine may load more than one root - and attachTo() is
+    // idempotent per controller, so a second root cannot double-report.
+    //
+    // Deliberately not wired to planCreators(): that hook is a factory for plan creators, it is
+    // handed only the Plan view's controller, and capturing a pointer from it would be a side
+    // effect in a function whose contract is to return a list.
+    connect(qmlEngine, &QQmlApplicationEngine::objectCreated, this, [](QObject* rootObject, const QUrl& url) {
+        if (!rootObject) {
+            // The engine reports a load failure as a null object. It has already logged the
+            // reason, so restating it here would be noise.
+            return;
+        }
+
+        qCDebug(AeroraCorePluginLog) << "attaching plan observation to QML scene:" << url;
+        (void) AeroraPlanBridge::attachToQmlScene(rootObject);
+    });
 
     // The allow-list is empty in this build, so this passes trivially. It is called anyway because
     // the condition it catches - a declared override whose mirrored resource is absent - is
