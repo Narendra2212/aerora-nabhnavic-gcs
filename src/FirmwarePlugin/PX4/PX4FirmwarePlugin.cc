@@ -455,6 +455,11 @@ static void _pauseVehicleThenChangeAltResultHandler(void* resultHandlerData, int
         case Vehicle::MavCmdResultFailureDuplicateCommand:
             qCDebug(PX4FirmwarePluginLog) << "Internal Error: MAV_CMD_DO_REPOSITION could not be sent due to duplicate command";
             break;
+        case Vehicle::MavCmdResultFailureAuthorizationDenied:
+            // Refused before queuing, so the vehicle never saw it. Logged distinctly from the
+            // no-response case: this is a ground-station decision, not an unresponsive aircraft.
+            qCDebug(PX4FirmwarePluginLog) << "MAV_CMD_DO_REPOSITION refused by command authorization; not sent";
+            break;
         }
     }
 

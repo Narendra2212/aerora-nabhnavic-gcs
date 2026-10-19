@@ -301,6 +301,13 @@ void RequestMessageCoordinator::_cmdResultHandler(void* resultHandlerData_, [[ma
         case MavCmdResultFailureDuplicateCommand:
             requestMessageFailureCode = RequestMessageFailureDuplicate;
             break;
+        case MavCmdResultFailureAuthorizationDenied:
+            // The command resolved with an error result rather than timing out, so this is
+            // CommandError and not CommandNotAcked - the caller is handed MAV_RESULT_DENIED
+            // alongside it. Leaving this unmapped left the code at RequestMessageNoFailure, which
+            // reported a refused request to the caller as no failure at all.
+            requestMessageFailureCode = RequestMessageFailureCommandError;
+            break;
         }
 
         coordinator->_removeInfo(info->compId, info->msgId);

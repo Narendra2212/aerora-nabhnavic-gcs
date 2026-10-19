@@ -2309,6 +2309,12 @@ void Vehicle::_rebootCommandResultHandler(void* resultHandlerData, int /*compId*
         case MavCmdResultFailureDuplicateCommand:
             qCDebug(VehicleLog) << "MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN failed: duplicate command";
             break;
+        case MavCmdResultFailureAuthorizationDenied:
+            // Refused before queuing, so the vehicle never saw it. The operator still gets the
+            // message below; this line is what distinguishes a refusal from an unresponsive
+            // aircraft in the log.
+            qCDebug(VehicleLog) << "MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN refused by command authorization; not sent";
+            break;
         }
         QGC::showAppMessage(tr("Vehicle reboot failed."));
     } else {
