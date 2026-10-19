@@ -55,6 +55,10 @@ private slots:
     // fleet identity is withheld rather than substituted.
     void _identityPageReadsTheLiveVehicleAndWithholdsAFleetIdentity();
 
+    // SCR-SHL-01's navigation section: the operator's route from the Operations Hub to the view
+    // that hosts the Aerora setup pages, clicked rather than asserted on the registry.
+    void _vehicleConfigurationIsReachableFromTheOperationsHub();
+
 private:
     /// Clicks the sidebar entry named @a sidebarObjectName, waits for @a pageObjectName to appear,
     /// and asserts the loaded panel renders visible content.

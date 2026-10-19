@@ -24,6 +24,19 @@ constexpr const char* kServicesSidebarButton = "vehicleConfig_comp_AeroraService
 constexpr const char* kIdentityPageObject = "aeroraIdentityPage";
 constexpr const char* kServicesPageObject = "aeroraServiceDiagnosticsPage";
 
+/// The Operations Hub's Analyze entry, as AnalyzeView builds it: "analyzeButton_" plus the title
+/// from AeroraCorePlugin::analyzePages(). A rename there breaks this and should - it is the string
+/// the operator reads.
+constexpr const char* kHubAnalyzeEntryButton = "analyzeButton_Aerora Operations";
+
+/// The hub's navigation button and the flickable it sits inside. The navigation section is below
+/// fifteen report rows, so it has to be scrolled into view before it can be clicked.
+constexpr const char* kHubVehicleConfigButton = "aeroraHub_vehicleConfigButton";
+constexpr const char* kHubReportFlickable = "aeroraHub_reportFlickable";
+
+/// The Configure view's root, which is the destination the hub button claims to open.
+constexpr const char* kVehicleConfigRoot = "vehicleConfig_root";
+
 }  // namespace
 
 void AeroraVehicleConfigUITest::init()
@@ -134,6 +147,52 @@ void AeroraVehicleConfigUITest::_identityPageReadsTheLiveVehicleAndWithholdsAFle
             // "not checked" could not satisfy the fleet-identity check vacuously.
             QVERIFY2(page->property("_available").toBool(),
                      "an Aerora vehicle is connected, so the page must report its services attached");
+
+            waitForParamRefreshQuiet(vehicle);
+        });
+}
+
+void AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperationsHub()
+{
+    runWithMockLink(
+        [] { return MockLink::startGenericMockLink(); },
+        [this](QPointer<MockLink>, Vehicle* vehicle) {
+            QVERIFY(vehicle);
+
+            // The operator's route in, through the Analyze list rather than by loading the hub
+            // directly: whether the hub's entry becomes a button a person can reach is a property
+            // of the Analyze view consuming analyzePages(), which the registry cannot report.
+            QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
+                     "the Analyze view must be reachable from the tool-select dropdown");
+            QVERIFY2(clickButton(QString::fromUtf8(kHubAnalyzeEntryButton)),
+                     "the Aerora Operations entry must appear in the Analyze page list");
+
+            // Found including hidden items, then scrolled: the navigation section is at the bottom
+            // of the hub's report and starts below the fold on an offscreen-sized window.
+            QQuickItem* const navButton = findItem(_rootItem, QString::fromUtf8(kHubVehicleConfigButton));
+            QVERIFY2(navButton, "the hub must carry its Vehicle Configuration navigation button");
+            QVERIFY(scrollIntoView(navButton, QString::fromUtf8(kHubReportFlickable)));
+
+            // Enabled because a vehicle is connected. The gate is the point of the button's
+            // `enabled` binding: with no vehicle the Configure view has no sidebar to show.
+            QVERIFY(verifyEnabled(QString::fromUtf8(kHubVehicleConfigButton), true,
+                                  QStringLiteral("with an Aerora vehicle connected")));
+
+            QVERIFY2(clickButton(QString::fromUtf8(kHubVehicleConfigButton)),
+                     "the hub's Vehicle Configuration button must be clickable");
+
+            // Clicking is not navigating. Without this the test would pass against a button whose
+            // handler called a function that does not exist - which is a runtime ReferenceError in
+            // QML, not a build failure.
+            QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kVehicleConfigRoot), TestTimeout::mediumMs()),
+                     "the hub button must open the Vehicle Configuration view");
+
+            // And the destination is the one the hub's text promises: both Aerora pages are in the
+            // sidebar it just opened.
+            QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kIdentitySidebarButton), TestTimeout::mediumMs()),
+                     "the opened view must list the Aerora Identity page");
+            QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kServicesSidebarButton), TestTimeout::mediumMs()),
+                     "the opened view must list the Aerora Services page");
 
             waitForParamRefreshQuiet(vehicle);
         });

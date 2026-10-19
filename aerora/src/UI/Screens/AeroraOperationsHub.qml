@@ -59,14 +59,31 @@ import QGroundControl.AnalyzeView
 /// `QGCFlickable`, which is the pattern the upstream analyze pages already use for content taller
 /// than the view.
 ///
-/// \section nav Why there are no navigation buttons yet
+/// \section nav Navigation, and what is deliberately not a button
 ///
-/// `WP7-B` specifies the hub as the navigation root, reaching the other Aerora screens through
-/// `mainWindow.showTool()`. None of those screens exists: `SCR-VEH-*`, `SCR-LIV-*`, `SCR-SEC-*`
-/// and the rest are `DESIGNED` or `SPECIFIED-NOT-DESIGNED` under `WP7-C`. A button that opens
-/// nothing is worse than an absent one - the same reasoning `P7-FLY-004` applies to action
-/// controls - so the navigation section arrives with its first destination rather than ahead of
-/// it.
+/// `WP7-B` specifies the hub as the navigation root. It carried no navigation at first because no
+/// destination existed; three now do, so the section arrived with them - a button that opens
+/// nothing is worse than an absent one, which is the reasoning `P7-FLY-004` applies to action
+/// controls.
+///
+/// Exactly one is a button, and only because the route is a real function:
+/// `mainWindow.showVehicleConfig()` (`MainWindow.qml:161`), which is where `SCR-VEH-02` and
+/// `SCR-VEH-06` appear in the sidebar. It is gated on a connected vehicle because
+/// `VehicleConfigView` builds its whole sidebar from `_fullParameterVehicleAvailable`.
+///
+/// The other two destinations are **stated, not offered**, because no supported route exists:
+///
+/// \li `AnalyzeView` has no public API for selecting a sibling analyze page - `_loadPage()` is
+///     private and the entries are a `Repeater` over `analyzePages()`. Matching an entry by its
+///     translated title would break on the first locale change, which is the defect class upstream
+///     issue #14929 records.
+/// \li `SCR-LIV-01` is an overlay on the Fly View rather than a screen with an address, so there
+///     is nothing to navigate *to*.
+///
+/// Deep-linking to a specific Aerora setup page is possible in principle -
+/// `VehicleConfigView.showVehicleComponentPanel()` takes a component object - but reaching it means
+/// matching a `VehicleComponent` by its translated name, and that is the same locale defect. The
+/// sidebar already lists both pages once the view is open.
 ///
 /// \section reg How this screen is reached
 ///
@@ -112,6 +129,10 @@ AnalyzePage {
         id: pageComponent
 
         QGCFlickable {
+            // Test hook. The navigation section is below fifteen report rows, so a scene test has
+            // to scroll it into view before it can be clicked.
+            objectName: "aeroraHub_reportFlickable"
+
             width: root.availableWidth
             height: root.availableHeight
             contentHeight: reportColumn.height
@@ -335,13 +356,58 @@ AnalyzePage {
                                 + "parsed and no product family is named here.")
                 }
 
+                // ------------------------------------------------------------ Navigation
+
+                QGCLabel {
+                    text: qsTr("Aerora screens")
+                    font.bold: true
+                }
+
+                QGCButton {
+                    objectName: "aeroraHub_vehicleConfigButton"
+                    text: qsTr("Open Vehicle Configuration")
+                    // Gated on a vehicle, not on the Aerora pages: VehicleConfigView builds its
+                    // whole sidebar from _fullParameterVehicleAvailable, so with no vehicle this
+                    // opens a view with nothing in it. A button that opens an empty view is the
+                    // thing P7-FLY-004 argues against, so it is disabled with the reason stated
+                    // below rather than offered and useless.
+                    enabled: root._servicesAvailable
+                    onClicked: mainWindow.showVehicleConfig()
+                }
+
+                QGCLabel {
+                    Layout.fillWidth: true
+                    text: root._servicesAvailable
+                          ? qsTr("Aerora Identity and Aerora Services appear in the configuration sidebar. Both "
+                                 + "are read-only.")
+                          : qsTr("Disabled: no Aerora vehicle is connected, so the configuration view would "
+                                 + "have no pages to show.")
+                    color: qgcPal.colorGrey
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    wrapMode: Text.WordWrap
+                }
+
+                QGCLabel {
+                    Layout.fillWidth: true
+                    // Stated rather than offered as a button. AnalyzeView exposes no supported way
+                    // to select a sibling analyze page - _loadPage() is private and the entries are
+                    // a Repeater over analyzePages() - and matching one by its translated title
+                    // would break the moment the locale changes. The operator is already in the
+                    // list that contains it.
+                    text: qsTr("Aerora Mission Progress is in the Analyze list alongside this screen. The Live "
+                               + "Operations overlay appears in Fly View while an Aerora vehicle is connected.")
+                    color: qgcPal.colorGrey
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    wrapMode: Text.WordWrap
+                }
+
                 // ------------------------------------------------------------ Scope of this screen
 
                 QGCLabel {
                     Layout.fillWidth: true
-                    text: qsTr("This screen reports the station's own configuration. It is observation and "
-                               + "supervision only and carries no control: nothing on it commands the "
-                               + "aircraft, changes a policy, or alters what is recorded.")
+                    text: qsTr("This screen reports the station's own configuration. Apart from the navigation "
+                               + "above it carries no control: nothing on it commands the aircraft, changes a "
+                               + "policy, or alters what is recorded.")
                     color: qgcPal.colorGrey
                     font.pointSize: ScreenTools.smallFontPointSize
                     wrapMode: Text.WordWrap
