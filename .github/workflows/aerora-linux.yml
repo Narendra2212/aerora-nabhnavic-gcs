@@ -1,0 +1,268 @@
+name: Aerora Linux
+
+# The overlay's Linux test leg, and the only leg that can run the QML scene tests.
+#
+# aerora-windows.yml carries the shared rationale for an overlay-owned CI leg (Debug only, no
+# packaging, GitHub-hosted runner, `^Aerora` name scoping) and is the file to read first. This one
+# exists because of a constraint that is specific to the harness rather than to the overlay:
+#
+#   * QmlUITestBase::startUI() aborts partway through the offscreen scene boot on Windows
+#     (`ASSERT: "value < maximalPlusOne" in qnumeric.h`, exit 0xc0000409). That path has never run
+#     on Windows in this project - windows.yml runs `include-labels: Portable` only - so the ~25
+#     QmlUITestBase suites in test/QmlUITests have only ever been exercised on Linux, under
+#     xvfb with Mesa llvmpipe. AeroraSceneAttachmentUITest is registered off Windows for that
+#     reason (aerora/CMakeLists.txt), which left it running nowhere until this leg existed.
+#
+# Two differences from aerora-windows.yml, both platform facts rather than choices:
+#
+#   * install-dependencies is required, not optional. It installs xvfb, xauth and
+#     libgl1-mesa-dri (tools/setup/install_dependencies/_packages.py), and
+#     cmake_helper.py::_maybe_wrap_xvfb then prefixes `xvfb-run -a` whenever DISPLAY is unset. No
+#     workflow-level display setup is needed, and none is added here.
+#   * No QT_FORCE_STDERR_LOGGING. That variable exists because a Windows GUI-subsystem binary
+#     routes QTest output to OutputDebugStringA; Linux has a POSIX stderr and never takes that
+#     branch.
+#
+# Every pinned version comes from .github/build-config.json via build-setup. Nothing is restated
+# here, so this workflow cannot drift from the project's single source of truth.
+
+# The two `paths` lists are duplicated rather than shared: GitHub Actions does not support YAML
+# anchors. Keep them in sync, and in sync with aerora-windows.yml.
+on:
+  push:
+    branches:
+      - 'aerora/**'
+    paths:
+      - 'aerora/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+      - '.github/build-config.json'
+      - '.github/workflows/aerora-linux.yml'
+  pull_request:
+    paths:
+      - 'aerora/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+      - '.github/build-config.json'
+      - '.github/workflows/aerora-linux.yml'
+  workflow_dispatch:
+    inputs:
+      debug_runner:
+        description: 'Open an actor-only SSH session after a failure (up to 15 minutes, branches only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Aerora Overlay x64 Debug
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      actions: read
+      # checks: write lets test-report publish the JUnit summary (as in linux.yml).
+      checks: write
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Record build timeline
+        uses: Kesin11/actions-timeline@v3
+        continue-on-error: true
+        with:
+          show-waiting-runner: true
+
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build Setup
+        uses: ./.github/actions/build-setup
+        with:
+          qt-host: linux
+          qt-arch: linux_gcc_64
+          build-type: Debug
+          cache-variant: aerora
+          cache-key-suffix: aerora-linux-debug
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+
+      # The preset is the single source of truth for QGC_CUSTOM_DIR=aerora and the Debug/test
+      # configuration; it is not restated as extra-args. The assertion step below fails the job if
+      # that wiring ever stops taking effect.
+      - name: Configure
+        uses: ./.github/actions/cmake-configure
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          preset: Aerora-Linux-debug
+          testing: 'true'
+
+      - name: Read overlay configuration
+        id: overlay
+        run: |
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/cmake_helper.py" cache-var \
+            --build-dir "${RUNNER_TEMP}/build" \
+            --name QGC_CUSTOM_DIR \
+            --required \
+            --output-key custom_dir
+
+      # R7-02 / ADR-012: QGC_CUSTOM_BUILD is a plain CMake variable, not a cache entry, so it
+      # cannot be read back from CMakeCache.txt. Its only observable effect is the compile
+      # definitions src/CMakeLists.txt applies inside `if(QGC_CUSTOM_BUILD)`. Asserting those
+      # proves the overlay actually attached: without this check it can silently fall out of the
+      # build - still compiling, still linking - while QGCCorePlugin::instance() stops routing
+      # through AeroraCorePlugin and the authorization gate is never consulted.
+      - name: Assert the Aerora overlay is active
+        env:
+          BUILD_DIR: ${{ runner.temp }}/build
+          CUSTOM_DIR: ${{ steps.overlay.outputs.custom_dir }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${CUSTOM_DIR}" != "aerora" ]]; then
+            echo "::error::QGC_CUSTOM_DIR is '${CUSTOM_DIR}', expected 'aerora'"
+            exit 1
+          fi
+
+          # Ninja emits compile flags inline in build.ninja but can spill long command lines into
+          # response files, so both are searched rather than assuming a layout.
+          generated="$(find "${BUILD_DIR}" -type f \( -name build.ninja -o -name '*.rsp' \) | wc -l)"
+          if [[ "${generated}" -eq 0 ]]; then
+            echo "::error::No generated build files found under ${BUILD_DIR}"
+            exit 1
+          fi
+          echo "Searching ${generated} generated build file(s)"
+
+          # Set by aerora/CMakeLists.txt via CUSTOM_DEFINITIONS and applied to the application
+          # target by src/CMakeLists.txt only when QGC_CUSTOM_BUILD is ON. Substring matches: the
+          # surrounding quoting and -D spelling are generator- and compiler-specific.
+          failed=0
+          for define in \
+            'QGC_CUSTOM_BUILD' \
+            'CUSTOMCLASS=AeroraCorePlugin' \
+            'CUSTOMHEADER=' \
+            'AERORA_VEHICLE_FACTGROUP_FRIENDSHIP'
+          do
+            if grep -rqF --include=build.ninja --include='*.rsp' -- "${define}" "${BUILD_DIR}"; then
+              echo "ok: ${define}"
+            else
+              echo "::error::Overlay compile definition missing from the generated build: ${define}"
+              failed=1
+            fi
+          done
+
+          if [[ "${failed}" -ne 0 ]]; then
+            echo "::error::QGC_CUSTOM_BUILD did not take effect; the Aerora overlay is not attached."
+            exit 1
+          fi
+
+      - name: Build
+        id: build
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+
+      # The acceptance check for this whole workflow. ctest -N resolves the same selection the
+      # integration step runs, so a test that is silently unregistered - the `if(NOT WIN32)` guard
+      # misfiring, a label typo, a dropped source - fails here with the reason instead of being
+      # reported as a pass by a selection that never contained it.
+      - name: Assert the scene UI test is selected
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        working-directory: ${{ runner.temp }}/build
+        run: |
+          set -euo pipefail
+          listing="$(ctest -N -R '^AeroraSceneAttachmentUITest$' -L Integration)"
+          echo "${listing}"
+          if ! grep -q 'Total Tests: 1' <<< "${listing}"; then
+            echo "::error::AeroraSceneAttachmentUITest is not registered as an Integration test."
+            echo "::error::It would not run, and the suite below would pass without it."
+            exit 1
+          fi
+
+      # cmake_helper.py always passes --no-tests=error, so a regex that selects nothing fails the
+      # job rather than reporting a vacuous pass.
+      - name: Run Aerora unit tests
+        id: unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: ./.github/actions/run-unit-tests
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          tests-regex: '^Aerora'
+          include-labels: Unit
+          junit-output: junit-aerora-unit.xml
+          ctest-output: aerora-unit-output.txt
+
+      - name: Report Aerora unit tests
+        if: ${{ !cancelled() && steps.unit.outcome != 'skipped' && steps.unit.outcome != '' }}
+        uses: ./.github/actions/test-report
+        with:
+          name: Aerora unit tests (linux)
+          build-dir: ${{ runner.temp }}/build
+          junit-file: junit-aerora-unit.xml
+          output-file: aerora-unit-output.txt
+          artifact-name: test-results-aerora-unit-linux
+          retention-days: 7
+
+      # Serialized: the Vehicle-labelled integration tests hold CTest resource locks, and the
+      # scene tests boot a full QML window each.
+      - name: Run Aerora integration tests
+        id: integration
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: ./.github/actions/run-unit-tests
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          tests-regex: '^Aerora'
+          include-labels: Integration
+          parallel: '1'
+          junit-output: junit-aerora-integration.xml
+          ctest-output: aerora-integration-output.txt
+
+      - name: Report Aerora integration tests
+        if: ${{ !cancelled() && steps.integration.outcome != 'skipped' && steps.integration.outcome != '' }}
+        uses: ./.github/actions/test-report
+        with:
+          name: Aerora integration tests (linux)
+          build-dir: ${{ runner.temp }}/build
+          junit-file: junit-aerora-integration.xml
+          output-file: aerora-integration-output.txt
+          artifact-name: test-results-aerora-integration-linux
+          retention-days: 7
+
+      - name: Debug failed runner
+        if: ${{ failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.debug_runner && github.ref_type == 'branch' }}
+        timeout-minutes: 15
+        uses: ./.github/actions/debug-runner
