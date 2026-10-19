@@ -21,6 +21,7 @@
 #include "AeroraMissionSnapshot.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
+#include "AeroraTelemetryState.h"
 #include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleServices.h"
 #include "AeroraVehicleUiContext.h"
@@ -54,6 +55,10 @@ constexpr const char *kUiLogCategory = "Aerora.Ui";
 /// the engine's view of the same file cannot drift in step.
 constexpr const char* kIdentityPageFile = "AeroraIdentityPage.qml";
 constexpr const char* kServiceDiagnosticsPageFile = "AeroraServiceDiagnosticsPage.qml";
+
+/// SCR-HLP-02's page. An AnalyzePage rather than a SetupPage, but the compile check is the same
+/// question - whether the document's types and property names resolve - so it shares the slot.
+constexpr const char* kStateVocabularyPageFile = "AeroraStateVocabularyPage.qml";
 
 /// Resolves one of the three meta-objects AeroraMissionProgressPage.qml binds to, by class name.
 ///
@@ -248,6 +253,57 @@ void AeroraUiFoundationTest::_flyViewOverlayMirrorDocumentCompiles()
     // Not covered here: that the overlay loads into a real Fly View, positions itself and
     // publishes its occluder rect. That needs the booted scene and lives in
     // AeroraFlyViewOverlayUITest.
+}
+
+void AeroraUiFoundationTest::_stateVocabularyPageListsEveryStateClass()
+{
+    const QMetaObject* const meta = &AeroraTelemetryState::staticMetaObject;
+
+    const int enumIndex = meta->indexOfEnumerator("Class");
+    QVERIFY2(enumIndex >= 0, "AeroraTelemetryState.Class does not resolve");
+    const QMetaEnum classEnum = meta->enumerator(enumIndex);
+
+    // Exactly the enumerators AeroraStateVocabularyPage.qml names in its _classes list, in the
+    // same order - declaration order, which is the order the vocabulary is defined in and the
+    // order the page presents.
+    const QStringList pageClasses({QStringLiteral("Unknown"), QStringLiteral("Unavailable"), QStringLiteral("Reported"),
+                                   QStringLiteral("Effective"), QStringLiteral("Requested"), QStringLiteral("Proposed"),
+                                   QStringLiteral("Stale")});
+
+    QStringList declaredClasses;
+    declaredClasses.reserve(classEnum.keyCount());
+    for (int i = 0; i < classEnum.keyCount(); ++i) {
+        declaredClasses.append(QString::fromUtf8(classEnum.key(i)));
+    }
+
+    // Compared as an ordered list rather than a count or a set. A count would be satisfied by a
+    // rename, and a set by a reordering - and the page renders them in order, so the order is part
+    // of what it claims.
+    QCOMPARE(declaredClasses, pageClasses);
+
+    // The page renders each class through the four predicates and classToString(), so those have
+    // to answer for every enumerator rather than only the ones a test happened to name.
+    for (int i = 0; i < classEnum.keyCount(); ++i) {
+        const auto stateClass = static_cast<AeroraTelemetryState::Class>(classEnum.value(i));
+
+        QVERIFY2(!AeroraTelemetryState::classToString(stateClass).isEmpty(),
+                 qPrintable(QStringLiteral("classToString() returns nothing for %1, so the vocabulary page "
+                                           "would render a nameless row")
+                                .arg(QString::fromUtf8(classEnum.key(i)))));
+
+        // Called for their total function-ness rather than their answers: the page branches on all
+        // four for every class, and a predicate that asserted or returned garbage for a class
+        // nobody had passed it would surface here rather than on screen.
+        (void) AeroraTelemetryState::isAuthoritative(stateClass);
+        (void) AeroraTelemetryState::isCurrent(stateClass);
+        (void) AeroraTelemetryState::isSubordinate(stateClass);
+        (void) AeroraTelemetryState::isNonValue(stateClass);
+    }
+
+    // The one class whose treatment the page calls out in words, because AeroraStateText renders it
+    // by making itself invisible and the resulting blank cell would otherwise read as a fault.
+    QVERIFY2(AeroraTelemetryState::isNonValue(AeroraTelemetryState::Unavailable),
+             "UNAVAILABLE must carry no value; the page's empty sample cell depends on it");
 }
 
 void AeroraUiFoundationTest::_selfCheckResolvesTheDeclaredOverride()
@@ -628,15 +684,16 @@ void AeroraUiFoundationTest::_identityPagePropertiesResolve()
             QStringLiteral("AeroraIdentityPage.qml reads AeroraUi.identity.%1").arg(QString::fromUtf8(propertyName))));
 }
 
-void AeroraUiFoundationTest::_setupPageDocumentsCompile_data()
+void AeroraUiFoundationTest::_aeroraPageDocumentsCompile_data()
 {
     QTest::addColumn<QByteArray>("pageFile");
 
     QTest::newRow("identity") << QByteArray(kIdentityPageFile);
     QTest::newRow("service diagnostics") << QByteArray(kServiceDiagnosticsPageFile);
+    QTest::newRow("state vocabulary") << QByteArray(kStateVocabularyPageFile);
 }
 
-void AeroraUiFoundationTest::_setupPageDocumentsCompile()
+void AeroraUiFoundationTest::_aeroraPageDocumentsCompile()
 {
     QFETCH(QByteArray, pageFile);
 
@@ -675,12 +732,13 @@ void AeroraUiFoundationTest::_setupPageDocumentsCompile()
 
     QVERIFY2(compiled, qPrintable(errors));
 
-    // What this does *not* cover: no binding is evaluated, because create() is never called.
-    // SetupPage.qml reads `globals` and `vehicleComponent` from context that only
-    // VehicleConfigView's Loader supplies, so instantiating a page here would report that absence
-    // as a failure of the page, and supplying a stand-in would assert the stand-in. Binding
-    // evaluation and rendering are covered instead by AeroraVehicleConfigUITest, which loads both
-    // pages through the real Configure view in a booted scene.
+    // What this does *not* cover: no binding is evaluated, because create() is never called. Both
+    // base classes read from context their real host supplies - SetupPage reads `globals` and
+    // `vehicleComponent` from VehicleConfigView's Loader, AnalyzePage reads `qgcPal` from the
+    // Analyze view - so instantiating a page here would report that absence as a failure of the
+    // page, and supplying a stand-in would assert the stand-in. Binding evaluation and rendering
+    // are covered in a booted scene instead: the setup pages by AeroraVehicleConfigUITest, the
+    // Analyze pages by AeroraSceneAttachmentUITest.
 }
 
 void AeroraUiFoundationTest::_missionGadgetValuesAreReadableFromQml_data()

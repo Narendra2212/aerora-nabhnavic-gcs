@@ -63,6 +63,11 @@ private slots:
     // The operator-facing route: Analyze menu -> the Aerora entry -> the page actually loads.
     void _missionProgressPageIsReachableFromTheAnalyzeMenu();
 
+    // SCR-HLP-02, by the same route. Its content is derived from AeroraTelemetryState at runtime,
+    // so a page that loaded with an empty class list would look like a working screen - this
+    // asserts the rows are actually there.
+    void _stateVocabularyPageIsReachableAndRendersEveryClass();
+
 private:
     /// @return The scene's controller for @a flyView, or nullptr when absent.
     PlanMasterController* _sceneController(bool flyView);

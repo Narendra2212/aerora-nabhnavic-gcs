@@ -156,6 +156,7 @@ set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Screens/AeroraMissionProgressPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
     ${AERORA_UI_DIR}/Screens/AeroraServiceDiagnosticsPage.qml
+    ${AERORA_UI_DIR}/Screens/AeroraStateVocabularyPage.qml
 )
 
 # ----------------------------------------------------------------------------

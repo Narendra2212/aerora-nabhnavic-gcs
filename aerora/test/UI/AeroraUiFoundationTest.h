@@ -66,6 +66,13 @@ private slots:
     // a missing item in the Fly View scene test.
     void _flyViewOverlayMirrorDocumentCompiles();
 
+    // SCR-HLP-02 - the state vocabulary page claims to be derived from AeroraTelemetryState rather
+    // than a written copy of it. QML cannot enumerate a Q_ENUM's keys, so the page lists the seven
+    // enumerators by name, and this is what holds that list to the meta-object: a class added,
+    // renamed or removed in C++ must fail here rather than leave the one screen that teaches the
+    // vocabulary quietly incomplete.
+    void _stateVocabularyPageListsEveryStateClass();
+
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
     // startup self-check reads, so an interface quietly missing its Aerora layer is detectable
     // rather than merely wrong. These are the tests that fail if the AeroraCorePlugin overrides
@@ -117,8 +124,8 @@ private slots:
     // published purely on its resource existing, so a document that does not compile would be
     // offered in the Vehicle Configuration view and fail when clicked, with nothing upstream of
     // the click able to report it.
-    void _setupPageDocumentsCompile_data();
-    void _setupPageDocumentsCompile();
+    void _aeroraPageDocumentsCompile_data();
+    void _aeroraPageDocumentsCompile();
 
     // Gadget value access through a real QML engine, not through the meta-object.
     //

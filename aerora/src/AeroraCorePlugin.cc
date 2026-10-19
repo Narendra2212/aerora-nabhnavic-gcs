@@ -133,6 +133,14 @@ const QVariantList &AeroraCorePlugin::analyzePages()
             tr("Aerora Mission Progress"),
             QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraMissionProgressPage.qml")))));
 
+        // SCR-HLP-02. Vehicle-independent in the strongest sense of the three: it is reference
+        // material derived from AeroraTelemetryState's own enumeration and predicates, and reads no
+        // vehicle at all. Gating it on a connection would withhold the vocabulary from an operator
+        // reading it to prepare for one.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora State Vocabulary"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraStateVocabularyPage.qml")))));
+
         return list;
     }();
 
