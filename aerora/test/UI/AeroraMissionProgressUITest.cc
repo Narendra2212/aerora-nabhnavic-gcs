@@ -186,10 +186,14 @@ void AeroraMissionProgressUITest::_livePlanAndSelectionReachTheObserverAndThePag
     controller->removeAll();
     QVERIFY(missionController->insertSimpleMissionItem(kWaypoint, -1 /* append */));
 
-    // Reported through the bridge's coalescing timer, so this waits rather than reading straight
-    // away: a synchronous read would be asserting the timer's interval instead of the behaviour.
-    QVERIFY(UnitTest::waitForCondition([observer]() { return observer->gcsPlan().isCaptured(); },
-                                       TestTimeout::mediumMs(), QStringLiteral("the plan to reach the observer")));
+    // Waits on the item count, not on isCaptured(). attachTo() has already reported the
+    // controller's initial state, and that snapshot is captured *and empty* - a settings-item-only
+    // plan flattens to nothing. Waiting on isCaptured() therefore returns immediately against the
+    // pre-edit snapshot and asserts nothing about the edit, which is exactly the stale read this
+    // suite is here to rule out.
+    QVERIFY(UnitTest::waitForCondition([observer]() { return observer->gcsPlan().itemCount() > 0; },
+                                       TestTimeout::mediumMs(),
+                                       QStringLiteral("the edited plan to reach the observer")));
 
     const AeroraMissionSnapshot plan = observer->gcsPlan();
     QCOMPARE(plan.origin(), AeroraMissionSnapshot::GcsPlan);
