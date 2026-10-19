@@ -205,6 +205,28 @@ function(add_qgc_test test_name)
         # GLX path (under xvfb, see cmake_helper.py) onto Mesa llvmpipe, no GPU needed.
         list(PREPEND _test_env "QT_QPA_PLATFORM=offscreen" "QT_QUICK_BACKEND=software"
              "LIBGL_ALWAYS_SOFTWARE=1")
+
+        if(WIN32)
+            # The offscreen plugin does not use the native Windows font database - it uses
+            # QFreeTypeFontDatabase, which looks in QT_QPA_FONTDIR and falls back to
+            # <QtLibrariesPath>/fonts. Qt has not shipped fonts since 6.x, so on a CI Qt install
+            # that fallback directory does not exist and the font database comes up *empty*:
+            #
+            #   QFontDatabase: Cannot find font directory <qt>/lib/fonts.
+            #   Note that Qt no longer ships fonts.
+            #
+            # An empty database yields degenerate font metrics, ScreenTools feeds those into QML
+            # sizes, and the first qreal->int size conversion trips Qt's own saturating cast in a
+            # debug build:
+            #
+            #   ASSERT: "value < maximalPlusOne" in qnumeric.h
+            #
+            # which fast-fails the process with 0xc0000409 before any assertion in the test runs.
+            # Pointing at the system font directory is enough - Windows always has one, and it is
+            # the same set the native plugin would have used. Linux needs nothing here because the
+            # offscreen plugin picks up fontconfig.
+            list(APPEND _test_env "QT_QPA_FONTDIR=$ENV{SystemRoot}/Fonts")
+        endif()
     endif()
 
     # LSan's tracer process needs ptrace, which Yama (ptrace_scope>=1) blocks on
