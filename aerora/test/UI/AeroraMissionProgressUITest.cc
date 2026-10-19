@@ -201,8 +201,14 @@ void AeroraMissionProgressUITest::_livePlanAndSelectionReachTheObserverAndThePag
 
     // Selection, which is the operator's cursor and never the aircraft's position.
     missionController->setCurrentPlanViewSeqNum(1, true /* force */);
-    QVERIFY(UnitTest::waitForCondition([observer]() { return observer->planViewSelection().isKnown(); },
-                                       TestTimeout::mediumMs(), QStringLiteral("the selection to reach the observer")));
+    const int expectedSeqNum = missionController->currentPlanViewSeqNum();
+
+    // Waits for the value just set, not merely for isKnown(). MissionController::start() seeds the
+    // selection to 0 on a Plan view controller, and 0 is a known index, so isKnown() was already
+    // true before this edit - the same stale read the plan wait above avoids.
+    QVERIFY(UnitTest::waitForCondition(
+        [observer, expectedSeqNum]() { return observer->planViewSelection().sequenceNumber() == expectedSeqNum; },
+        TestTimeout::mediumMs(), QStringLiteral("the edited selection to reach the observer")));
 
     const AeroraMissionIndex selection = observer->planViewSelection();
     QCOMPARE(selection.sequenceNumber(), missionController->currentPlanViewSeqNum());
