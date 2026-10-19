@@ -397,7 +397,14 @@ bool GPSCorrectionRouter::_submit(const GPSCorrectionFrame& frame, bool selected
             _ledger.recordDrop(frame, submissionFailure, frame.data.size(), it.key(), 0, false);
             continue;
         }
-        _admission.emplace();
+        // Assigned rather than emplace()d. libstdc++ constrains optional::emplace() on
+        // is_constructible_v<AdmissionContext>, which clang-18 does not satisfy for this private
+        // nested aggregate, so the call has no viable overload and the Linux build fails while
+        // MSVC accepts it. Assignment is equivalent here and not merely similar: _finishAdmission()
+        // runs std::exchange(_admission, std::nullopt) at the end of every admission, so the
+        // optional is always disengaged at this point and operator=(U&&) direct-constructs exactly
+        // as emplace() would, with no engaged value to assign over.
+        _admission = AdmissionContext{};
         _admission->deliveryId = frame.deliveryId;
         const auto finishAdmission = qScopeGuard([guard] {
             if (guard) {
