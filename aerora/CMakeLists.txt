@@ -262,6 +262,9 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraTelemetryAttachmentTest LABELS Unit)
     add_qgc_test(AeroraUiFoundationTest LABELS Unit)
     add_qgc_test(AeroraUiSafetyTest LABELS Unit)
+    # Boots a real application scene via QmlUITestBase, so it carries the same labels and timeout
+    # the core QML UI tests use (test/QmlUITests/CMakeLists.txt).
+    add_qgc_test(AeroraMissionProgressUITest LABELS Integration NoSanitizer TIMEOUT 180)
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
     add_qgc_test(AeroraVehicleSetupTest LABELS Unit)
