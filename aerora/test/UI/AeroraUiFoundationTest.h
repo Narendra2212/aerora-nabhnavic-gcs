@@ -23,12 +23,19 @@
 ///
 /// Four of these are prohibition tests and they name the regression they catch:
 ///
-/// \li an override declared by accident, which would silently fork a populated upstream file;
+/// \li an override of a **populated** upstream file, which would silently fork it - the declared
+///     set is spelled out by path and tier, so a swap is a failure rather than a count that still
+///     adds up;
 /// \li an override of `CustomMapItems.qml`, which reads as a purpose-built seam and is not one;
-/// \li interception of a URL Aerora never declared, which would silently replace upstream
-///     behaviour with no error of any kind;
+/// \li interception of a URL Aerora never declared, including the two action seams that stay
+///     undeclared while no Aerora action can be authorized (`Q-029`);
 /// \li a string-keyed service lookup appearing on the QML surface, which would let the interface
 ///     reach any service attached later with no review of its QML surface.
+///
+/// One override is declared - `FlyViewCustomLayer.qml`, carrying `SCR-LIV-01` - so the interception
+/// group now has a positive control as well. That matters more than it sounds: while the allow-list
+/// was empty, every test in it could only assert that nothing happened, and a rule that never
+/// rewrote any URL at all would have satisfied the lot.
 ///
 /// One test covers a third seam: the names `AeroraEnforcementIndicator.qml` binds to on the
 /// `AeroraSecurity` singleton. The strip itself is QML and cannot be loaded here - that needs the
@@ -41,7 +48,7 @@ class AeroraUiFoundationTest : public UnitTest
 
 private slots:
     // Q7-003 - the override allow-list, and the tier discipline it enforces.
-    void _noOverrideIsDeclared();
+    void _exactlyOnePurposeBuiltSeamIsDeclared();
     void _customMapItemsIsForbiddenAndUndeclared();
     void _mirroredResourcePathMirrorsTheStockPath_data();
     void _mirroredResourcePathMirrorsTheStockPath();
@@ -51,12 +58,12 @@ private slots:
     void _nonResourceUrlPassesThroughUnchanged();
     void _undeclaredResourceUrlIsNeverIntercepted_data();
     void _undeclaredResourceUrlIsNeverIntercepted();
-    void _aPresentMirrorIsStillNotInterceptedWithoutADeclaration();
-    void _selfCheckPassesWhenNothingIsDeclared();
+    void _theDeclaredSeamResolvesToTheAeroraMirror();
+    void _selfCheckResolvesTheDeclaredOverride();
 
-    // SCR-LIV-01 - the Fly View overlay mirror. Registered under the /Aerora override prefix and
-    // inert until its stock path is declared, so nothing loads it yet and no other test would
-    // notice if it stopped compiling.
+    // SCR-LIV-01 - the Fly View overlay mirror compiles as a document. Cheap, and it localises the
+    // failure: a break in the overlay fails here with a QML error string, rather than surfacing as
+    // a missing item in the Fly View scene test.
     void _flyViewOverlayMirrorDocumentCompiles();
 
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015

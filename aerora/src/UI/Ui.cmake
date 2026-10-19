@@ -30,6 +30,7 @@
 #       if(NOT WIN32)
 #           add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
 #           add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
+#           add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
 #       endif()
 #   endif()
 #
@@ -229,6 +230,8 @@ set(AERORA_UI_TEST_DIR ${AERORA_UI_DIR}/../../test/UI)
 cmake_path(NORMAL_PATH AERORA_UI_TEST_DIR)
 
 set(AERORA_UI_TEST_SOURCES
+    ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.cc
+    ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.h
     ${AERORA_UI_TEST_DIR}/AeroraMissionProgressUITest.cc
     ${AERORA_UI_TEST_DIR}/AeroraMissionProgressUITest.h
     ${AERORA_UI_TEST_DIR}/AeroraSceneAttachmentUITest.cc
@@ -254,6 +257,7 @@ set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
 )
 
 set(AERORA_UI_TEST_NAMES
+    AeroraFlyViewOverlayUITest
     AeroraMissionProgressUITest
     AeroraSceneAttachmentUITest
     AeroraUiFoundationTest

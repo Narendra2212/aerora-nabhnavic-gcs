@@ -43,27 +43,37 @@ QQmlApplicationEngine *s_engine = nullptr;
 QList<AeroraQmlOverrides::OverrideEntry> AeroraQmlOverrides::overrideEntries()
 {
     // ------------------------------------------------------------------------------------------
-    // EMPTY BY DESIGN. Aerora overrides no upstream QML file in this build.
+    // ONE ENTRY. Adding another is a deliberate, reviewable act.
     //
-    // Adding an entry is a deliberate, reviewable act. The three upstream purpose-built seams are
-    // listed below as the only pre-approved candidates, commented out because no Aerora content
-    // exists to put behind them:
+    // FlyViewCustomLayer.qml carries SCR-LIV-01, the Aerora Live Operations overlay. Upstream
+    // ships the file as an empty, purpose-built seam - an `Item` with three `property var`
+    // declarations and no content - and documents it as the override point for a custom overlay,
+    // so this is Tier::PurposeBuiltSeam and forks nothing populated. Nothing upstream is
+    // discarded by replacing it.
     //
-    //   {QStringLiteral("/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml"),
-    //       Tier::PurposeBuiltSeam},               instantiated at src/FlyView/FlyView.qml:145
-    //   {QStringLiteral("/qml/QGroundControl/FlyView/CustomGuidedActionsController.qml"),
-    //       Tier::PurposeBuiltSeam},               instantiated at GuidedActionsController.qml:187
-    //   {QStringLiteral("/qml/QGroundControl/FlyView/FlyViewAdditionalCustomActionsList.qml"),
-    //       Tier::PurposeBuiltSeam},               FlyViewAdditionalActionsButton.qml:28
+    // The scope of the declaration is read-only display. The overlay behind it has no clickable
+    // control, no command path and no call to AeroraMissionObserver::verify(); a scene test
+    // asserts the absence structurally rather than by review.
     //
-    // The guided-actions and additional-actions seams must stay unused until an Aerora action has
-    // an authorized command path: both exist to introduce operator actions, and no Aerora action
-    // can be executed in this build.
+    // The other two pre-approved seams stay UNDECLARED, and the reason is not that no content
+    // exists for them - it is that both exist to introduce operator *actions*:
+    //
+    //   /qml/QGroundControl/FlyView/CustomGuidedActionsController.qml
+    //       GuidedActionsController.qml:187
+    //   /qml/QGroundControl/FlyView/FlyViewAdditionalCustomActionsList.qml
+    //       FlyViewAdditionalActionsButton.qml:28
+    //
+    // No Aerora action can be executed in this build - the authorization gate evaluates nothing
+    // while the operator role set is undecided (Q-029) - so declaring either would put an action
+    // surface in front of an operator with no decision behind it.
     //
     // A Tier::PopulatedFile entry additionally requires a recorded reason, a fork-point commit and
-    // a named owner before it is added (IF-UIS-012, AERORA-UI-REQ-005, Q-038).
+    // a named owner before it is added (IF-UIS-012, AERORA-UI-REQ-005, Q-038). There are none, and
+    // populatedFileOverrideCount() is asserted to be zero.
     // ------------------------------------------------------------------------------------------
-    return {};
+    return {
+        {QStringLiteral("/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml"), Tier::PurposeBuiltSeam},
+    };
 }
 
 QStringList AeroraQmlOverrides::overridePaths()

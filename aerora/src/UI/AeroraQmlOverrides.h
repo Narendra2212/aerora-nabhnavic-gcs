@@ -45,11 +45,12 @@ class QQmlApplicationEngine;
 /// compile-time list, and a path outside it is never rewritten however many resources exist. That
 /// makes "no unintended interception" a property of a data structure rather than of a review.
 ///
-/// \section empty The list is empty in this build
+/// \section declared What is declared in this build
 ///
-/// Aerora overrides nothing yet, so every URL passes through unchanged and the interceptor is a
-/// no-op. That is the correct state, not an unfinished one: no Aerora QML content exists, and the
-/// tier-3 count is **zero** rather than the one the Phase 2 inventory anticipated.
+/// Exactly one entry: `FlyViewCustomLayer.qml`, the purpose-built Fly View overlay seam, carrying
+/// `SCR-LIV-01`. Every other URL passes through unchanged. The populated-file count is **zero** —
+/// no upstream file with content is forked — rather than the figure the Phase 2 inventory
+/// anticipated.
 ///
 /// \section safety What this must never do
 ///
@@ -87,7 +88,8 @@ public:
     /// Scheme the QML engine uses for resource URLs. The only scheme this class acts on.
     static constexpr const char *kResourceScheme = "qrc";
 
-    /// The complete set of declared overrides. **Empty in this build.**
+    /// The complete set of declared overrides. **One purpose-built seam in this build** — see
+    /// \ref declared.
     [[nodiscard]] static QList<OverrideEntry> overrideEntries();
 
     /// Stock paths of every declared override, for the startup self-check and for tests.
@@ -132,9 +134,8 @@ public:
 
     /// Asserts that every declared override resolves to Aerora content.
     ///
-    /// The `IF-UIS-015` assertion that catches the silent fork. Passes trivially while the
-    /// allow-list is empty, which is honest: there is nothing that could have failed to take
-    /// effect.
+    /// The `IF-UIS-015` assertion that catches the silent fork: a declared override whose mirrored
+    /// resource is absent does not take effect, and nothing else in the build reports that.
     ///
     /// \note This covers QML resources only. A C++ `QFile(":/json/...")` read never passes through
     ///       a QML URL interceptor, so the `:/json` class of resource needs its own assertion and

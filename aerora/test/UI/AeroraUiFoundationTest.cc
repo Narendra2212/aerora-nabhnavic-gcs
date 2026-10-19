@@ -33,12 +33,15 @@ namespace {
 /// that list fails this test.
 constexpr const char *kCustomMapItemsPath = "/qml/QGroundControl/FlightMap/MapItems/CustomMapItems.qml";
 
-/// A stock seam path Aerora has pre-approved but has not declared. Used to assert that approval is
-/// not the same thing as declaration: an undeclared path is never intercepted.
-///
-/// SCR-LIV-01's mirror is compiled in at the corresponding `:/Aerora` path, which is what makes
-/// that assertion non-vacuous - see _aPresentMirrorIsStillNotInterceptedWithoutADeclaration().
-constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml";
+/// The one declared override: the purpose-built Fly View overlay seam carrying `SCR-LIV-01`.
+constexpr const char* kFlyViewCustomLayerPath = "/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml";
+
+/// The two stock seams Aerora has pre-approved and deliberately has **not** declared. Both exist
+/// to introduce operator actions, and no Aerora action can be executed while the authorization gate
+/// evaluates nothing (`Q-029`). They are the subjects of the undeclared-interception tests, which
+/// assert that approval is not the same thing as declaration.
+constexpr const char* kGuidedActionsSeamPath = "/qml/QGroundControl/FlyView/CustomGuidedActionsController.qml";
+constexpr const char* kAdditionalActionsSeamPath = "/qml/QGroundControl/FlyView/FlyViewAdditionalCustomActionsList.qml";
 
 /// Exact logging category of AeroraQmlOverrides, from AeroraUiLog.cc. expectLogMessage() matches
 /// the category string literally, so a mismatch here is a silent test failure rather than a
@@ -72,14 +75,34 @@ const QMetaObject *missionMetaObjectFor(const QByteArray &className)
 
 } // namespace
 
-void AeroraUiFoundationTest::_noOverrideIsDeclared()
+void AeroraUiFoundationTest::_exactlyOnePurposeBuiltSeamIsDeclared()
 {
-    // The whole tier-3 obligation - a recorded fork point, a named owner, a drift review at every
-    // upstream merge - attaches per populated-file override. Zero is the cheapest possible state
-    // and this test is what keeps it from drifting upward unnoticed.
-    QVERIFY(AeroraQmlOverrides::overrideEntries().isEmpty());
-    QVERIFY(AeroraQmlOverrides::overridePaths().isEmpty());
+    const QList<AeroraQmlOverrides::OverrideEntry> entries = AeroraQmlOverrides::overrideEntries();
+
+    // The set is spelled out rather than counted. A count alone would be satisfied by swapping
+    // this seam for a different one, and the two carry entirely different obligations.
+    QCOMPARE(AeroraQmlOverrides::overridePaths(), QStringList({QString::fromUtf8(kFlyViewCustomLayerPath)}));
+    QCOMPARE(entries.count(), 1);
+    QCOMPARE(entries.first().stockPath, QString::fromUtf8(kFlyViewCustomLayerPath));
+
+    // The tier is the load-bearing part. The whole tier-3 obligation - a recorded fork point, a
+    // named owner, a drift review at every upstream merge - attaches per *populated-file*
+    // override, and upstream's FlyViewCustomLayer.qml is an empty seam it documents as an override
+    // point. Zero populated-file overrides is the cheapest possible state and this is what keeps it
+    // from drifting upward unnoticed.
+    QCOMPARE(entries.first().tier, AeroraQmlOverrides::Tier::PurposeBuiltSeam);
     QCOMPARE(AeroraQmlOverrides::populatedFileOverrideCount(), 0);
+
+    // The two remaining pre-approved seams must stay undeclared. Both exist to introduce operator
+    // actions, and no Aerora action can be executed while the authorization gate evaluates nothing
+    // (Q-029), so declaring either would offer an action with no decision behind it.
+    for (const char* actionSeam : {kGuidedActionsSeamPath, kAdditionalActionsSeamPath}) {
+        const QString path = QString::fromUtf8(actionSeam);
+        QVERIFY2(!AeroraQmlOverrides::overridePaths().contains(path),
+                 qPrintable(QStringLiteral("action seam must stay undeclared: %1").arg(path)));
+        QVERIFY2(!AeroraQmlOverrides::isOverrideCandidate(path),
+                 qPrintable(QStringLiteral("action seam must not be an override candidate: %1").arg(path)));
+    }
 }
 
 void AeroraUiFoundationTest::_customMapItemsIsForbiddenAndUndeclared()
@@ -143,8 +166,10 @@ void AeroraUiFoundationTest::_undeclaredResourceUrlIsNeverIntercepted_data()
 {
     QTest::addColumn<QUrl>("url");
 
-    QTest::newRow("pre-approved but undeclared seam")
-        << QUrl(QStringLiteral("qrc:%1").arg(QString::fromUtf8(kUndeclaredSeamPath)));
+    QTest::newRow("pre-approved but undeclared guided-actions seam")
+        << QUrl(QStringLiteral("qrc:%1").arg(QString::fromUtf8(kGuidedActionsSeamPath)));
+    QTest::newRow("pre-approved but undeclared additional-actions seam")
+        << QUrl(QStringLiteral("qrc:%1").arg(QString::fromUtf8(kAdditionalActionsSeamPath)));
     QTest::newRow("forbidden path")
         << QUrl(QStringLiteral("qrc:%1").arg(QString::fromUtf8(kCustomMapItemsPath)));
     QTest::newRow("main window") << QUrl(QStringLiteral("qrc:/qml/QGroundControl/MainWindow.qml"));
@@ -165,32 +190,34 @@ void AeroraUiFoundationTest::_undeclaredResourceUrlIsNeverIntercepted()
     QCOMPARE(AeroraQmlOverrides::interceptedUrlFor(url), url);
 }
 
-void AeroraUiFoundationTest::_aPresentMirrorIsStillNotInterceptedWithoutADeclaration()
+void AeroraUiFoundationTest::_theDeclaredSeamResolvesToTheAeroraMirror()
 {
-    const QString stockPath = QString::fromUtf8(kUndeclaredSeamPath);
+    const QString stockPath = QString::fromUtf8(kFlyViewCustomLayerPath);
     const QString mirrored = AeroraQmlOverrides::mirroredResourcePath(stockPath);
 
-    // The row above covers this path in the data table, but it covered it vacuously while no
-    // mirrored resource existed anywhere in the build: "not intercepted" and "nothing to intercept
-    // to" were indistinguishable. SCR-LIV-01's mirror is now compiled in, so the distinction is
-    // real and this is the assertion that uses it.
+    // The positive control, and the first one this suite has ever been able to run: while the
+    // allow-list was empty every interception test could only assert that nothing happened, so a
+    // rule that never rewrote anything would have passed all of them.
     QVERIFY2(QFile::exists(mirrored),
-             qPrintable(QStringLiteral("this test needs the mirror to exist to mean anything: %1").arg(mirrored)));
-
-    // QGroundControl's reference overlay would intercept here, because it keys on
-    // QFile::exists(":/Custom" + path). Aerora keys on the allow-list, so a mirror that is present
-    // and undeclared is not loaded - which is what makes "no unintended interception" a property
-    // of a data structure rather than of whatever resources the build happens to contain.
-    QVERIFY(!AeroraQmlOverrides::overridePaths().contains(stockPath));
-    QVERIFY(!AeroraQmlOverrides::isOverrideCandidate(stockPath));
+             qPrintable(QStringLiteral("the declared override needs its mirror: %1").arg(mirrored)));
+    QVERIFY(AeroraQmlOverrides::isOverrideCandidate(stockPath));
 
     const QUrl stockUrl(QStringLiteral("qrc:%1").arg(stockPath));
-    QCOMPARE(AeroraQmlOverrides::interceptedUrlFor(stockUrl), stockUrl);
+    const QUrl intercepted = AeroraQmlOverrides::interceptedUrlFor(stockUrl);
+
+    QVERIFY2(intercepted != stockUrl, "the declared seam must actually be rewritten");
+    QCOMPARE(intercepted.scheme(), QStringLiteral("qrc"));
+
+    // The engine-facing URL, spelled out. mirroredResourcePath() returns a ':'-rooted resource
+    // path; the URL drops that leading colon, so getting this wrong yields a URL that resolves to
+    // nothing and reports as a missing QML type rather than as a bad path.
+    QCOMPARE(intercepted.path(), mirrored.mid(1));
+    QCOMPARE(intercepted, QUrl(QStringLiteral("qrc:/Aerora/qml/QGroundControl/FlyView/FlyViewCustomLayer.qml")));
 }
 
 void AeroraUiFoundationTest::_flyViewOverlayMirrorDocumentCompiles()
 {
-    const QString mirrored = AeroraQmlOverrides::mirroredResourcePath(QString::fromUtf8(kUndeclaredSeamPath));
+    const QString mirrored = AeroraQmlOverrides::mirroredResourcePath(QString::fromUtf8(kFlyViewCustomLayerPath));
     QVERIFY2(QFile::exists(mirrored),
              qPrintable(QStringLiteral("the Fly View overlay mirror must be compiled in at %1").arg(mirrored)));
 
@@ -219,19 +246,24 @@ void AeroraUiFoundationTest::_flyViewOverlayMirrorDocumentCompiles()
     QVERIFY2(compiled, qPrintable(errors));
 
     // Not covered here: that the overlay loads into a real Fly View, positions itself and
-    // publishes its occluder rect. That needs the booted scene and the allow-list declaration, and
-    // lives in the Fly View scene test.
+    // publishes its occluder rect. That needs the booted scene and lives in
+    // AeroraFlyViewOverlayUITest.
 }
 
-void AeroraUiFoundationTest::_selfCheckPassesWhenNothingIsDeclared()
+void AeroraUiFoundationTest::_selfCheckResolvesTheDeclaredOverride()
 {
     const AeroraQmlOverrides::SelfCheckResult result = AeroraQmlOverrides::verify();
 
-    // Passing trivially is the honest outcome, not a weak assertion: with nothing declared there is
-    // nothing that could have failed to take effect. The assertion that earns its place is that the
-    // check reports no missing resource while also reporting that it examined an empty set.
-    QVERIFY(result.passed);
+    // This is the IF-UIS-015 check, and it now has something to check. While the allow-list was
+    // empty it passed because it examined nothing; with one declared override it passes only if
+    // that override's mirrored resource is actually in the build - which is the silent fork it
+    // exists to catch, where a declared override quietly does not take effect.
+    QVERIFY2(result.passed, qPrintable(QStringLiteral("declared overrides with no mirror: %1")
+                                           .arg(result.missingMirroredResources.join(QStringLiteral(", ")))));
     QVERIFY(result.missingMirroredResources.isEmpty());
+
+    // And it examined a non-empty set, so the pass above cannot be vacuous.
+    QCOMPARE(AeroraQmlOverrides::overridePaths().count(), 1);
 }
 
 void AeroraUiFoundationTest::_uiContextIsUnavailableWithNoActiveVehicle()

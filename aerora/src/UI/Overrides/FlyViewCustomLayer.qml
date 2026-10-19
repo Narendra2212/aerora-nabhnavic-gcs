@@ -117,6 +117,10 @@ Item {
     ColumnLayout {
         id: panelColumn
 
+        // Test hook. The container's visibility and the published rect must agree, and a scene
+        // test can only check that if it can find the container independently of the rect.
+        objectName: "aeroraLiveOperationsPanels"
+
         // Guarded: `occluders` is supplied by FlyView.qml, but an overlay loaded without it must
         // position itself rather than bind to undefined.
         readonly property rect _toolStrip: root.occluders ? root.occluders.toolStrip : Qt.rect(0, 0, 0, 0)
