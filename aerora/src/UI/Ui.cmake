@@ -24,6 +24,7 @@
 #       add_qgc_test(AeroraUiFoundationTest LABELS Unit)
 #       add_qgc_test(AeroraUiSafetyTest LABELS Unit)
 #       add_qgc_test(AeroraMissionProgressUITest LABELS Integration Vehicle)
+#       add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
 #   endif()
 #
 # ----------------------------------------------------------------------------
@@ -187,20 +188,28 @@ cmake_path(NORMAL_PATH AERORA_UI_TEST_DIR)
 set(AERORA_UI_TEST_SOURCES
     ${AERORA_UI_TEST_DIR}/AeroraMissionProgressUITest.cc
     ${AERORA_UI_TEST_DIR}/AeroraMissionProgressUITest.h
+    ${AERORA_UI_TEST_DIR}/AeroraSceneAttachmentUITest.cc
+    ${AERORA_UI_TEST_DIR}/AeroraSceneAttachmentUITest.h
     ${AERORA_UI_TEST_DIR}/AeroraUiFoundationTest.cc
     ${AERORA_UI_TEST_DIR}/AeroraUiFoundationTest.h
     ${AERORA_UI_TEST_DIR}/AeroraUiSafetyTest.cc
     ${AERORA_UI_TEST_DIR}/AeroraUiSafetyTest.h
 )
 
+# test/QmlUITests carries QmlUITestBase, which AeroraSceneAttachmentUITest derives from to boot a
+# real application scene. Its .cc is already compiled into the application target by
+# test/QmlUITests/CMakeLists.txt, so only the header path is needed here - the overlay builds no
+# second copy of the harness and modifies no core file to reach it.
 set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
     ${AERORA_UI_TEST_DIR}
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+    ${CMAKE_SOURCE_DIR}/test/QmlUITests
 )
 
 set(AERORA_UI_TEST_NAMES
     AeroraMissionProgressUITest
+    AeroraSceneAttachmentUITest
     AeroraUiFoundationTest
     AeroraUiSafetyTest
 )

@@ -80,6 +80,12 @@ import QGroundControl.AnalyzeView
 AnalyzePage {
     id: root
 
+    // Test hook, following the convention upstream already uses for `analyzeButton_*`,
+    // `settingsDivider_*` and `popupDialog_title`: without a name on the root there is no way for
+    // a UI test to confirm that clicking the Analyze entry actually loaded *this* page rather than
+    // silently loading nothing.
+    objectName: "aeroraMissionProgressPage"
+
     pageComponent: pageComponent
     pageDescription: qsTr("What the Aerora mission observer has seen: the vehicle's execution position, the "
                           + "mission it holds, and the transfers in between. Every row states what was checked.")

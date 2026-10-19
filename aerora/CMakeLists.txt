@@ -265,6 +265,9 @@ if(QGC_BUILD_TESTING)
     # Loads the mission progress page on a real application engine, so it needs a connected
     # vehicle but no window - see the \section nowindow note on the test class.
     add_qgc_test(AeroraMissionProgressUITest LABELS Integration Vehicle)
+    # Boots a full application scene via QmlUITestBase, so it carries the same labels and timeout
+    # the core QML UI tests use (test/QmlUITests/CMakeLists.txt).
+    add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
     add_qgc_test(AeroraVehicleSetupTest LABELS Unit)
