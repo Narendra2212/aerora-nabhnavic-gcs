@@ -83,6 +83,23 @@ private slots:
     void _missionProgressPropertiesResolve_data();
     void _missionProgressPropertiesResolve();
 
+    // SCR-VEH-06 - the names AeroraServiceDiagnosticsPage.qml binds to. That page is the one
+    // Aerora screen that names an enumerator by *type*, which the mission screen cannot do, so it
+    // depends on two things the mission screen does not: the registered QML name of
+    // AeroraVehicleServices, and its Q_ENUM keys. The property half needs nothing new -
+    // _uiContextDoesNotExposeTheVehicleOrTheServiceMap() already asserts the whole AeroraUi set
+    // the page reads.
+    void _serviceDiagnosticsRegisteredTypeNameMatchesThePageBinding();
+    void _serviceDiagnosticsEnumeratorsResolve_data();
+    void _serviceDiagnosticsEnumeratorsResolve();
+
+    // And the document itself. A name lookup proves the C++ side of a binding exists; it says
+    // nothing about whether the QML file that reads it can be loaded at all. The setup page is
+    // published purely on its resource existing, so a document that does not compile would be
+    // offered in the Vehicle Configuration view and fail when clicked, with nothing upstream of
+    // the click able to report it.
+    void _serviceDiagnosticsPageDocumentCompiles();
+
     // Gadget value access through a real QML engine, not through the meta-object.
     //
     // This is the mechanism AeroraMissionProgressPage.qml actually depends on, and the one a name

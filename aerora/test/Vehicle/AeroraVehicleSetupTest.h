@@ -14,6 +14,13 @@
 /// The property these tests exist to protect is that neither seam offers something it cannot
 /// deliver: a setup page is published only when its QML is in the build, and an indicator is
 /// offered only when the capability it reports on was reported **available**.
+///
+/// That gate fails in two directions and both are asserted. A page whose QML is absent must be
+/// withheld, which the matched-pair checks cover generically; and a page whose QML is *present*
+/// must actually publish, which no generic check can cover - a broken resource alias withholds
+/// every page, and a test written only as a matched pair would still pass with the whole Aerora
+/// setup surface silently gone. `_serviceDiagnosticsIsPublishedAndTheRemainingPagesAreWithheld()`
+/// is the assertion that names the expected state outright for that reason.
 class AeroraVehicleSetupTest : public UnitTest
 {
     Q_OBJECT
@@ -25,7 +32,8 @@ private slots:
     void _resourceResolutionRejectsAbsentAndNonResourcePaths();
 
     void _aPageIsPublishableOnlyWhenEveryDeclaredResourceExists();
-    void _declaredPagesAreWithheldWhileTheirQmlIsAbsent();
+    void _pagePublishabilityFollowsItsQmlResource();
+    void _serviceDiagnosticsIsPublishedAndTheRemainingPagesAreWithheld();
 
     void _indicatorGateRequiresCapabilityReportedAvailable_data();
     void _indicatorGateRequiresCapabilityReportedAvailable();

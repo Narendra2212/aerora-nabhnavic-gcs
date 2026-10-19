@@ -173,14 +173,13 @@ void AeroraVehicleSetupTest::_aPageIsPublishableOnlyWhenEveryDeclaredResourceExi
     }
 }
 
-void AeroraVehicleSetupTest::_declaredPagesAreWithheldWhileTheirQmlIsAbsent()
+void AeroraVehicleSetupTest::_pagePublishabilityFollowsItsQmlResource()
 {
-    // The honest state of U4 in this build: the C++ seam is complete and the Aerora setup QML does
-    // not exist, so every declared page is withheld and the setup view shows no Aerora page.
+    // Written as a matched pair rather than as a count, so it holds as the Aerora setup QML lands
+    // one file at a time and the reason stays attached: a page is unpublishable *because* its
+    // resource is missing, and unresolvedPageResources() names which.
     //
-    // This test is expected to change when the QML lands. It is written as a matched pair rather
-    // than as "the list is empty" so that the reason stays attached: a page is unpublishable
-    // *because* its resource is missing, and unresolvedPageResources() names which.
+    // A matched pair cannot say which pages exist, and must not try - that is the next test.
     const QStringList unresolved = AeroraVehicleComponent::unresolvedPageResources();
 
     for (const PageDescriptor &descriptor : AeroraVehicleComponent::pageDescriptors()) {
@@ -199,6 +198,47 @@ void AeroraVehicleSetupTest::_declaredPagesAreWithheldWhileTheirQmlIsAbsent()
                  qPrintable(QStringLiteral("withheld page is not reported as unresolved: %1")
                                 .arg(descriptor.screenId)));
     }
+}
+
+void AeroraVehicleSetupTest::_serviceDiagnosticsIsPublishedAndTheRemainingPagesAreWithheld()
+{
+    // The state of U4 in this build, named rather than derived. SCR-VEH-06 has its QML and
+    // publishes; the other three are declared and waiting for theirs.
+    //
+    // Naming it is the point. Publishability is "does this resource exist", so the failure that
+    // matters most here is the one where the resource moves - a changed RESOURCE_PREFIX, a dropped
+    // qgc_set_qt_resource_alias() call, a file removed from AERORA_UI_QML_FILES. Any of those
+    // withholds the page, and every other test in this fixture is written as a matched pair that
+    // moves with it. This one does not move: the path is spelled out, so the Aerora setup surface
+    // cannot disappear from the Vehicle Configuration view without a test failing.
+    constexpr const char* kServiceDiagnosticsResource = ":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
+
+    // Screen ids rather than Page values, so a failure prints which page rather than an integer.
+    QStringList publishedScreenIds;
+    for (const PageDescriptor& descriptor : AeroraVehicleComponent::pageDescriptors()) {
+        if (!AeroraVehicleComponent::isPublishable(descriptor)) {
+            continue;
+        }
+        publishedScreenIds.append(descriptor.screenId);
+
+        if (descriptor.page == Page::ServiceDiagnostics) {
+            QCOMPARE(descriptor.setupResource, QString::fromUtf8(kServiceDiagnosticsResource));
+
+            // The URL the Loader in VehicleConfigView is handed. A resource path that exists but
+            // resolves to a URL the engine cannot open is a blank panel with no error on screen.
+            QCOMPARE(AeroraVehicleComponent::resolvedQmlUrl(descriptor.setupResource),
+                     QUrl(QStringLiteral("qrc") + QString::fromUtf8(kServiceDiagnosticsResource)));
+        }
+    }
+
+    QCOMPARE(publishedScreenIds, QStringList({QStringLiteral("SCR-VEH-06")}));
+
+    // And the three that are still waiting say so, by resource, so this fails when one of them
+    // lands rather than letting the published set grow unremarked.
+    QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(),
+             QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraIdentityPage.qml"),
+                          QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
+                          QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml")}));
 }
 
 void AeroraVehicleSetupTest::_indicatorGateRequiresCapabilityReportedAvailable_data()

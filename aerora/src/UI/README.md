@@ -27,6 +27,8 @@ Full design records, evidence and handoffs:
 | `Controls/AeroraSelfReportRow.qml` | One self-report line. Carries three outcomes, so "not checked" cannot render as a finding |
 | `Indicators/AeroraEnforcementIndicator.qml` | `SCR-SHL-03`. The toolbar strip that says command authorization is not enforced |
 | `Screens/AeroraOperationsHub.qml` | `SCR-SHL-01`. The overlay's honest self-report: services attached, enforcement state, audit posture |
+| `Screens/AeroraMissionProgressPage.qml` | `SCR-LIV-06`. An `AnalyzePage`: what the vehicle is flying, what the ground station holds, and whether the two agree |
+| `Screens/AeroraServiceDiagnosticsPage.qml` | `SCR-VEH-06`. A `SetupPage`: which Aerora services attached to this vehicle, and why a classification is not an identification |
 | `Ui.cmake` | Source manifest, and the integration instructions for `aerora/CMakeLists.txt` |
 
 `Controls/`, `Indicators/` and `Screens/` are a source-tree split only. The resource alias flattens
@@ -35,9 +37,13 @@ import to reach `AeroraSelfReportRow` and why its registration URL carries no `S
 
 ## What is deliberately not here
 
-No panel, no product surface, no guided action, no tool-strip entry. Every Aerora fact group is
-`CONTRACT-ONLY` for want of a dialect, so there is no Aerora value to populate a panel with —
-building one would be shape with nothing behind it.
+No telemetry panel, no product surface, no guided action, no tool-strip entry. Every Aerora fact
+group is `CONTRACT-ONLY` for want of a dialect, so there is no Aerora value to populate a panel
+with — building one would be shape with nothing behind it.
+
+The three screens that do exist are not that panel and are not an exception to it. Each renders
+state the overlay computes in C++ — services attached, enforcement posture, observed mission
+progress, vehicle composition — and none reads a fact group.
 
 The one indicator that does exist is the exception that proves the rule: it renders a C++ singleton
 the overlay already computes, so there is something behind it. It is also read-only — no click

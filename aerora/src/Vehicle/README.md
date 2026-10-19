@@ -636,11 +636,15 @@ exists a published page would load a panel that renders nothing —
 existence check of its own, and `FlyViewToolBarIndicators.qml` binds `visible: item.showIndicator`
 on the loaded item with no null guard.
 
-So both seams gate on the resource being present, and the honest result today is **no Aerora setup
-page and no Aerora indicator**. This is the declared-intent-plus-existence shape
+So both seams gate on the resource being present. This is the declared-intent-plus-existence shape
 `AeroraQmlOverrides::verify()` already established in this overlay: the catalogue is the declaration
 of intent, and `unresolvedPageResources()` names what is declared but absent, so an absent page is
 reportable rather than silent. A page appears with no C++ change once its QML lands.
+
+`SCR-VEH-06` is the first page to do exactly that: adding
+`aerora/src/UI/Screens/AeroraServiceDiagnosticsPage.qml` to `AERORA_UI_QML_FILES` published it, with
+no edit to this module. The honest result today is therefore **one Aerora setup page, three still
+withheld, and no Aerora indicator**.
 
 The resource root is `:/qml/Aerora/Controls`, which is not a guess: it follows
 `AERORA_UI_QML_MODULE_URI` and `RESOURCE_PREFIX /qml` from `aerora/src/UI/Ui.cmake:133`, and the
@@ -652,11 +656,11 @@ withheld — rather than publishing a panel that cannot load.
 | Screen | Treatment |
 | --- | --- |
 | `SCR-VEH-01` page index | `AeroraAutoPilotPlugin::vehicleComponents()`. The list itself, not a page |
-| `SCR-VEH-02` identity and profile | Declared. Backed by `AeroraVehicleIdentity` and the resolved profile |
-| `SCR-VEH-03` capability report | Declared. Backed by `AeroraVehicleCapabilities`' three-state model |
-| `SCR-VEH-04` sensor and health | Declared, with the `vehicleConfigJson()` seam implemented and empty |
+| `SCR-VEH-02` identity and profile | Declared, QML absent. Backed by `AeroraVehicleIdentity` and the resolved profile |
+| `SCR-VEH-03` capability report | Declared, QML absent. Backed by `AeroraVehicleCapabilities`' three-state model |
+| `SCR-VEH-04` sensor and health | Declared, QML absent, with the `vehicleConfigJson()` seam implemented and empty |
 | `SCR-VEH-05` calibration | **WITHHELD.** See below |
-| `SCR-VEH-06` service diagnostics | Declared. Backed by `AeroraVehicleServices::serviceNames()` |
+| `SCR-VEH-06` service diagnostics | **PUBLISHED.** `AeroraServiceDiagnosticsPage.qml`, reading the typed `AeroraUi` accessors — not `serviceNames()`, which stays off the QML surface by design |
 
 Calibration is the one `SCR-VEH-*` screen that acts on the aircraft, and the ADR-015 gate in front
 of it permits everything while the operator role set is undecided (`Q-029`). An Aerora calibration

@@ -1,6 +1,7 @@
 #include "AeroraUiFoundationTest.h"
 
 #include <QtCore/QByteArray>
+#include <QtCore/QFile>
 #include <QtCore/QMetaClassInfo>
 #include <QtCore/QMetaEnum>
 #include <QtCore/QMetaMethod>
@@ -10,6 +11,7 @@
 #include <QtCore/QUrl>
 #include <QtCore/QVariant>
 #include <QtQml/QQmlApplicationEngine>
+#include <QtQml/QQmlComponent>
 #include <QtQml/QQmlContext>
 #include <QtQml/QQmlEngine>
 #include <QtQml/QQmlExpression>
@@ -19,7 +21,9 @@
 #include "AeroraMissionSnapshot.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
+#include "AeroraVehicleServices.h"
 #include "AeroraVehicleUiContext.h"
+#include "QGCCorePlugin.h"
 
 namespace {
 
@@ -36,6 +40,13 @@ constexpr const char *kUndeclaredSeamPath = "/qml/QGroundControl/FlyView/FlyView
 /// the category string literally, so a mismatch here is a silent test failure rather than a
 /// compile error - which is why it is a named constant checked against the production definition.
 constexpr const char *kUiLogCategory = "Aerora.Ui";
+
+/// The SCR-VEH-06 setup page, as the engine URL and as the resource path behind it. Flat under the
+/// module prefix because qgc_set_qt_resource_alias() aliases every AERORA_UI_QML_FILES entry to its
+/// bare name. Spelled out rather than read from AeroraVehicleComponent::pageDescriptors(), so that
+/// the catalogue and the engine's view of the same file cannot drift in step.
+constexpr const char* kServiceDiagnosticsPageUrl = "qrc:/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
+constexpr const char* kServiceDiagnosticsResource = ":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml";
 
 /// Resolves one of the three meta-objects AeroraMissionProgressPage.qml binds to, by class name.
 ///
@@ -437,6 +448,107 @@ void AeroraUiFoundationTest::_missionProgressPropertiesResolve()
     QVERIFY2(meta->indexOfProperty(propertyName.constData()) != -1,
              qPrintable(QStringLiteral("AeroraMissionProgressPage.qml reads %1.%2")
                             .arg(QString::fromUtf8(className), QString::fromUtf8(propertyName))));
+}
+
+void AeroraUiFoundationTest::_serviceDiagnosticsRegisteredTypeNameMatchesThePageBinding()
+{
+    const QMetaObject* const meta = &AeroraVehicleServices::staticMetaObject;
+
+    // AeroraServiceDiagnosticsPage.qml writes the type name out - `AeroraVehicleServices.
+    // CorroboratedAerora` - so the registered QML name is part of the binding, not a registration
+    // detail. A switch to QML_NAMED_ELEMENT would leave the C++ untouched, the enumerators intact
+    // and every comparison on the page permanently false, which renders as "classification
+    // unknown" on a vehicle that was classified.
+    //
+    // Read through the QML.Element class info rather than QQmlMetaType, which is private - the
+    // same public route AeroraUiSafetyTest takes.
+    QString qmlName;
+    for (int i = meta->classInfoOffset(); i < meta->classInfoCount(); ++i) {
+        if (qstrcmp(meta->classInfo(i).name(), "QML.Element") == 0) {
+            qmlName = QString::fromUtf8(meta->classInfo(i).value());
+            break;
+        }
+    }
+
+    // "auto" is what bare QML_ELEMENT emits, and it means qmltyperegistrar registers the type
+    // under its class name - which is the name the page writes. QML_NAMED_ELEMENT would put the
+    // registered name here instead, so this comparison is what catches the switch.
+    QCOMPARE(qmlName, QStringLiteral("auto"));
+
+    // The class name is the other half of that: "auto" only says "use the class name", so the
+    // class name itself has to be the string the page spells.
+    QCOMPARE(QString::fromUtf8(meta->className()), QStringLiteral("AeroraVehicleServices"));
+}
+
+void AeroraUiFoundationTest::_serviceDiagnosticsEnumeratorsResolve_data()
+{
+    QTest::addColumn<QByteArray>("enumeratorName");
+
+    // Exactly the three AeroraServiceDiagnosticsPage.qml names, and no others. The page matches
+    // positively and renders anything unmatched as unknown, so Classification::Unknown is never
+    // compared against and is not asserted here.
+    QTest::newRow("corroborated") << QByteArray("CorroboratedAerora");
+    QTest::newRow("selected by seam") << QByteArray("SelectedBySeam");
+    QTest::newRow("not aerora") << QByteArray("NotAerora");
+}
+
+void AeroraUiFoundationTest::_serviceDiagnosticsEnumeratorsResolve()
+{
+    QFETCH(QByteArray, enumeratorName);
+
+    const QMetaObject* const meta = &AeroraVehicleServices::staticMetaObject;
+
+    const int enumIndex = meta->indexOfEnumerator("Classification");
+    QVERIFY2(enumIndex >= 0, "AeroraVehicleServices.Classification does not resolve");
+
+    bool resolved = false;
+    (void) meta->enumerator(enumIndex).keyToValue(enumeratorName.constData(), &resolved);
+
+    QVERIFY2(resolved, qPrintable(QStringLiteral("AeroraServiceDiagnosticsPage.qml compares against "
+                                                 "AeroraVehicleServices.%1")
+                                      .arg(QString::fromUtf8(enumeratorName))));
+}
+
+void AeroraUiFoundationTest::_serviceDiagnosticsPageDocumentCompiles()
+{
+    QVERIFY2(QFile::exists(QString::fromUtf8(kServiceDiagnosticsResource)),
+             "the setup page must be compiled into the resource at the flat module path");
+
+    // The production factory rather than a bare QQmlEngine: it is what adds the qrc:/qml import
+    // path that `import QGroundControl` and the flat Aerora.Controls module resolve from, and it is
+    // the AeroraCorePlugin override, so the engine is configured as the application's is.
+    QQmlApplicationEngine* const engine = QGCCorePlugin::instance()->createQmlApplicationEngine(this);
+    QVERIFY(engine);
+
+    bool compiled = false;
+    QString errors;
+
+    // Scoped so the component is destroyed while its engine is still alive. QQmlComponent keeps a
+    // back-pointer to the engine and reads it on destruction, so the reverse order is a
+    // use-after-free rather than merely untidy.
+    {
+        QQmlComponent component(engine, QUrl(QString::fromUtf8(kServiceDiagnosticsPageUrl)));
+
+        // Compilation, which is more than it sounds: Qt resolves every referenced type and every
+        // property name on a QML-declared type at this point. So this covers the resource alias,
+        // the import set, SetupPage coming from QGroundControl.Controls, the implicit reach to
+        // AeroraSelfReportRow, and a mistyped property on any of them.
+        compiled = !component.isError();
+        errors = component.errorString();
+    }
+
+    // Released before the assertion, so a failing compile cannot leave the URL interceptor
+    // installed for the rest of the fixture - the interceptor is process-wide file-static state
+    // and a second install is refused.
+    QGCCorePlugin::instance()->destroyQmlApplicationEngine(engine);
+
+    QVERIFY2(compiled, qPrintable(errors));
+
+    // What this does *not* cover, stated because the gap is easy to miss: no binding is evaluated,
+    // because create() is never called. SetupPage.qml reads `globals` and `vehicleComponent` from
+    // context that only VehicleConfigView's Loader supplies, so instantiating the page here would
+    // report that absence as a failure of the page - and supplying a stand-in would assert the
+    // stand-in. Binding evaluation and rendering are evidenced by neither this test nor CI.
 }
 
 void AeroraUiFoundationTest::_missionGadgetValuesAreReadableFromQml_data()
