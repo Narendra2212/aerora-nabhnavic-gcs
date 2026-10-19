@@ -55,6 +55,21 @@ void AeroraMissionProgressUITest::init()
                      QRegularExpression(QStringLiteral("allowing commands without authorization")));
     ignoreLogMessage("ComponentInformation.RequestMetaDataTypeStateMachine", QtWarningMsg,
                      QRegularExpression(QStringLiteral("failed to load metadata")));
+
+    // Upstream AnalyzePage.qml:72 colours its popout icon from `qgcPal.text` without declaring a
+    // QGCPalette of its own, so it depends on an ancestor supplying `qgcPal`. In the application
+    // that ancestor is the Analyze view; loading the page on a bare engine gives it no parent, so
+    // the binding for that one upstream item fails. The Aerora page declares its own qgcPal and is
+    // unaffected - the document still compiles and create() still succeeds, which is what this
+    // suite asserts. Suppressed rather than expected because it comes from a core file this
+    // workstream does not own, and wrapping the page in a synthetic Analyze container to avoid it
+    // would be asserting the behaviour of the wrapper.
+    ignoreLogMessage("default", QtWarningMsg, QRegularExpression(QStringLiteral("qgcPal is not defined")));
+
+    // The Qt install on the Windows runner ships no lib/fonts directory. Environment noise, once
+    // per QML engine.
+    ignoreLogMessage("default", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("QFontDatabase: Cannot find font directory")));
 }
 
 void AeroraMissionProgressUITest::cleanup()
