@@ -285,6 +285,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraSecurityStatusTest LABELS Unit)
     add_qgc_test(AeroraSigningKeyStoreTest LABELS Unit)
     add_qgc_test(AeroraTelemetryAttachmentTest LABELS Unit)
+    add_qgc_test(AeroraScreenMetricsTest LABELS Unit)
     add_qgc_test(AeroraUiFoundationTest LABELS Unit)
     add_qgc_test(AeroraUiSafetyTest LABELS Unit)
     # Loads the mission progress page on a real application engine, so it needs a connected
