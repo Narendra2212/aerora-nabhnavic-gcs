@@ -28,20 +28,16 @@ class PlanMasterController;
 /// `AeroraMissionProgressUITest` and confines the expensive scene boot to the three questions that
 /// genuinely require it.
 ///
-/// \section windows Still not registered on Windows: the click path
+/// \section windows Not registered on Windows: no headless plugin produces a usable scene
 ///
-/// The scene boot itself is no longer the obstacle. `AeroraSceneHarnessProbeTest` measured both
-/// headless plugins on Windows (run `39265133278`): `offscreen` aborts on the first boot
-/// (`qnumeric.h:523`, exit `0xc0000409`), but `minimal` boots the scene and this suite reported
-/// "3 passed, 1 failed" under it.
+/// `AeroraSceneHarnessProbeTest` measured both candidates there and neither works, for different
+/// reasons - `offscreen` aborts during scene construction, `minimal` constructs the scene but lays
+/// nothing out, so the window's root item comes up zero-sized. The per-plugin evidence is recorded
+/// once, at the registration site in `aerora/CMakeLists.txt`, rather than restated here.
 ///
-/// The one that failed is `_missionProgressPageIsReachableFromTheAnalyzeMenu`, which drives mouse
-/// clicks through the tool-select dropdown - so what remains unfixed on Windows is the click and
-/// popup path, not scene construction. Two of the three slots here already pass under `minimal`.
-///
-/// The suite stays withheld rather than registered-and-failing, because registering it would add a
-/// known failure for the sake of the two slots that would pass. `AeroraFlyViewOverlayUITest`, which
-/// never clicks, is registered on Windows under `minimal` instead.
+/// An earlier revision of this comment read a probe run as "`minimal` boots the scene", on the
+/// strength of this suite reporting three passing slots under it. That was wrong: every slot here
+/// looks objects up and none reads a geometry, so all three pass against a zero-sized scene.
 ///
 /// Nothing here is weakened to make Windows pass, and nothing here rots while it waits: the file
 /// compiles on every platform.
@@ -66,22 +62,10 @@ private slots:
     // The operator-facing route: Analyze menu -> the Aerora entry -> the page actually loads.
     void _missionProgressPageIsReachableFromTheAnalyzeMenu();
 
-    // SCR-HLP-02's row rendering is deliberately NOT asserted here yet.
-    //
-    // A slot that navigated to the page and counted its rendered per-class samples was written and
-    // withdrawn: the page loads - its flickable is found - but the sample count never reaches seven
-    // within the timeout, so either the Repeater's delegates are not instantiating or the count's
-    // search predicate does not match them. Both readings are plausible and the run did not
-    // distinguish them.
-    //
-    // Keeping a failing assertion would have reported the page as broken on the strength of a test
-    // that may itself be wrong, and keeping a weakened one would have claimed rendering nobody had
-    // observed. What *is* verified sits elsewhere: AeroraUiFoundationTest holds the page's class
-    // list against the AeroraTelemetryState meta-object and compiles the document, and
-    // AeroraMissionProgressUITest covers the analyzePages() registration.
-    //
-    // The next step is a scene probe that dumps the objectNames and types found under the page's
-    // flickable, which separates "no delegates" from "delegates the predicate missed".
+    // SCR-HLP-02, by the same route. Its rows are built by a Repeater over a list derived from
+    // AeroraTelemetryState, so a page that loaded with an empty list would still show a heading and
+    // a scope note - a screen that looks like it works and teaches nothing. This counts the rows.
+    void _stateVocabularyPageIsReachableAndRendersEveryClass();
 
 private:
     /// @return The scene's controller for @a flyView, or nullptr when absent.
