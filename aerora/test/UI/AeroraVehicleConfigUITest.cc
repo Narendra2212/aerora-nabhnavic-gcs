@@ -1,7 +1,9 @@
 #include "AeroraVehicleConfigUITest.h"
 
+#include <QtCore/QList>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QString>
+#include <QtCore/QVariant>
 #include <QtQuick/QQuickItem>
 #include <QtTest/QTest>
 
@@ -17,12 +19,18 @@ namespace {
 /// rename there breaks these and should - the operator-facing label and the test's handle on it
 /// are the same string.
 constexpr const char* kIdentitySidebarButton = "vehicleConfig_comp_AeroraIdentity";
+constexpr const char* kCapabilitySidebarButton = "vehicleConfig_comp_AeroraCapabilities";
 constexpr const char* kServicesSidebarButton = "vehicleConfig_comp_AeroraServices";
 
 /// The page roots. Finding these proves the click loaded the intended page rather than leaving the
 /// previous one up, which a content check alone cannot distinguish.
 constexpr const char* kIdentityPageObject = "aeroraIdentityPage";
+constexpr const char* kCapabilityPageObject = "aeroraCapabilityPage";
 constexpr const char* kServicesPageObject = "aeroraServiceDiagnosticsPage";
+
+/// Every enumerator of AeroraVehicleCapabilities::Category. The capability page must publish one
+/// section per category; AeroraUiFoundationTest holds this count against the meta-object.
+constexpr int kCapabilityCategoryCount = 5;
 
 /// The Operations Hub's Analyze entry, as AnalyzeView builds it: "analyzeButton_" plus the title
 /// from AeroraCorePlugin::analyzePages(). A rename there breaks this and should - it is the string
@@ -97,11 +105,13 @@ void AeroraVehicleConfigUITest::_aeroraSetupPagesRenderInTheConfigureView()
                 return;
             }
 
-            // Both published pages, in catalogue order. Opening them in one slot is deliberate:
-            // the second click also proves the view switches *between* Aerora pages, which a
+            // Every published page, in catalogue order. Opening them in one slot is deliberate:
+            // each later click also proves the view switches *between* Aerora pages, which a
             // single-page test cannot show and which is where a shared objectName or a stuck
             // loader would surface.
             QVERIFY(_openAeroraPage(QString::fromUtf8(kIdentitySidebarButton), QString::fromUtf8(kIdentityPageObject)));
+            QVERIFY(
+                _openAeroraPage(QString::fromUtf8(kCapabilitySidebarButton), QString::fromUtf8(kCapabilityPageObject)));
             QVERIFY(_openAeroraPage(QString::fromUtf8(kServicesSidebarButton), QString::fromUtf8(kServicesPageObject)));
 
             // And the identity page is gone, so the panel was replaced rather than stacked.
@@ -187,12 +197,57 @@ void AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperation
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kVehicleConfigRoot), TestTimeout::mediumMs()),
                      "the hub button must open the Vehicle Configuration view");
 
-            // And the destination is the one the hub's text promises: both Aerora pages are in the
-            // sidebar it just opened.
+            // And the destination is the one the hub's text promises: all three Aerora pages are in
+            // the sidebar it just opened.
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kIdentitySidebarButton), TestTimeout::mediumMs()),
                      "the opened view must list the Aerora Identity page");
+            QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kCapabilitySidebarButton), TestTimeout::mediumMs()),
+                     "the opened view must list the Aerora Capabilities page");
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kServicesSidebarButton), TestTimeout::mediumMs()),
                      "the opened view must list the Aerora Services page");
+
+            waitForParamRefreshQuiet(vehicle);
+        });
+}
+
+void AeroraVehicleConfigUITest::_capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence()
+{
+    runWithMockLink(
+        [] { return MockLink::startGenericMockLink(); },
+        [this](QPointer<MockLink>, Vehicle* vehicle) {
+            QVERIFY(vehicle);
+
+            navigateToConfigureView();
+            if (QTest::currentTestFailed()) {
+                return;
+            }
+
+            QQuickItem* const page =
+                _openAeroraPage(QString::fromUtf8(kCapabilitySidebarButton), QString::fromUtf8(kCapabilityPageObject));
+            QVERIFY(page);
+
+            // The precondition, asserted first so nothing below can be satisfied vacuously by a
+            // page that read every row as "not checked".
+            QVERIFY2(page->property("_available").toBool(),
+                     "an Aerora vehicle is connected, so the page must report its services attached");
+            QVERIFY2(!page->property("_capabilities").isNull(),
+                     "the connected Aerora vehicle must have a capability service for the page to read");
+
+            // One entry per category, derived from the Q_ENUM rather than written out as sections.
+            // A page that rendered a heading and no inventory would still look like a working
+            // screen, which is the failure this count exists to catch.
+            const QVariantList reportedKeys = page->property("_reportedKeys").toList();
+            QCOMPARE(reportedKeys.size(), qsizetype(kCapabilityCategoryCount));
+
+            // Every category empty, which is the Q3-009 reading: no Aerora evidence source exists
+            // in this build, so nothing has reported a capability. When one does, this is the
+            // assertion that should fail and be updated - the page needs no change for it.
+            for (qsizetype i = 0; i < reportedKeys.size(); ++i) {
+                QVERIFY2(reportedKeys.at(i).toList().isEmpty(),
+                         qPrintable(QStringLiteral("category %1 reported a capability key; no evidence source "
+                                                   "exists in this build (Q3-009)")
+                                        .arg(i)));
+            }
 
             waitForParamRefreshQuiet(vehicle);
         });

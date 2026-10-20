@@ -143,7 +143,7 @@ while every group is `CONTRACT-ONLY`, so exposing it would be exposing an empty 
 | `AeroraVehicleIdentity` | `Vehicle/AeroraVehicleIdentity.{h,cc}` | `QML_ELEMENT` + `QML_UNCREATABLE` | `IMPLEMENTED-UNCOMPILED` — **fleet identity format `OPEN`** |
 | `AeroraVehicleCapabilities` | `Vehicle/AeroraVehicleCapabilities.{h,cc}` | `QML_ELEMENT` + `QML_UNCREATABLE` | `IMPLEMENTED-UNCOMPILED` — **no capability is reported (`Q3-009`)** |
 | `AeroraProductProfile` / `Registry` | `Vehicle/AeroraProductProfile.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` |
-| `AeroraAutoPilotPlugin` | — | — | **ABSENT.** Required for all 6 `SCR-VEH-*` screens |
+| `AeroraAutoPilotPlugin` | `Vehicle/AeroraAutoPilotPlugin.{h,cc}` | none | `VERIFIED` — the `SCR-VEH-*` page index. Publishes a page only when its QML exists; `AeroraVehicleConfigUITest` clicks the published entries in the real sidebar |
 | `toolIndicators()` override | — | — | **ABSENT.** Required for per-vehicle Aerora indicators |
 
 `AeroraFirmwarePlugin` deliberately derives from `FirmwarePlugin` rather than a vendor plugin, so
@@ -405,7 +405,7 @@ Named rather than mocked, per the Phase B rule. Each row is a real gap with an o
 | # | Missing | Impact | Owner | Gated on |
 | --- | --- | --- | --- | --- |
 | 1 | Authorization policy, identity provider, role resolver | **Every command is permitted.** No operator action surface can exist | Tab 2 | `Q-029` → ADR-014 |
-| 2 | `AeroraAutoPilotPlugin` | 6 vehicle screens unreachable | Tab 3 | Nothing — ready to implement |
+| 2 | ~~`AeroraAutoPilotPlugin`~~ | — | Tab 3 | **DONE.** Three pages published and clicked in the real sidebar (`SCR-VEH-01`/`02`/`03`/`06`). `SCR-VEH-04` waits on its QML, `SCR-VEH-05` is withheld by decision (`Q-029`) |
 | 3 | Per-vehicle Aerora indicator **content** | No per-vehicle Aerora indicator. The `FirmwarePlugin::toolIndicators()` seam itself is implemented (U5) and correctly inert — `AeroraToolIndicators::declaredIndicators()` is empty | Tab 3 | `Q3-009` — no evidenced capability identifier. The *non-vehicle* half is done, HO-TAB7-06 |
 | 4 | ~~Interceptor install (HO-TAB7-02)~~ | — | Tab 1 | **DONE** — U1, `84bbb3a6e`, `IMPLEMENTED-UNCOMPILED` |
 | 5 | ~~`AeroraControlsModule` `IMPORTS QGC` + resource alias (`D-UI-04`)~~ | — | Tab 1 | **DONE** — U2, `a73699796`, `IMPLEMENTED-UNCOMPILED` |

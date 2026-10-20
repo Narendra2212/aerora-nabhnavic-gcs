@@ -22,6 +22,7 @@
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
 #include "AeroraTelemetryState.h"
+#include "AeroraVehicleCapabilities.h"
 #include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleServices.h"
 #include "AeroraVehicleUiContext.h"
@@ -54,6 +55,7 @@ constexpr const char *kUiLogCategory = "Aerora.Ui";
 /// out rather than read from AeroraVehicleComponent::pageDescriptors(), so that the catalogue and
 /// the engine's view of the same file cannot drift in step.
 constexpr const char* kIdentityPageFile = "AeroraIdentityPage.qml";
+constexpr const char* kCapabilityPageFile = "AeroraCapabilityPage.qml";
 constexpr const char* kServiceDiagnosticsPageFile = "AeroraServiceDiagnosticsPage.qml";
 
 /// SCR-HLP-02's page. An AnalyzePage rather than a SetupPage, but the compile check is the same
@@ -304,6 +306,77 @@ void AeroraUiFoundationTest::_stateVocabularyPageListsEveryStateClass()
     // by making itself invisible and the resulting blank cell would otherwise read as a fault.
     QVERIFY2(AeroraTelemetryState::isNonValue(AeroraTelemetryState::Unavailable),
              "UNAVAILABLE must carry no value; the page's empty sample cell depends on it");
+}
+
+void AeroraUiFoundationTest::_capabilityPageListsEveryCategoryAndReadsResolvableMethods()
+{
+    const QMetaObject* const meta = &AeroraVehicleCapabilities::staticMetaObject;
+
+    const int enumIndex = meta->indexOfEnumerator("Category");
+    QVERIFY2(enumIndex >= 0, "AeroraVehicleCapabilities.Category does not resolve");
+    const QMetaEnum categoryEnum = meta->enumerator(enumIndex);
+
+    // Exactly the enumerators AeroraCapabilityPage.qml names in its _categories list, in the same
+    // order - declaration order, which is the order the page renders its sections.
+    const QStringList pageCategories({QStringLiteral("Vehicle"), QStringLiteral("Payload"), QStringLiteral("Mission"),
+                                      QStringLiteral("Telemetry"), QStringLiteral("Command")});
+
+    QStringList declaredCategories;
+    declaredCategories.reserve(categoryEnum.keyCount());
+    for (int i = 0; i < categoryEnum.keyCount(); ++i) {
+        declaredCategories.append(QString::fromUtf8(categoryEnum.key(i)));
+    }
+
+    // Compared as an ordered list rather than a count or a set. A count would be satisfied by a
+    // rename and a set by a reordering, and the page presents them in order.
+    QCOMPARE(declaredCategories, pageCategories);
+
+    // The evidence states the page branches on. `NotEvidenced` is the one that earns the screen its
+    // place: it is not `Unavailable`, and the page says so in words.
+    const int stateIndex = meta->indexOfEnumerator("State");
+    QVERIFY2(stateIndex >= 0, "AeroraVehicleCapabilities.State does not resolve");
+    const QMetaEnum stateEnum = meta->enumerator(stateIndex);
+    for (const char* const key : {"NotEvidenced", "Unavailable", "Available"}) {
+        bool resolved = false;
+        (void) stateEnum.keyToValue(key, &resolved);
+        QVERIFY2(resolved, qPrintable(QStringLiteral("AeroraCapabilityPage.qml compares against "
+                                                     "AeroraVehicleCapabilities.%1")
+                                          .arg(QString::fromUtf8(key))));
+    }
+
+    // The three queries the page calls. They are Q_INVOKABLE rather than properties, so a rename in
+    // C++ is not a compile error anywhere - it is a TypeError in QML on the first open of the page,
+    // which needs a running application to observe. This is what catches it without one.
+    for (const char* const method : {"state", "isAvailable", "reportedKeys"}) {
+        bool found = false;
+        for (int i = meta->methodOffset(); i < meta->methodCount(); ++i) {
+            const QMetaMethod candidate = meta->method(i);
+            if ((candidate.methodType() == QMetaMethod::Method) && (candidate.name() == method)) {
+                found = true;
+                break;
+            }
+        }
+        QVERIFY2(found, qPrintable(QStringLiteral("AeroraCapabilityPage.qml calls "
+                                                  "AeroraUi.capabilities.%1(), which must stay Q_INVOKABLE")
+                                       .arg(QString::fromUtf8(method))));
+    }
+
+    // The two signals the page re-reads on. reportedKeys() is a query rather than a notifying
+    // property, so without these the page would show the inventory as it stood when the panel
+    // loaded and would never update.
+    for (const char* const signalName : {"capabilityChanged", "reportsCleared"}) {
+        bool found = false;
+        for (int i = meta->methodOffset(); i < meta->methodCount(); ++i) {
+            const QMetaMethod candidate = meta->method(i);
+            if ((candidate.methodType() == QMetaMethod::Signal) && (candidate.name() == signalName)) {
+                found = true;
+                break;
+            }
+        }
+        QVERIFY2(found, qPrintable(QStringLiteral("AeroraCapabilityPage.qml connects to "
+                                                  "AeroraVehicleCapabilities::%1()")
+                                       .arg(QString::fromUtf8(signalName))));
+    }
 }
 
 void AeroraUiFoundationTest::_selfCheckResolvesTheDeclaredOverride()
@@ -689,6 +762,7 @@ void AeroraUiFoundationTest::_aeroraPageDocumentsCompile_data()
     QTest::addColumn<QByteArray>("pageFile");
 
     QTest::newRow("identity") << QByteArray(kIdentityPageFile);
+    QTest::newRow("capabilities") << QByteArray(kCapabilityPageFile);
     QTest::newRow("service diagnostics") << QByteArray(kServiceDiagnosticsPageFile);
     QTest::newRow("state vocabulary") << QByteArray(kStateVocabularyPageFile);
 }

@@ -202,8 +202,8 @@ void AeroraVehicleSetupTest::_pagePublishabilityFollowsItsQmlResource()
 
 void AeroraVehicleSetupTest::_publishedPagesAreNamedAndTheRestAreWithheld()
 {
-    // The state of U4 in this build, named rather than derived. SCR-VEH-02 and SCR-VEH-06 have
-    // their QML and publish; the other two are declared and waiting for theirs.
+    // The state of U4 in this build, named rather than derived. SCR-VEH-02, SCR-VEH-03 and
+    // SCR-VEH-06 have their QML and publish; SCR-VEH-04 is declared and waiting for its own.
     //
     // Naming it is the point. Publishability is "does this resource exist", so the failure that
     // matters most here is the one where the resource moves - a changed RESOURCE_PREFIX, a dropped
@@ -224,16 +224,17 @@ void AeroraVehicleSetupTest::_publishedPagesAreNamedAndTheRestAreWithheld()
         publishedResources.append(descriptor.setupResource);
     }
 
-    QCOMPARE(publishedScreenIds, QStringList({QStringLiteral("SCR-VEH-02"), QStringLiteral("SCR-VEH-06")}));
+    QCOMPARE(publishedScreenIds,
+             QStringList({QStringLiteral("SCR-VEH-02"), QStringLiteral("SCR-VEH-03"), QStringLiteral("SCR-VEH-06")}));
     QCOMPARE(publishedResources,
              QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraIdentityPage.qml"),
+                          QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
                           QStringLiteral(":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml")}));
 
-    // And the two that are still waiting say so, by resource, so this fails when one of them lands
-    // rather than letting the published set grow unremarked.
+    // And the one that is still waiting says so, by resource, so this fails when it lands rather
+    // than letting the published set grow unremarked.
     QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(),
-             QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
-                          QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml")}));
+             QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml")}));
 }
 
 void AeroraVehicleSetupTest::_indicatorGateRequiresCapabilityReportedAvailable_data()

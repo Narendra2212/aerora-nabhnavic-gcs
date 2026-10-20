@@ -460,8 +460,19 @@ are pure QML logic that the C++ test harness cannot reach, so they are guarded b
 until the Qt Quick Test target of HO-TAB7-04 exists. `IMPLEMENTED-UNCOMPILED` is the ceiling, and
 `D-006` is why.
 
-The navigation half of the hub is deliberately absent rather than incomplete: it is specified to
-reach other Aerora screens through `mainWindow.showTool()`, and no destination screen exists yet.
+The navigation half of the hub now exists, and is smaller than the specification imagined. One
+destination is a button, because one supported route exists: `mainWindow.showVehicleConfig()`, where
+the three published `SCR-VEH-*` pages appear in the sidebar. It is gated on a connected vehicle,
+because `VehicleConfigView` builds its whole sidebar from `_fullParameterVehicleAvailable`.
+`AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperationsHub` clicks it and
+checks all three entries are in the view it opens.
+
+The remaining destinations are **stated, not offered**. `AnalyzeView` exposes no supported way to
+select a sibling analyze page — `_loadPage()` is private and the entries are a `Repeater` over
+`analyzePages()` — so reaching `SCR-LIV-06` or `SCR-HLP-02` from the hub would mean matching an
+entry by its translated title, which breaks on the first locale change (upstream issue #14929). Both
+are already one click away in the list the hub itself sits in. `SCR-LIV-01` is an overlay on the Fly
+View rather than a screen with an address, so there is nothing to navigate to.
 
 ### Live operations — 9 screens
 
@@ -503,12 +514,20 @@ a defect class, not an optional polish item.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-VEH-01` | Aerora setup page index | O | `AeroraAutoPilotPlugin::vehicleComponents()` via `FirmwarePlugin::autopilotPlugin()` (`FirmwarePlugin.h:122`) | `DESIGNED` | 3 | **`AeroraAutoPilotPlugin` does not exist** |
-| `SCR-VEH-02` | Identity & profile | O | `VehicleComponent` subclass; `AeroraUi.identity` | `DESIGNED` | 3 + 7 | fleet identity format `OPEN` |
-| `SCR-VEH-03` | Capability report | O | `VehicleComponent`; `AeroraUi.capabilities` | `DESIGNED` | 3 + 7 | `Q3-009` capability presence reporting |
+| `SCR-VEH-01` | Aerora setup page index | O | `AeroraAutoPilotPlugin::vehicleComponents()` via `FirmwarePlugin::autopilotPlugin()` (`FirmwarePlugin.h:122`) | `VERIFIED` | 3 | — `AeroraAutoPilotPlugin` exists; `AeroraVehicleConfigUITest` clicks the published entries in the real sidebar |
+| `SCR-VEH-02` | Identity & profile | O | `VehicleComponent` subclass; `AeroraUi.identity` | `VERIFIED` | 3 + 7 | fleet identity format `OPEN` — the page withholds it rather than substituting the system id |
+| `SCR-VEH-03` | Capability report | O | `VehicleComponent`; `AeroraUi.capabilities` | `IMPLEMENTED-UNCOMPILED` | 3 + 7 | — `Q3-009` gates capability *content*, not the screen; see below |
 | `SCR-VEH-04` | Sensor & health | O | `VehicleComponent`, or the JSON-driven `vehicleConfigJson()` path | `DESIGNED` | 3 | `P7-VEH-004` |
 | `SCR-VEH-05` | Calibration (authorization-gated) | C/O | upstream calibration pages + the ADR-015 authorization seam | `IMPLEMENTED-UNCOMPILED` (gate) / `DESIGNED` (display) | 3 + 2 | `Q-029` — gate permits everything |
-| `SCR-VEH-06` | Service attachment diagnostics | O | `VehicleComponent` reading `AeroraVehicleServices` | `DESIGNED` | 3 | — |
+| `SCR-VEH-06` | Service attachment diagnostics | O | `VehicleComponent` reading `AeroraVehicleServices` | `VERIFIED` | 3 | — |
+
+#### `SCR-VEH-03` is not blocked by `Q3-009`, and the empty inventory is the reason it exists
+
+`Q3-009` is recorded against "`SCR-VEH-03` content" ([08-risk-register-and-open-decisions.md](08-risk-register-and-open-decisions.md)), and that is exactly right: it gates which capabilities can be *reported*, not whether the station can show the inventory. The same mistake was made for `SCR-VID-01` with `P7-VID-004` and corrected above.
+
+With no evidence source, `AeroraVehicleCapabilities::reportedKeys()` is empty for all five categories — and that is the state the screen is needed for. Before it, the only place an operator saw the capability service mentioned was `SCR-VEH-06`, which reports it as *attached*; an attached service with an empty inventory reads as "this aircraft has no capabilities" unless something says otherwise. `AeroraCapabilityPage.qml` says otherwise, per category, in words, and holds the model's own `NotEvidenced` / `Unavailable` distinction.
+
+Nothing on the page is written twice: the sections are the `Category` `Q_ENUM`, the keys are whatever `reportedKeys()` returns, and each state comes from `state()`. No capability identifier is named, because none is evidenced. The day a source reports one, it appears with no edit to the page — and `AeroraVehicleConfigUITest::_capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence` is the assertion that will fail and have to be updated when that happens.
 
 `SCR-VEH-04` should prefer the JSON-driven `vehicleConfigJson()` path: the base class then derives
 section ids (with `repeat` group expansion probed against live params), a search keyword index,
@@ -627,11 +646,19 @@ startup.
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-HLP-01` | Diagnostics report | O | `analyzePages()`; feeds `SCR-SHL-01` | `SPECIFIED-NOT-DESIGNED` | 1 + 7 | `P7-HELP-001` |
-| `SCR-HLP-02` | State vocabulary reference | O | `showTool()` from `SCR-SHL-01` | `DESIGNED` | 7 | `P7-HELP-003` |
+| `SCR-HLP-02` | State vocabulary reference | O | `analyzePages()` — **not** `showTool()`; see below | `VERIFIED` (registration + derivation) / row rendering under test | 7 | — `P7-HELP-003` is a documentation requirement, which this screen partly answers rather than waits on |
 | `SCR-HLP-03` | Error report assembly | O | `analyzePages()` | `DESIGNED` | 7 | `P7-HELP-002` — explicit operator action only, no auto-send |
 
 `SCR-HLP-02` is cheap and unusually valuable: the seven-state vocabulary is the product's main claim
 and an operator who does not understand it cannot use the product correctly.
+
+Its seam is `analyzePages()` rather than the specified `showTool()` from `SCR-SHL-01`, and the change
+is deliberate. `mainWindow.showTool()` replaces the whole tool drawer, so reaching the vocabulary
+that way from the hub — which is itself an analyze page — swaps the Analyze view out and leaves the
+drawer's back button pointing at Fly or Plan view, not at the list the operator came from. The
+vocabulary page is a sibling entry in that same list, one click away, and `AnalyzePage` also gives
+it the popout-to-window lifecycle, which is worth more on a reference screen than on any other.
+A `showTool()` button from the hub would be a second, worse route to a screen already reachable.
 
 ### Inventory totals
 

@@ -59,6 +59,10 @@ private slots:
     // that hosts the Aerora setup pages, clicked rather than asserted on the registry.
     void _vehicleConfigurationIsReachableFromTheOperationsHub();
 
+    // SCR-VEH-03's claim: the inventory is derived from the category Q_ENUM, and an empty one is
+    // reported as unreported rather than as a vehicle with no capabilities.
+    void _capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence();
+
 private:
     /// Clicks the sidebar entry named @a sidebarObjectName, waits for @a pageObjectName to appear,
     /// and asserts the loaded panel renders visible content.

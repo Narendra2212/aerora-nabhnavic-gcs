@@ -73,6 +73,13 @@ private slots:
     // vocabulary quietly incomplete.
     void _stateVocabularyPageListsEveryStateClass();
 
+    // SCR-VEH-03 - the same question for the capability page, which lists the five category
+    // enumerators by name for the same reason, and calls three Q_INVOKABLE queries on the service.
+    // A category added in C++ and missed on the page would leave a whole class of capability
+    // unreported with nothing to say so; a renamed method would fail at runtime, in QML, on the
+    // first open.
+    void _capabilityPageListsEveryCategoryAndReadsResolvableMethods();
+
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
     // startup self-check reads, so an interface quietly missing its Aerora layer is detectable
     // rather than merely wrong. These are the tests that fail if the AeroraCorePlugin overrides
