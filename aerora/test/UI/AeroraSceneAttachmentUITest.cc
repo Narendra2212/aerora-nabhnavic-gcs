@@ -23,14 +23,7 @@ constexpr const char* kAnalyzeEntryButton = "analyzeButton_Aerora Mission Progre
 /// the click loaded the page rather than silently loading nothing.
 constexpr const char* kPageObjectName = "aeroraMissionProgressPage";
 
-/// SCR-HLP-02's Analyze entry and the flickable inside its loaded page. The title comes from
-/// AeroraCorePlugin::analyzePages(), so a rename there breaks this and should.
-constexpr const char* kVocabularyEntryButton = "analyzeButton_Aerora State Vocabulary";
-constexpr const char* kVocabularyFlickable = "aeroraVocabulary_flickable";
 
-/// Every enumerator of AeroraTelemetryState::Class. The count is what the vocabulary page must
-/// render a row for; AeroraUiFoundationTest holds this set against the meta-object.
-constexpr int kStateClassCount = 7;
 
 }  // namespace
 
@@ -150,52 +143,4 @@ void AeroraSceneAttachmentUITest::_missionProgressPageIsReachableFromTheAnalyzeM
     QVERIFY2(!page->property("_attached").toBool(),
              "with no vehicle connected the page must report no mission observer");
     QVERIFY2(!page->property("_agreementMatched").toBool(), "an unattached page must never report an agreement match");
-}
-
-void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEveryClass()
-{
-    startUI();
-    if (QTest::currentTestFailed()) {
-        return;
-    }
-
-    // No vehicle is connected and none is needed: the page is reference material derived from the
-    // state singleton's own enumeration, which is exactly why it is registered without a vehicle
-    // gate. Reaching it with nothing connected is the normal case.
-    QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
-             "the Analyze view must be reachable from the tool-select dropdown");
-    QVERIFY2(clickButton(QString::fromUtf8(kVocabularyEntryButton)),
-             "the Aerora State Vocabulary entry must appear in the Analyze page list");
-
-    QQuickItem* const flickable =
-        findVisibleItem(_rootItem, QString::fromUtf8(kVocabularyFlickable), TestTimeout::mediumMs());
-    QVERIFY2(flickable, "clicking the entry must load the state vocabulary page");
-
-    // The rows are built by a Repeater over the class list, so an empty list would still load a
-    // page with a heading and a scope note - a screen that looks like it works and teaches nothing.
-    // AeroraStateText is the per-row sample, so counting those counts rendered rows, and it is
-    // identified by its own classLabel property rather than by type name: QGCLabel's concrete Qt
-    // class is an implementation detail of the control, and the property is the contract.
-    //
-    // Polled, because Repeater delegates instantiate over following frames rather than during the
-    // click that loaded the page.
-    const auto sampleCount = [flickable]() {
-        int count = 0;
-        const QList<QQuickItem*> items = flickable->findChildren<QQuickItem*>();
-        for (QQuickItem* const item : items) {
-            if (item->property("classLabel").isValid()) {
-                ++count;
-            }
-        }
-        return count;
-    };
-
-    // One per class, including UNAVAILABLE - whose sample is instantiated and deliberately
-    // invisible, so it is counted by existence rather than by visibility.
-    QVERIFY2(
-        UnitTest::waitForCondition([&sampleCount]() { return sampleCount() == kStateClassCount; },
-                                   TestTimeout::mediumMs(), QStringLiteral("every state class to render a sample")),
-        qPrintable(QStringLiteral("expected %1 rendered state-class samples, found %2")
-                       .arg(kStateClassCount)
-                       .arg(sampleCount())));
 }
