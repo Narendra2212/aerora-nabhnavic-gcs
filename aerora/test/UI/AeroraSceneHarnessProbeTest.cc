@@ -32,6 +32,19 @@ const QStringList& candidatePlatforms()
     return platforms;
 }
 
+/// Breaks the markers CTest scans for, in text that came from the child.
+///
+/// `cmake/QGCTest.cmake:256` gives every test `FAIL_REGULAR_EXPRESSION "FAIL!;Segmentation fault"`,
+/// and CTest matches it against *this* process's output. Echoing a child's log verbatim therefore
+/// fails the probe on the child's words even when every assertion here passed - which is what
+/// happened on Windows, where the child aborts and prints `FAIL!`. The markers are mangled rather
+/// than dropped, so the reading stays legible and still says a failure occurred, in the child.
+QString withoutCTestFailureMarkers(QString text)
+{
+    return text.replace(QLatin1String("FAIL!"), QLatin1String("FAIL-in-child:"))
+        .replace(QLatin1String("Segmentation fault"), QLatin1String("segmentation-fault-in-child"));
+}
+
 /// What one candidate did.
 struct ProbeResult
 {
@@ -121,7 +134,7 @@ ProbeResult probePlatform(const QString& platform, const QString& suite)
     // lines are where the abort and the failing operation are.
     const QString output = QString::fromLocal8Bit(child.readAll());
     const QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-    result.tail = lines.mid(qMax(0, lines.count() - 6)).join(QStringLiteral(" | "));
+    result.tail = withoutCTestFailureMarkers(lines.mid(qMax(0, lines.count() - 6)).join(QStringLiteral(" | ")));
 
     return result;
 }
