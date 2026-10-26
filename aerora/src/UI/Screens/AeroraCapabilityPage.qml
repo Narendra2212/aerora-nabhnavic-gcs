@@ -41,13 +41,18 @@ import QGroundControl.Controls
 /// and inventing one would be inventing a capability dialect. The day an evidence source reports a
 /// key, it appears here with no edit to this page.
 ///
-/// \section live Why the inventory is re-read rather than bound
+/// \section live Why a report counter appears in the bindings
 ///
-/// `reportedKeys()` and `state()` are `Q_INVOKABLE` methods, not notifying properties, so a binding
-/// over them is evaluated once and never again. `AeroraVehicleCapabilities` does emit
-/// `capabilityChanged()` and `reportsCleared()`, so the page tracks those and re-reads. Without it
-/// the page would show the inventory as it stood when the panel loaded and would silently stop
-/// agreeing with the vehicle - which is the failure mode this overlay has hit before.
+/// `reportedKeys()` and `state()` are `Q_INVOKABLE` methods, not notifying properties. A binding
+/// over them has nothing to depend on, so it is evaluated once when the panel loads and never
+/// again - the page would keep showing the inventory as it stood then and would silently stop
+/// agreeing with the vehicle, which is a failure mode this overlay has hit before.
+///
+/// `AeroraVehicleCapabilities` does emit `capabilityChanged()` and `reportsCleared()`.
+/// `_reportRevision` counts them, and every expression that reads the inventory takes it as an
+/// argument, so the dependency is visible at each call site rather than inferred. A vehicle change
+/// needs no counter: `_capabilityService()` reads `AeroraUi.available` and `AeroraUi.capabilities`,
+/// which do notify.
 ///
 /// \section token Why not AeroraTokenDisplay
 ///
@@ -89,15 +94,14 @@ SetupPage {
     /// @return The active vehicle's capability service, or null.
     ///
     /// Null is the normal case: no vehicle, a vehicle that is not an Aerora composition, or the
-    /// service not attached. A function rather than only a property so `_readReportedKeys()` can
-    /// resolve the service without depending on the order in which bindings and signal handlers
-    /// run for the same `servicesChanged()` emission.
+    /// service not attached. One definition, read by the property below and by the inventory
+    /// expressions, so "which object this page reads" is written once.
     function _capabilityService() {
         return (!!AeroraUi && AeroraUi.available && AeroraUi.capabilities) ? AeroraUi.capabilities : null
     }
 
-    /// The same answer as a bound property, for the rows to read. Updates on `servicesChanged()`,
-    /// because that is what the reads inside `_capabilityService()` notify on.
+    /// The same answer as a property, for the rows and the `Connections` target to read. Updates on
+    /// `servicesChanged()`, because that is what the reads inside `_capabilityService()` notify on.
     readonly property var _capabilities: root._capabilityService()
 
     /// Every enumerator of `AeroraVehicleCapabilities.Category`, in declaration order. Listed by
@@ -112,36 +116,8 @@ SetupPage {
         AeroraVehicleCapabilities.Command
     ]
 
-    /// The keys reported for each category, in the order `_categories` declares them.
-    ///
-    /// Assigned rather than bound. `reportedKeys()` is a `Q_INVOKABLE`, so a binding over it would
-    /// be evaluated once when the panel loaded and never again - the page would keep showing the
-    /// inventory as it stood then. Every input that can change it re-reads instead, which is the
-    /// three handlers below.
-    property var _reportedKeys: []
-
-    function _readReportedKeys() {
-        const service = root._capabilityService()
-
-        var byCategory = []
-        for (var i = 0; i < root._categories.length; ++i) {
-            byCategory.push(service ? service.reportedKeys(root._categories[i]) : [])
-        }
-
-        root._reportedKeys = byCategory
-    }
-
-    Component.onCompleted: root._readReportedKeys()
-
-    Connections {
-        // The active vehicle changed, or its Aerora services appeared or went away, so the service
-        // this page reads may be a different object or none.
-        target: AeroraUi
-
-        function onServicesChanged() {
-            root._readReportedKeys()
-        }
-    }
+    /// Bumped on every capability report, so `_reportedKeys` is re-read. See \section live.
+    property int _reportRevision: 0
 
     Connections {
         target: root._capabilities
@@ -149,12 +125,36 @@ SetupPage {
         // Declared with no parameters on purpose: the page re-reads the whole inventory rather
         // than trusting one notification's arguments to describe it.
         function onCapabilityChanged() {
-            root._readReportedKeys()
+            root._reportRevision++
         }
 
         function onReportsCleared() {
-            root._readReportedKeys()
+            root._reportRevision++
         }
+    }
+
+    /// The keys reported for each category, in the order `_categories` declares them.
+    readonly property var _reportedKeys: root._readReportedKeys(root._reportRevision)
+
+    /// @param revision Not read by the computation. It is this binding's explicit dependency:
+    ///        `reportedKeys()` is a `Q_INVOKABLE` rather than a notifying property, so without it
+    ///        the expression would be evaluated once when the panel loaded and never again. The
+    ///        other dependency is implicit and sufficient on its own - `_capabilityService()` reads
+    ///        `AeroraUi.available` and `AeroraUi.capabilities`, which notify, so a vehicle change
+    ///        re-reads without the counter.
+    ///
+    /// Kept a binding rather than an assignment driven from `Component.onCompleted`: `SetupPage`
+    /// declares a root-level `Component.onCompleted` of its own, and a derived page's handler is
+    /// not guaranteed to run alongside it rather than in place of it.
+    function _readReportedKeys(revision) {
+        const service = root._capabilityService()
+
+        var byCategory = []
+        for (var i = 0; i < root._categories.length; ++i) {
+            byCategory.push(service ? service.reportedKeys(root._categories[i]) : [])
+        }
+
+        return byCategory
     }
 
     /// Operator-facing name for a category. The `Q_ENUM` keys are identifiers, not labels, and
@@ -180,11 +180,15 @@ SetupPage {
     /// resolving, every comparison yields `undefined === value` and the key reads as unreported,
     /// which is the honest direction. Written against `Available` and negated, the same failure
     /// would present an unreported capability as present.
-    function _stateText(category, key) {
-        if (!root._capabilities) {
+    ///
+    /// @param revision Not read. The caller's dependency on the report counter - see \section live.
+    function _stateText(category, key, revision) {
+        const service = root._capabilityService()
+        if (!service) {
             return ""
         }
-        var state = root._capabilities.state(category, key)
+
+        const state = service.state(category, key)
         if (state === AeroraVehicleCapabilities.Available) {
             return qsTr("Reported present by an evidence source.")
         }
@@ -198,11 +202,15 @@ SetupPage {
     /// happen - `report()` rejects `NotEvidenced`, so a listed key always has one. A capability
     /// reported absent is a correct answer rather than a gap, the same reading `SCR-VEH-06` gives
     /// `NotAerora`.
-    function _stateIsWarning(category, key) {
-        if (!root._capabilities) {
+    ///
+    /// @param revision Not read. The caller's dependency on the report counter - see \section live.
+    function _stateIsWarning(category, key, revision) {
+        const service = root._capabilityService()
+        if (!service) {
             return false
         }
-        var state = root._capabilities.state(category, key)
+
+        const state = service.state(category, key)
         return (state !== AeroraVehicleCapabilities.Available)
                && (state !== AeroraVehicleCapabilities.Unavailable)
     }
@@ -286,8 +294,10 @@ SetupPage {
 
                             Layout.fillWidth: true
                             label: capabilityRow.modelData
-                            warning: root._stateIsWarning(categorySection.category, capabilityRow.modelData)
-                            statusText: root._stateText(categorySection.category, capabilityRow.modelData)
+                            warning: root._stateIsWarning(categorySection.category, capabilityRow.modelData,
+                                                          root._reportRevision)
+                            statusText: root._stateText(categorySection.category, capabilityRow.modelData,
+                                                        root._reportRevision)
                             basis: qsTr("AeroraVehicleCapabilities.state(). The key is carried verbatim from "
                                         + "the evidence source and is not parsed: no Aerora capability "
                                         + "identifier is evidenced.")
