@@ -395,7 +395,7 @@ Owner: Tab 2.
 | ID | Requirement | Status |
 | --- | --- | --- |
 | `P7-RAD-001` | QGC's link layer (serial, UDP, TCP, Bluetooth, MockLink) is reused unchanged | `IMPLEMENTED` (upstream) |
-| `P7-RAD-002` | Link state, quality and freshness are displayed per link, not aggregated into one bar | `DESIGNED` |
+| `P7-RAD-002` | Link state, quality and freshness are displayed per link, not aggregated into one bar | `VERIFIED` (state) / `OPEN` (quality) — `SCR-LIV-07` renders one row per link and `AeroraFlyViewOverlayUITest` holds the row list against the vehicle's own `linkNames`. Quality is **not** per link and is not presented as such: upstream counts message loss per vehicle, so the panel labels that figure as covering all links together rather than dividing an aggregate |
 | `P7-RAD-003` | **Every Aerora radio capability is `DESIGNED`, not supported.** No radio hardware has been attached, so no claim of hardware support is made | `DESIGNED` â€” `D-004` deferred |
 | `P7-RAD-004` | A designed-but-unverified interface is labelled as such in the UI as well as in the documents | `DESIGNED` |
 | `P7-RAD-005` | Link redundancy and failover behaviour are not implemented and not displayed as available | `OPEN` |

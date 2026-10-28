@@ -319,7 +319,7 @@ Columns: **Class** per [§4](#4-delivery-classes) · **Seam** the exact mechanis
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-SHL-01` | Aerora Operations Hub | O | `analyzePages()` + `mainWindow.showTool()` | `IMPLEMENTED-UNCOMPILED` | 7 | — (navigation half deferred: no destination screen exists) |
 | `SCR-SHL-02` | Aerora indicator cluster | O | `QGCCorePlugin::toolBarIndicators()` (non-vehicle) + `FirmwarePlugin::toolIndicators()` (per-vehicle) | `IMPLEMENTED-UNCOMPILED` (non-vehicle half) | 7 + 3 | Non-vehicle: **closed** — `HO-TAB7-06` registers `AeroraEnforcementIndicator.qml`. Per-vehicle: implemented and correctly inert — `AeroraFirmwarePlugin::toolIndicators()` returns the base list untouched because `AeroraToolIndicators::declaredIndicators()` is empty (U5), awaiting an evidenced capability identifier (`Q3-009`) |
-| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `IMPLEMENTED-UNCOMPILED` | 7 + 2 | Read path **closed** (`D-UI-01`, `AeroraSecurityStatus`); QML **closed** (`HO-TAB1-10`, `602b38a18`); registration **closed** (`HO-TAB7-06`) — see [§ The indicator seam](#the-indicator-seam-and-what-it-is-allowed-to-carry). Renders `NotEnforced` vs `EnforcedAtCommandGate` only; no roles, policies or command paths |
+| `SCR-SHL-03` | Enforcement-state strip | O | Indicator reading `AeroraSecurity.enforcement` | `VERIFIED` — `AeroraFlyViewOverlayUITest` finds it in the toolbar with no vehicle connected and requires it to report *not enforced* | 7 + 2 | Read path **closed** (`D-UI-01`, `AeroraSecurityStatus`); QML **closed** (`HO-TAB1-10`, `602b38a18`); registration **closed** (`HO-TAB7-06`) — see [§ The indicator seam](#the-indicator-seam-and-what-it-is-allowed-to-carry). Renders `NotEnforced` vs `EnforcedAtCommandGate` only; no roles, policies or command paths |
 | `SCR-SHL-04` | Build provenance / about | O | `analyzePages()` entry | `SPECIFIED-NOT-DESIGNED` | 1 | `P7-HELP-004` — no provenance source exists |
 
 `SCR-SHL-03` is the screen that makes `P7-AUTH-002` visible: the station must be able to say "not
@@ -484,7 +484,7 @@ View rather than a screen with an address, so there is nothing to navigate to.
 | `SCR-LIV-04` | Power & tether panel | O | child; `AeroraUi.power` | `DESIGNED` | 7 + 6 | `P7-PWR-006` tether item set undefined |
 | `SCR-LIV-05` | Proposal queue / approval | O | child | `SPECIFIED-NOT-DESIGNED` | 7 + 6 | `P7-AI-001` proposal model; `Q-029` |
 | `SCR-LIV-06` | Mission progress & verification | O | `analyzePages()` + overlay child; `AeroraUi.mission` | `VERIFIED` | 7 + 5 | — verification itself still needs `verify()`, which nothing calls |
-| `SCR-LIV-07` | Per-link state panel | O | child | `DESIGNED` | 7 | `P7-RAD-002`; label as `DESIGNED` not supported |
+| `SCR-LIV-07` | Per-link state panel | O | child of `SCR-LIV-01`; `vehicle.vehicleLinkManager` | `VERIFIED` | 7 | — `P7-RAD-002` is the display rule the panel implements. The panel's footer carries the `P7-RAD-004` label |
 | `SCR-LIV-08` | Critical-state alert surface | O | child + `QGCPopupDialog` | `DESIGNED` | 7 | `P7-FLY-005` |
 | `SCR-LIV-09` | Aerora pre-flight checklist | C | `QGCOptions::preFlightChecklistUrl()` — replaces wholesale, **no fork** | `DESIGNED` | 7 | `P7-CHK-004` unevaluable-check handling |
 
@@ -641,7 +641,25 @@ startup.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-SIM-01` | Simulated source control & labelling | O | `analyzePages()`; upstream MockLink settings are class R | `DESIGNED` | 8 | `P7-SIM-002` — labelling must reach every display, not just this screen |
+| `SCR-SIM-01` | Simulated source control & labelling | O | `analyzePages()`; upstream MockLink settings are class R | `BLOCKED` | 8 | the only QML-reachable discriminator is compiled out of release builds — see below |
+
+#### `SCR-SIM-01` is blocked on a discriminator that does not exist where it matters
+
+The screen would list the station's links and mark the simulated ones. The only discriminator QML can
+reach is `LinkConfiguration.linkType` compared against `TypeMock` — and `TypeMock` is declared inside
+`#ifdef QT_DEBUG` (`LinkConfiguration.h:112`). In a release build the enumerator is absent, the
+comparison evaluates against `undefined`, and every simulated link would be reported as **not
+simulated**. That is the fail-unsafe direction, in precisely the build where mislabelling simulated
+data as live matters most.
+
+Inverting it — positively identifying the real transports and treating everything else as "not a
+live transport" — would be fail-safe, but it invents a classification the product has not defined
+and sweeps log replay in with simulation.
+
+`P7-SIM-002` is the deeper reason to wait: it requires a simulated source be labelled "in every
+display that shows its values", which is a property of the value, not of a screen. One screen listing
+links cannot satisfy it, and building the screen first would make it look satisfied. The decision
+needed is where the simulated flag lives on a reported value.
 
 ### Help & diagnostics — 3 screens
 
@@ -680,14 +698,14 @@ A `showTool()` button from the hub would be a second, worse route to a screen al
 
 | Status | Count | Screens |
 | --- | --- | --- |
-| `VERIFIED` — navigated to and drawn in a booted window | **11** | `SCR-SHL-01`, `SCR-LIV-01`, `SCR-LIV-06`, `SCR-VEH-01`..`04`, `SCR-VEH-06`, `SCR-SEC-01`, `SCR-HLP-02`, `SCR-HLP-03` |
+| `VERIFIED` — navigated to and drawn in a booted window | **13** | `SCR-SHL-01`, `SCR-SHL-03`, `SCR-LIV-01`, `SCR-LIV-06`, `SCR-LIV-07`, `SCR-VEH-01`..`04`, `SCR-VEH-06`, `SCR-SEC-01`, `SCR-HLP-02`, `SCR-HLP-03` |
 | `SUPERSEDED` by a delivered screen | 1 | `SCR-HLP-01` |
-| Not delivered | 33 | of which 5 have an implemented service or half behind them |
+| Not delivered | 31 | of which 4 have an implemented service or half behind them |
 | **Total Aerora screens** | **45** | |
 | Class X (forks) | **0** | |
 | Upstream screens reused unchanged (class R) | Not enumerated — the entire QGC surface | |
 
-The 33 undelivered screens are not a backlog of unwritten code. **Every one of them is waiting on a
+The 31 undelivered screens are not a backlog of unwritten code. **Every one of them is waiting on a
 product, firmware or architecture decision** — a command set, a reported-value set, a freshness
 budget, an operator role policy, an autonomy proposal model, a durable store, a fleet identity
 format, or a fork point. Designing them before the decision would mean inventing the decision. See
