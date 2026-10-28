@@ -105,6 +105,13 @@ Item {
     /// station's life.
     readonly property var _mission: root._available && AeroraUi.mission ? AeroraUi.mission : null
 
+    /// The active vehicle itself, for the panels that read upstream state rather than an Aerora
+    /// service. Reached through the `QGroundControl` singleton rather than `globals`, which is an id
+    /// on a QtObject inside MainWindow.qml - see the note on AeroraHealthPage.qml.
+    readonly property var _vehicle: QGroundControl.multiVehicleManager.activeVehicle
+                                    ? QGroundControl.multiVehicleManager.activeVehicle
+                                    : null
+
     readonly property real _margin: ScreenTools.defaultFontPixelWidth
 
     QGCPalette {
@@ -136,6 +143,13 @@ Item {
         AeroraMissionProgressPanel {
             Layout.fillWidth: true
             mission: root._mission
+        }
+
+        // SCR-LIV-07. Reads the vehicle's own link manager rather than an Aerora service, because
+        // the link layer is reused unchanged (P7-RAD-001) and Aerora adds no radio of its own.
+        AeroraLinkStatePanel {
+            Layout.fillWidth: true
+            vehicle: root._vehicle
         }
 
         // Extension point. Later SCR-LIV-* panels are appended here and need no change to the

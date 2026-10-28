@@ -63,6 +63,16 @@ private slots:
     // The read-only boundary the seam declaration was approved under.
     void _overlayCarriesNoActionableControl();
 
+    // SCR-LIV-07. The panel reads the vehicle's own link manager, so this holds its row count and
+    // the parallel-list invariant against the vehicle rather than against a fixture's expectation.
+    void _linkStatePanelReportsOneRowPerLink();
+
+    // SCR-SHL-03. The enforcement strip reaches the toolbar through a QUrl in toolBarIndicators()
+    // and a Loader, so nothing short of a running application can say whether it arrived. This is
+    // the first assertion that it does - and that it reports *not enforced*, which is this build's
+    // actual state and the reason P7-AUTH-002 wanted the strip.
+    void _enforcementIndicatorReachesTheToolbarAndReportsNotEnforced();
+
 private:
     /// Locates the overlay root in the booted scene. Includes hidden items: the root is present
     /// even when its panels are not, and that distinction is the subject of two of these tests.

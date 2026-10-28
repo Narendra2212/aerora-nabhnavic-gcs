@@ -146,6 +146,7 @@ set(AERORA_UI_QML_MODULE_URI "Aerora.Controls")
 
 set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Controls/AeroraAgeLabel.qml
+    ${AERORA_UI_DIR}/Controls/AeroraLinkStatePanel.qml
     ${AERORA_UI_DIR}/Controls/AeroraMissionProgressPanel.qml
     ${AERORA_UI_DIR}/Controls/AeroraOverlayValueRow.qml
     ${AERORA_UI_DIR}/Controls/AeroraSelfReportRow.qml

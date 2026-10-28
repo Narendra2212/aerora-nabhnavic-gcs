@@ -30,6 +30,7 @@
 #include "QGroundControlQmlGlobal.h"
 #include "SysStatusSensorInfo.h"
 #include "Vehicle.h"
+#include "VehicleLinkManager.h"
 
 namespace {
 
@@ -400,7 +401,7 @@ void AeroraUiFoundationTest::_upstreamBindingsTheNewScreensDependOnResolve()
     const QMetaObject* const vehicleMeta = &Vehicle::staticMetaObject;
     for (const char* const property :
          {"sysStatusSensorInfo", "allSensorsHealthy", "firmwareMajorVersion", "firmwareMinorVersion",
-          "firmwarePatchVersion", "firmwareVersionTypeString", "gitHash"}) {
+          "firmwarePatchVersion", "firmwareVersionTypeString", "gitHash", "vehicleLinkManager", "mavlinkLossPercent"}) {
         QVERIFY2(vehicleMeta->indexOfProperty(property) != -1,
                  qPrintable(QStringLiteral("an Aerora screen reads Vehicle.%1").arg(QString::fromUtf8(property))));
     }
@@ -414,6 +415,16 @@ void AeroraUiFoundationTest::_upstreamBindingsTheNewScreensDependOnResolve()
             sensorMeta->indexOfProperty(property) != -1,
             qPrintable(
                 QStringLiteral("AeroraHealthPage.qml reads sysStatusSensorInfo.%1").arg(QString::fromUtf8(property))));
+    }
+
+    // SCR-LIV-07 reads the vehicle's link manager. These four are what the panel renders, and
+    // linkStatuses() in particular carries upstream's encode-health-as-an-empty-string convention
+    // that the panel has to read rather than display - see \section empty on the panel.
+    const QMetaObject* const linkMeta = &VehicleLinkManager::staticMetaObject;
+    for (const char* const property : {"linkNames", "linkStatuses", "primaryLinkName", "communicationLost"}) {
+        QVERIFY2(linkMeta->indexOfProperty(property) != -1,
+                 qPrintable(QStringLiteral("AeroraLinkStatePanel.qml reads vehicleLinkManager.%1")
+                                .arg(QString::fromUtf8(property))));
     }
 
     // SCR-HLP-03's build provenance lines, and the one action on any Aerora screen.

@@ -73,6 +73,11 @@ import QGroundControl.Controls
 QGCLabel {
     id: root
 
+    // Test hook. The indicator reaches the toolbar through a QUrl in toolBarIndicators() and a
+    // Loader, so nothing upstream of a running application can report whether it arrived - a
+    // scene test needs a name to look for.
+    objectName: "aeroraEnforcementIndicator"
+
     /// Required by the unguarded `visible: item.showIndicator` binding described above. See
     /// \ref always for why it is constant.
     property bool showIndicator: true

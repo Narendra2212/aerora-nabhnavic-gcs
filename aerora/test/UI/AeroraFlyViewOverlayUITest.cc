@@ -3,6 +3,8 @@
 #include <QtCore/QList>
 #include <QtCore/QRectF>
 #include <QtCore/QRegularExpression>
+#include <QtCore/QString>
+#include <QtCore/QStringList>
 #include <QtCore/QVariant>
 #include <QtCore/QVariantList>
 #include <QtQuick/QQuickItem>
@@ -232,4 +234,78 @@ void AeroraFlyViewOverlayUITest::_overlayCarriesNoActionableControl()
             QVERIFY2(!hasActionableControl(overlay),
                      "the Live Operations overlay must carry no button and no mouse area");
         });
+}
+
+void AeroraFlyViewOverlayUITest::_linkStatePanelReportsOneRowPerLink()
+{
+    runWithMockLink(
+        [] { return MockLink::startGenericMockLink(); },
+        [this](QPointer<MockLink>, Vehicle* vehicle) {
+            QVERIFY(vehicle);
+
+            QQuickItem* const overlay = _overlay();
+            QVERIFY(overlay);
+
+            QQuickItem* const panel = findItem(overlay, QStringLiteral("aeroraLinkStatePanel"));
+            QVERIFY2(panel, "the overlay must contain the link state panel");
+
+            // Polled for the same reason as the occluder publication: the services attach during
+            // vehicle construction but the binding chain settles a frame or two later.
+            QVERIFY2(UnitTest::waitForCondition([panel]() { return panel->isVisible(); }, TestTimeout::mediumMs(),
+                                                QStringLiteral("the link panel to render")),
+                     "with an Aerora vehicle connected the link panel must render");
+
+            // Read the same source the panel reads, so the comparison is between the panel and the
+            // vehicle rather than between the panel and this test's idea of the vehicle.
+            QObject* const linkManager = vehicle->property("vehicleLinkManager").value<QObject*>();
+            QVERIFY2(linkManager, "the vehicle must publish its link manager");
+
+            const QStringList vehicleLinkNames = linkManager->property("linkNames").toStringList();
+            QVERIFY2(!vehicleLinkNames.isEmpty(), "a connected vehicle must have at least one link to report");
+
+            // One row per link and none invented. P7-RAD-002 asks for per-link display rather than
+            // an aggregate, and a panel that collapsed them would fail here rather than on review.
+            QCOMPARE(panel->property("_linkNames").toStringList(), vehicleLinkNames);
+
+            // Upstream's parallel-list invariant, which the panel indexes into. If the two lists
+            // ever differed in length the panel would describe one link with another's status, and
+            // the per-link display would be worse than an aggregate rather than better.
+            QCOMPARE(panel->property("_linkStatuses").toStringList().size(), qsizetype(vehicleLinkNames.size()));
+
+            // The link the vehicle is actually addressed through. Read to mark a row; a panel that
+            // left it empty would mark none, which on a multi-link handover is the one thing the
+            // operator needs.
+            QVERIFY2(!panel->property("_primaryLinkName").toString().isEmpty(),
+                     "a connected vehicle must have a primary link for the panel to mark");
+        });
+}
+
+void AeroraFlyViewOverlayUITest::_enforcementIndicatorReachesTheToolbarAndReportsNotEnforced()
+{
+    startUI();
+    if (QTest::currentTestFailed()) {
+        return;
+    }
+
+    // No vehicle needed and deliberately none connected: the enforcement strip is a non-vehicle
+    // indicator, which is the whole point of registering it through QGCCorePlugin rather than
+    // through FirmwarePlugin. It must be readable before anything is connected.
+    QQuickItem* const indicator =
+        findVisibleItem(_rootItem, QStringLiteral("aeroraEnforcementIndicator"), TestTimeout::mediumMs());
+    QVERIFY2(indicator,
+             "the Aerora enforcement indicator must reach the toolbar through toolBarIndicators(); a missing one "
+             "is the silent-registration failure this overlay has hit before");
+
+    // The claim the strip exists to make. No authorization policy is installed in any build
+    // shipped so far, so the honest reading is "not enforced" - and the derivation is written
+    // against the enforced enumerator so a resolution failure lands here too rather than
+    // presenting enforcement that is not happening.
+    QVERIFY2(!indicator->property("_enforced").toBool(),
+             "with no authorization policy installed the strip must not report enforcement");
+
+    // Asserted because the binding FlyView's toolbar uses is `visible: item.showIndicator`, which
+    // is unguarded: an indicator that lost this property would be laid out with an undefined
+    // visibility rather than failing.
+    QVERIFY2(indicator->property("showIndicator").toBool(),
+             "the toolbar binds visible to showIndicator, so the indicator must keep it true");
 }
