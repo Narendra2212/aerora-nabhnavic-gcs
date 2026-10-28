@@ -63,6 +63,10 @@ Rectangle {
 
     QGCFlickable {
         id:                 buttonScroll
+        // Test hook, same purpose as setupPage_contentLoader and vehicleConfig_panelLoader: the
+        // page list scrolls, so a UI test has to be able to bring an entry below the fold into
+        // view before it can click it.
+        objectName:         "analyzeView_buttonScroll"
         width:              buttonColumn.width
         anchors.topMargin:  _defaultTextHeight / 2
         anchors.top:        parent.top

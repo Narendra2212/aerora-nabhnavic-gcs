@@ -47,6 +47,12 @@ constexpr const char* kHubReportFlickable = "aeroraHub_reportFlickable";
 /// The Configure view's root, which is the destination the hub button claims to open.
 constexpr const char* kVehicleConfigRoot = "vehicleConfig_root";
 
+/// The Analyze view's own page-list flickable. Aerora entries are appended after the upstream ones,
+/// so the list outgrows an offscreen window and an entry has to be scrolled into view before it can
+/// be clicked. Clicked through the scrolling helper so this stays independent of how many entries
+/// precede the hub.
+constexpr const char* kAnalyzeListFlickable = "analyzeView_buttonScroll";
+
 }  // namespace
 
 void AeroraVehicleConfigUITest::init()
@@ -177,7 +183,8 @@ void AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperation
             // of the Analyze view consuming analyzePages(), which the registry cannot report.
             QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
                      "the Analyze view must be reachable from the tool-select dropdown");
-            QVERIFY2(clickButton(QString::fromUtf8(kHubAnalyzeEntryButton)),
+            QVERIFY2(clickButtonScrolled(QString::fromUtf8(kHubAnalyzeEntryButton),
+                                         QString::fromUtf8(kAnalyzeListFlickable)),
                      "the Aerora Operations entry must appear in the Analyze page list");
 
             // Found including hidden items, then scrolled: the navigation section is at the bottom

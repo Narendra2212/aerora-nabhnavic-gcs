@@ -45,6 +45,13 @@ constexpr const char* kSecurityFlickable = "aeroraSecurity_flickable";
 constexpr const char* kErrorReportEntryButton = "analyzeButton_Aerora Error Report";
 constexpr const char* kErrorReportFlickable = "aeroraErrorReport_flickable";
 
+/// The Analyze view's own page-list flickable. Every Aerora entry is appended after the upstream
+/// ones, so the list is taller than an offscreen window and an entry has to be scrolled into view
+/// before it can be clicked - which is how "Aerora Error Report" first failed, at
+/// (97.6, 625.5) in an 800x590 window. Clicking through clickButtonScrolled() rather than
+/// clickButton() makes that independent of how many entries precede it.
+constexpr const char* kAnalyzeListFlickable = "analyzeView_buttonScroll";
+
 /// Counts the AeroraStateText samples in the visual subtree rooted at @a item.
 ///
 /// Walked through childItems() rather than QObject::findChildren(), and that is the correction that
@@ -208,7 +215,7 @@ void AeroraSceneAttachmentUITest::_missionProgressPageIsReachableFromTheAnalyzeM
     QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
              "the Analyze view must be reachable from the tool-select dropdown");
 
-    QVERIFY2(clickButton(QString::fromUtf8(kAnalyzeEntryButton)),
+    QVERIFY2(clickButtonScrolled(QString::fromUtf8(kAnalyzeEntryButton), QString::fromUtf8(kAnalyzeListFlickable)),
              "the Aerora Mission Progress entry must appear in the Analyze page list");
 
     // Clicking is not loading. Without this the test would pass against an entry that opens an
@@ -236,7 +243,7 @@ void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEvery
     // gate. Reaching it with nothing connected is the normal case.
     QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
              "the Analyze view must be reachable from the tool-select dropdown");
-    QVERIFY2(clickButton(QString::fromUtf8(kVocabularyEntryButton)),
+    QVERIFY2(clickButtonScrolled(QString::fromUtf8(kVocabularyEntryButton), QString::fromUtf8(kAnalyzeListFlickable)),
              "the Aerora State Vocabulary entry must appear in the Analyze page list");
 
     QQuickItem* const flickable =
@@ -275,7 +282,7 @@ void AeroraSceneAttachmentUITest::_securityPosturePageIsReachableAndReportsNotEn
 
     QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
              "the Analyze view must be reachable from the tool-select dropdown");
-    QVERIFY2(clickButton(QString::fromUtf8(kSecurityEntryButton)),
+    QVERIFY2(clickButtonScrolled(QString::fromUtf8(kSecurityEntryButton), QString::fromUtf8(kAnalyzeListFlickable)),
              "the Aerora Security entry must appear in the Analyze page list");
 
     QQuickItem* const flickable =
@@ -310,7 +317,7 @@ void AeroraSceneAttachmentUITest::_errorReportPageIsReachableAndAssemblesRealSta
 
     QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
              "the Analyze view must be reachable from the tool-select dropdown");
-    QVERIFY2(clickButton(QString::fromUtf8(kErrorReportEntryButton)),
+    QVERIFY2(clickButtonScrolled(QString::fromUtf8(kErrorReportEntryButton), QString::fromUtf8(kAnalyzeListFlickable)),
              "the Aerora Error Report entry must appear in the Analyze page list");
 
     QQuickItem* const flickable =
