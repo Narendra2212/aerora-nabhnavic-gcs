@@ -203,10 +203,11 @@ reports agreement, and it refuses to replay payload state. Both are the right sh
 | --- | --- | --- | --- |
 | `AeroraVehicleUiContext` | `UI/AeroraVehicleUiContext.{h,cc}` | `QML_NAMED_ELEMENT(AeroraUi)` + `QML_SINGLETON` | `IMPLEMENTED-UNCOMPILED` — 5 typed read-only properties |
 | `AeroraQmlOverrides` | `UI/AeroraQmlOverrides.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` — **not installed (HO-TAB7-02)**; allow-list currently empty |
-| `AeroraValueDisplay` | `UI/Controls/AeroraValueDisplay.qml` | — | `IMPLEMENTED-UNCOMPILED` — **never linted** |
-| `AeroraStateText` | `UI/Controls/AeroraStateText.qml` | — | `IMPLEMENTED-UNCOMPILED` — never linted |
-| `AeroraAgeLabel` | `UI/Controls/AeroraAgeLabel.qml` | — | `IMPLEMENTED-UNCOMPILED` — never linted |
-| `AeroraTokenDisplay` | `UI/Controls/AeroraTokenDisplay.qml` | — | `IMPLEMENTED-UNCOMPILED` — never linted |
+| `AeroraValueDisplay` | `UI/Controls/AeroraValueDisplay.qml` | — | `IMPLEMENTED-UNCOMPILED` — linted, one unqualified-access finding |
+| `AeroraStateText` | `UI/Controls/AeroraStateText.qml` | — | `VERIFIED` (renders) — the vocabulary page's seven samples are this control, found in a booted window |
+| `AeroraAgeLabel` | `UI/Controls/AeroraAgeLabel.qml` | — | `IMPLEMENTED-UNCOMPILED` — linted, one unqualified-access finding |
+| `AeroraTokenDisplay` | `UI/Controls/AeroraTokenDisplay.qml` | — | `IMPLEMENTED-UNCOMPILED` — linted, one unqualified-access finding |
+| `AeroraSelfReportRow` | `UI/Controls/AeroraSelfReportRow.qml` | — | `VERIFIED` (renders) — the rows on `SCR-VEH-02`, `SCR-VEH-03` and `SCR-VEH-06`, drawn in a booted window |
 | The other 41 screens | — | — | `DESIGNED` (24) / `SPECIFIED-NOT-DESIGNED` (19) — see [03 §8](03-gui-information-architecture-and-screens.md#8-screen-inventory) |
 
 `AeroraVehicleUiContext` exposes one typed `Q_PROPERTY` per service (`payload`, `power`, `mission`,
@@ -216,9 +217,15 @@ exposes **no** `vehicle` property (reachable already as
 the surface for no gain) and **no** `telemetry` property (nothing to show). Both absences are
 asserted by `AeroraUiSafetyTest::_uiContextDoesNotExposeTheVehicleOrTheServiceMap`.
 
-**No QML file in the overlay has had any tooling applied to it.** There is no `qmllint` or
-`qmlformat` on this host. This is the single largest first-build risk — see
-[§10](#10-first-build-expectations).
+`qmllint` **has** now been applied to the overlay's QML — 15 files, CI run 40363963190, under
+`--qml-build` against the generated types. It is not clean, and most of what it reports is its own
+view of the source layout rather than a defect; the reading is recorded once, in
+[04-ui-implementation/00-ui-architecture-map.md](../04-ui-implementation/00-ui-architecture-map.md).
+Neither `qmllint` nor `qmlformat` exists on the authoring host, so this is CI-only evidence.
+
+The "no tooling has touched the QML" first-build risk is therefore retired: the overlay compiles on
+Linux and Windows, and its screens are navigated to and drawn in a booted window by
+`AeroraSceneAttachmentUITest`, `AeroraVehicleConfigUITest` and `AeroraFlyViewOverlayUITest`.
 
 ## 3. QML-reachable surface
 

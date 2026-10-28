@@ -669,8 +669,32 @@ The findings fall into two groups and only one of them is a defect:
 | `colorGroupEnabled: enabled` reads `enabled` unqualified from the parent element | 8 controls | **Real, and unfixed.** It is also upstream QGC's idiom, repeated across `src/`, so the overlay is no stricter than the code it mirrors here. Left alone deliberately rather than silently: polishing this before the module resolves would be tidying output that cannot yet be trusted |
 
 So the honest status is *`qmllint` now covers the overlay and reports findings that are mostly its
-own view of the source layout.* Making the run meaningful means pointing it at the module as built
-rather than at the source tree, which is the next step and is not taken here.
+own view of the source layout.*
+
+#### Pointing qmllint at the module as built was tried and does not work
+
+The obvious correction — lint each module member from its copy in the built module tree, where the
+layout is flat — was implemented, run, and **reverted**. Run 40651177206 disproved it twice over:
+
+* **The build tree has no flat Aerora module directory to read.** 14 of the 15 files found no
+  candidate under `${CMAKE_BINARY_DIR}/qml`, so the `.qml` files are not materialised beside the
+  generated `qmldir` and `.qmltypes` the way they are for upstream's modules. There is nothing to
+  point at.
+* **The one file that did match matched the wrong module.** `aerora/src/UI/Overrides/FlyViewCustomLayer.qml`
+  resolved to upstream's `FlyViewCustomLayer.qml` on basename, so qmllint linted upstream's stub and
+  the output was relabelled with the Aerora path — nine "unused import" findings at line numbers
+  that belong to a different file. A mechanism that fabricates diagnostics is worse than the gap it
+  was closing, so it is gone rather than narrowed.
+
+What remains are two options, and both are decisions rather than fixes:
+
+| Option | What it costs |
+| --- | --- |
+| Stage the module's QML files into `${CMAKE_BINARY_DIR}/qml/Aerora/Controls/` at configure time | A build step whose only consumer is a linter. It would also make `import Aerora.Controls` work from the build tree, which today it cannot |
+| Flatten the source layout so `Controls/`, `Indicators/` and `Screens/` become one directory | 14 file moves and the loss of the source-tree grouping. Needs no tooling at all, and makes the overlay match how every upstream QML module is laid out. Changes no resource URL, no C++ and no QML — the alias already flattens them |
+
+Until one is taken, `--qml-build`'s `--import error` promotion cannot be satisfied for this module
+and the `[import]` findings above stand as known noise.
 
 Screens exist, are registered with `analyzePages()` and with
 `AeroraAutoPilotPlugin::vehicleComponents()`, and are reached by test-driven clicks. Every status

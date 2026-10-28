@@ -23,58 +23,6 @@ class QmlLintAnalyzer(AnalyzerBase):
         "Install with: Qt SDK or 'sudo apt install qt6-declarative-dev-tools'"
     )
 
-    def built_module_copy(self, file: Path, module_root: Path) -> Path | None:
-        """Return the built copy of `file` to lint instead of the source, or None to lint source.
-
-        A QML module member resolves its sibling types through the implicit import of its own
-        directory, so qmllint sees what the application sees only when the directory it reads is
-        the module as built. For most modules those are the same directory and nothing here
-        applies.
-
-        Aerora's module is this repository's exception. ``qgc_set_qt_resource_alias()`` flattens
-        ``Controls/``, ``Indicators/`` and ``Screens/`` into one module directory
-        (``aerora/src/UI/Ui.cmake``), so a file in ``Screens/`` has no sibling
-        ``AeroraSelfReportRow.qml`` on disk and every cross-directory reference is reported as a
-        missing type - the tool reading a layout the application never loads.
-
-        Two conditions, both narrowing:
-
-        * the built directory must offer QML files the source directory does not, which is what
-          makes implicit-import resolution differ in the first place;
-        * the basename must be unambiguous under the module root, because the same file name in
-          two modules says nothing about which one this file belongs to.
-        """
-        if not module_root.is_dir():
-            return None
-
-        candidates = [path for path in module_root.rglob(file.name) if path.is_file()]
-        if len(candidates) != 1:
-            return None
-
-        built = candidates[0]
-        source_siblings = {path.name for path in file.parent.glob("*.qml")}
-        built_siblings = {path.name for path in built.parent.glob("*.qml")}
-        if built_siblings <= source_siblings:
-            return None
-
-        return built
-
-    def _lint_targets(self, files: list[Path]) -> list[tuple[Path, Path]]:
-        """Pair each collected source file with the path to hand qmllint."""
-        if not self.build_aware:
-            return [(file, file) for file in files]
-
-        module_root = self.build_dir / "qml"
-        targets = [(file, self.built_module_copy(file, module_root) or file) for file in files]
-
-        remapped = sum(1 for source, target in targets if source != target)
-        log_info(
-            f"{remapped} of {len(files)} file(s) linted from the built module tree, "
-            "where a module's layout differs from the source tree"
-        )
-
-        return targets
-
     def run(self, files: list[Path], fix: bool = False) -> AnalysisResult:
         if shutil.which("qmllint") is None:
             log_warn("qmllint not found")
@@ -115,15 +63,10 @@ class QmlLintAnalyzer(AnalyzerBase):
         files_with_issues: list[str] = []
         all_output: list[str] = []
 
-        for source, target in self._lint_targets(files):
-            result = run_captured(["qmllint", *extra_args, str(target)])
+        for file in files:
+            result = run_captured(["qmllint", *extra_args, str(file)])
 
             output = result.stdout + result.stderr
-            if target != source:
-                # Findings have to name the file a developer edits rather than its build-tree
-                # copy. The copy is the same file, so line and column numbers carry over.
-                output = output.replace(str(target), str(source))
-
             error_findings |= bool(re.search(r"^Error:", output, re.MULTILINE))
             if output.strip():
                 print(output)
@@ -131,7 +74,7 @@ class QmlLintAnalyzer(AnalyzerBase):
 
             if result.returncode != 0:
                 issues_found = True
-                files_with_issues.append(self.relative_path(source))
+                files_with_issues.append(self.relative_path(file))
 
         if issues_found:
             log_warn("QML lint issues found")
