@@ -39,6 +39,19 @@ class FileCollector:
     CPP_EXTENSIONS: ClassVar[tuple[str, ...]] = (".cc", ".cpp", ".h", ".hpp")
     QML_EXTENSIONS: ClassVar[tuple[str, ...]] = (".qml",)
 
+    # Roots searched in whole-tree mode. Changed-file mode needs no equivalent: it asks git for
+    # changed paths, which has always covered the whole repository.
+    #
+    # QML includes the Aerora overlay because leaving it out was a silent hole rather than a
+    # limitation: `--all` reported success over 479 files having never opened an Aerora QML
+    # document, and QML is the half of the overlay no compiler checks.
+    #
+    # The C++ roots are deliberately still `src` only. The same hole exists there, and closing it
+    # changes what clazy, clang-tidy and cppcheck report in whole-tree mode - a larger change than
+    # this one, and one that cannot be assessed in the same run.
+    CPP_ROOTS: ClassVar[tuple[str, ...]] = ("src",)
+    QML_ROOTS: ClassVar[tuple[str, ...]] = ("src", "aerora/src")
+
     def __init__(self, repo_root: Path) -> None:
         self.repo_root = repo_root
 
@@ -52,7 +65,7 @@ class FileCollector:
         analyze_all: bool = False,
     ) -> list[Path]:
         """Get C++ files to analyze."""
-        return self._get_files(self.CPP_EXTENSIONS, target_path, analyze_all)
+        return self._get_files(self.CPP_EXTENSIONS, self.CPP_ROOTS, target_path, analyze_all)
 
     def get_qml_files(
         self,
@@ -60,11 +73,12 @@ class FileCollector:
         analyze_all: bool = False,
     ) -> list[Path]:
         """Get QML files to analyze."""
-        return self._get_files(self.QML_EXTENSIONS, target_path, analyze_all)
+        return self._get_files(self.QML_EXTENSIONS, self.QML_ROOTS, target_path, analyze_all)
 
     def _get_files(
         self,
         extensions: tuple[str, ...],
+        roots: tuple[str, ...],
         target_path: Path | None = None,
         analyze_all: bool = False,
     ) -> list[Path]:
@@ -73,14 +87,23 @@ class FileCollector:
             return self._find_files(search_path, extensions)
 
         if analyze_all:
-            return self._find_files(self.repo_root / "src", extensions)
+            return self._find_files_under_roots(roots, extensions)
 
         compare_ref = self.get_compare_ref()
         if compare_ref:
             return self._get_changed_files(extensions, compare_ref)
 
         log_warn("Default branch not available, analyzing all files")
-        return self._find_files(self.repo_root / "src", extensions)
+        return self._find_files_under_roots(roots, extensions)
+
+    def _find_files_under_roots(
+        self, roots: tuple[str, ...], extensions: tuple[str, ...]
+    ) -> list[Path]:
+        """Find all files with given extensions under every root that exists."""
+        files: set[Path] = set()
+        for root in roots:
+            files.update(self._find_files(self.repo_root / root, extensions))
+        return sorted(files)
 
     def _find_files(self, search_path: Path, extensions: tuple[str, ...]) -> list[Path]:
         """Find all files with given extensions under search_path."""

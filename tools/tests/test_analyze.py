@@ -53,6 +53,49 @@ class TestFileCollector:
         assert "bar.h" in names
         assert "readme.txt" not in names
 
+    def test_qml_whole_tree_covers_the_aerora_overlay(self, tmp_path: Path) -> None:
+        """Whole-tree QML collection must reach aerora/src, not only src."""
+        upstream = tmp_path / "src" / "QmlControls"
+        upstream.mkdir(parents=True)
+        (upstream / "Upstream.qml").touch()
+
+        overlay = tmp_path / "aerora" / "src" / "UI" / "Screens"
+        overlay.mkdir(parents=True)
+        (overlay / "AeroraOverlay.qml").touch()
+
+        collector = FileCollector(tmp_path)
+        names = [f.name for f in collector.get_qml_files(analyze_all=True)]
+
+        assert "Upstream.qml" in names
+        assert "AeroraOverlay.qml" in names
+
+    def test_cpp_whole_tree_stays_under_src(self, tmp_path: Path) -> None:
+        """The C++ roots are src-only on purpose; see FileCollector.CPP_ROOTS."""
+        upstream = tmp_path / "src"
+        upstream.mkdir()
+        (upstream / "Upstream.cc").touch()
+
+        overlay = tmp_path / "aerora" / "src"
+        overlay.mkdir(parents=True)
+        (overlay / "AeroraOverlay.cc").touch()
+
+        collector = FileCollector(tmp_path)
+        names = [f.name for f in collector.get_cpp_files(analyze_all=True)]
+
+        assert "Upstream.cc" in names
+        assert "AeroraOverlay.cc" not in names
+
+    def test_missing_root_is_skipped(self, tmp_path: Path) -> None:
+        """A repository without the overlay directory still collects the upstream tree."""
+        upstream = tmp_path / "src"
+        upstream.mkdir()
+        (upstream / "Upstream.qml").touch()
+
+        collector = FileCollector(tmp_path)
+        names = [f.name for f in collector.get_qml_files(analyze_all=True)]
+
+        assert names == ["Upstream.qml"]
+
 
 class TestValidatePath:
     def test_valid_relative_path(self, tmp_path: Path) -> None:
