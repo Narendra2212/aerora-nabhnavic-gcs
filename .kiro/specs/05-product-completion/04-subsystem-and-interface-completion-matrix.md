@@ -203,6 +203,7 @@ reports agreement, and it refuses to replay payload state. Both are the right sh
 | --- | --- | --- | --- |
 | `AeroraVehicleUiContext` | `UI/AeroraVehicleUiContext.{h,cc}` | `QML_NAMED_ELEMENT(AeroraUi)` + `QML_SINGLETON` | `IMPLEMENTED-UNCOMPILED` — 5 typed read-only properties |
 | `AeroraQmlOverrides` | `UI/AeroraQmlOverrides.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` — **not installed (HO-TAB7-02)**; allow-list currently empty |
+| `AeroraProvenance` | `UI/AeroraProvenance.{h,cc}` | `QML_NAMED_ELEMENT` + `QML_SINGLETON` | `VERIFIED` — build identity from a generated header; no data member, no writable property, no invokable |
 | `AeroraValueDisplay` | `UI/Controls/AeroraValueDisplay.qml` | — | `IMPLEMENTED-UNCOMPILED` — linted, one unqualified-access finding |
 | `AeroraStateText` | `UI/Controls/AeroraStateText.qml` | — | `VERIFIED` (renders) — the vocabulary page's seven samples are this control, found in a booted window |
 | `AeroraAgeLabel` | `UI/Controls/AeroraAgeLabel.qml` | — | `IMPLEMENTED-UNCOMPILED` — linted, one unqualified-access finding |

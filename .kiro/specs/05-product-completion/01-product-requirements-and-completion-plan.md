@@ -445,7 +445,7 @@ Owner: Tab 7.
 | `P7-HELP-001` | A diagnostics screen reports overlay state: which services attached, which interfaces are available, whether authorization is enforced | `VERIFIED` — answered by `SCR-SHL-01` (attachment and posture) and `SCR-SEC-01` (enforcement scope). `SCR-HLP-01` is superseded rather than deferred; a second screen carrying the same readings would drift from the first |
 | `P7-HELP-002` | An error report is assembled locally and transmitted only on explicit operator action | `VERIFIED` — `SCR-HLP-03`. Satisfied structurally: the screen has no network or file path at all, and its one action copies to the station clipboard |
 | `P7-HELP-003` | Operator documentation covers the state vocabulary, because the vocabulary is the product's main claim | `SPECIFIED-NOT-DESIGNED` |
-| `P7-HELP-004` | The station can state its own build provenance: base commit, overlay commit, profile set, enforcement state | `SPECIFIED-NOT-DESIGNED` |
+| `P7-HELP-004` | The station can state its own build provenance: base commit, overlay commit, profile set, enforcement state | `VERIFIED` (3 of 4 fields) — `SCR-SHL-04`. Commit, profile set and enforcement state are reported; base and overlay commit are the **same** commit because the overlay shares the git tree. The **upstream** commit the fork diverged from is genuinely unrecorded — no remote, merge-base or vendored revision is captured — so `AeroraProvenance.upstreamBaseCommitKnown` is a compile-time `false` and the screen renders *not recorded* rather than substituting the fork's own hash |
 
 Owner: Tab 1 (provenance), Tab 7 (screens).
 
