@@ -516,7 +516,7 @@ a defect class, not an optional polish item.
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-VEH-01` | Aerora setup page index | O | `AeroraAutoPilotPlugin::vehicleComponents()` via `FirmwarePlugin::autopilotPlugin()` (`FirmwarePlugin.h:122`) | `VERIFIED` | 3 | — `AeroraAutoPilotPlugin` exists; `AeroraVehicleConfigUITest` clicks the published entries in the real sidebar |
 | `SCR-VEH-02` | Identity & profile | O | `VehicleComponent` subclass; `AeroraUi.identity` | `VERIFIED` | 3 + 7 | fleet identity format `OPEN` — the page withholds it rather than substituting the system id |
-| `SCR-VEH-03` | Capability report | O | `VehicleComponent`; `AeroraUi.capabilities` | `IMPLEMENTED-UNCOMPILED` | 3 + 7 | — `Q3-009` gates capability *content*, not the screen; see below |
+| `SCR-VEH-03` | Capability report | O | `VehicleComponent`; `AeroraUi.capabilities` | `VERIFIED` | 3 + 7 | — `Q3-009` gates capability *content*, not the screen; see below |
 | `SCR-VEH-04` | Sensor & health | O | `VehicleComponent`, or the JSON-driven `vehicleConfigJson()` path | `DESIGNED` | 3 | `P7-VEH-004` |
 | `SCR-VEH-05` | Calibration (authorization-gated) | C/O | upstream calibration pages + the ADR-015 authorization seam | `IMPLEMENTED-UNCOMPILED` (gate) / `DESIGNED` (display) | 3 + 2 | `Q-029` — gate permits everything |
 | `SCR-VEH-06` | Service attachment diagnostics | O | `VehicleComponent` reading `AeroraVehicleServices` | `VERIFIED` | 3 | — |
@@ -528,6 +528,8 @@ a defect class, not an optional polish item.
 With no evidence source, `AeroraVehicleCapabilities::reportedKeys()` is empty for all five categories — and that is the state the screen is needed for. Before it, the only place an operator saw the capability service mentioned was `SCR-VEH-06`, which reports it as *attached*; an attached service with an empty inventory reads as "this aircraft has no capabilities" unless something says otherwise. `AeroraCapabilityPage.qml` says otherwise, per category, in words, and holds the model's own `NotEvidenced` / `Unavailable` distinction.
 
 Nothing on the page is written twice: the sections are the `Category` `Q_ENUM`, the keys are whatever `reportedKeys()` returns, and each state comes from `state()`. No capability identifier is named, because none is evidenced. The day a source reports one, it appears with no edit to the page — and `AeroraVehicleConfigUITest::_capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence` is the assertion that will fail and have to be updated when that happens.
+
+What **is not** exercised, and is recorded rather than glossed: the per-key row. With an empty inventory the inner `Repeater` instantiates no delegate, so the path that renders a reported capability has never run. The same delegate shape — a `Repeater` over a JS array with a `required property modelData` — *is* verified on `SCR-HLP-02`, whose seven rows are found in a booted window, so the pattern is sound; the capability row's own bindings are not evidenced.
 
 `SCR-VEH-04` should prefer the JSON-driven `vehicleConfigJson()` path: the base class then derives
 section ids (with `repeat` group expansion probed against live params), a search keyword index,
@@ -646,7 +648,7 @@ startup.
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-HLP-01` | Diagnostics report | O | `analyzePages()`; feeds `SCR-SHL-01` | `SPECIFIED-NOT-DESIGNED` | 1 + 7 | `P7-HELP-001` |
-| `SCR-HLP-02` | State vocabulary reference | O | `analyzePages()` — **not** `showTool()`; see below | `VERIFIED` (registration + derivation) / row rendering under test | 7 | — `P7-HELP-003` is a documentation requirement, which this screen partly answers rather than waits on |
+| `SCR-HLP-02` | State vocabulary reference | O | `analyzePages()` — **not** `showTool()`; see below | `VERIFIED` | 7 | — `P7-HELP-003` is a documentation requirement, which this screen partly answers rather than waits on |
 | `SCR-HLP-03` | Error report assembly | O | `analyzePages()` | `DESIGNED` | 7 | `P7-HELP-002` — explicit operator action only, no auto-send |
 
 `SCR-HLP-02` is cheap and unusually valuable: the seven-state vocabulary is the product's main claim

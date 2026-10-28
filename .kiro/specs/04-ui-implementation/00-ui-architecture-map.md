@@ -639,14 +639,40 @@ retrofit; the panels are not.
 | Build tooling on the authoring host | **Verified, re-checked 2026-10-18** | Absent from the default `PATH` and from the host entirely: `cl`, `g++`, `clang++` (no MSVC install, no `vswhere`), Qt (`qmake` absent, `C:\Qt` does not exist), `qmllint`, `qmlformat`, `just`. Present in the repository's `tools/.venv/Scripts`, not on the default `PATH`: `cmake` 3.31.10, `ninja` 1.13.0, `ctest` 3.31.10, `pre-commit` 4.6.0, `gcovr`. `clang-format` 23.1.0 exists only inside the `pre-commit` hook environment cache. As first written this row listed `cmake`, `ninja` and `pre-commit` as absent, which was true of the host at the time |
 | `includedResumeCommands` untouched | **Verified** | Sole definition and call site remain `src/MissionManager/MissionManager.cc:110-134`; no Aerora file modifies it |
 
-**Status as of 2026-10-18, baseline commit `915dd09ae`** (Windows CI run 39146146397). The overlay
-**compiles** and its tests **pass** — 15/15 unit, 3/3 integration, including
-`AeroraUiFoundationTest` — and `Q_GADGET` property and invokable access through a `QQmlEngine` is
-exercised there. That is compile-and-unit-test evidence and nothing more.
+**Status as of 2026-10-26, baseline commit `eafbb77a1`** (Aerora Linux run 40356071361, Aerora
+Windows run 40356071332). The overlay **compiles** on both platforms and its tests **pass** — 16/16
+unit on each, 9/9 integration on Linux, 6/6 on Windows.
 
-**No claim is made that any Aerora UI renders, navigates, presents missing data correctly, stays
-read-only in a live scene, or passes `qmllint`.** No launch has happened, no test loads a `.qml`
-file, and `qmllint` has not been run on any Aerora QML. Screens exist and are registered with
-`analyzePages()`; whether an operator can reach and read them is unevidenced. Every status gated on
-`Q-029`, `ADR-014`, `D-007`, the absent Aerora dialect, `Q-036`, `Q3-009`/F3.1-05, `Q4-002`,
-`Q-021`/`Q-023`, `Q-040` or `Q7-004` is unchanged by this run.
+The "no Aerora UI renders" caveat this paragraph used to carry is **withdrawn**, and the three
+reasons it gave are each now false. Tests do load `.qml` files; a booted application window does
+exist; and the screens are reached by clicking, not by registry inspection.
+`AeroraSceneAttachmentUITest`, `AeroraVehicleConfigUITest`, `AeroraFlyViewOverlayUITest` and
+`AeroraMissionProgressUITest` navigate to the Aerora screens through the Analyze list, the Configure
+sidebar and the Fly View overlay seam, and `verifyPanelContentVisible()` requires a laid-out item
+with a real size rather than an instantiated object. What is still **not** claimed is pixel
+appearance, and the Aerora visual language remains unresolved (`Q-040`).
+
+### `qmllint` has now been run on Aerora QML, and what it says needs reading carefully
+
+First run: 40363963190, 15 files, `--qml-build` against the generated types. It is **not** clean, and
+the previous rounds of "qmllint: success" said nothing about the overlay at all —
+`tools/analyze.py` collected whole-tree files from `repo_root / "src"` only, so `aerora/src` was
+never opened. Fixed by `FileCollector.QML_ROOTS`; a regression test covers it. The C++ roots are
+deliberately still `src`-only, because widening them changes what clazy, clang-tidy and cppcheck
+report and that cannot be assessed in the same run.
+
+The findings fall into two groups and only one of them is a defect:
+
+| Finding | Count | Reading |
+| --- | --- | --- |
+| `X was not found. Did you add all imports and dependencies?` for `AeroraSelfReportRow`, `AeroraStateText`, `AeroraMissionProgressPanel`, plus `[unqualified]` on `AeroraTelemetryState` / `AeroraSecurity` / `AeroraMissionObserver` | most of the output | **Artifact of linting the source tree.** `Aerora.Controls` members live in three sibling source directories (`Controls/`, `Indicators/`, `Screens/`) and the build flattens them into one module directory via `qgc_set_qt_resource_alias()`. A file in `Screens/` has no sibling `AeroraSelfReportRow.qml`, so the implicit same-directory import does not contain it — a layout the running application never sees. The same cause explains the singleton warnings |
+| `colorGroupEnabled: enabled` reads `enabled` unqualified from the parent element | 8 controls | **Real, and unfixed.** It is also upstream QGC's idiom, repeated across `src/`, so the overlay is no stricter than the code it mirrors here. Left alone deliberately rather than silently: polishing this before the module resolves would be tidying output that cannot yet be trusted |
+
+So the honest status is *`qmllint` now covers the overlay and reports findings that are mostly its
+own view of the source layout.* Making the run meaningful means pointing it at the module as built
+rather than at the source tree, which is the next step and is not taken here.
+
+Screens exist, are registered with `analyzePages()` and with
+`AeroraAutoPilotPlugin::vehicleComponents()`, and are reached by test-driven clicks. Every status
+gated on `Q-029`, `ADR-014`, `D-007`, the absent Aerora dialect, `Q-036`, `Q3-009`/F3.1-05,
+`Q4-002`, `Q-021`/`Q-023`, `Q-040` or `Q7-004` is unchanged by this run.
