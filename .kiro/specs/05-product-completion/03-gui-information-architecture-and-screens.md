@@ -478,12 +478,12 @@ View rather than a screen with an address, so there is nothing to navigate to.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-LIV-01` | Live Operations overlay (root) | O | `FlyViewCustomLayer.qml` (tier 2, empty seam, `FlyView.qml:145`) | `DESIGNED` | 7 | **unblocked** — HO-TAB7-02 closed by U1 |
+| `SCR-LIV-01` | Live Operations overlay (root) | O | `FlyViewCustomLayer.qml` (tier 2, declared seam, `FlyView.qml:151`) | `VERIFIED` | 7 | — `AeroraFlyViewOverlayUITest` finds the overlay in the real Fly View |
 | `SCR-LIV-02` | Vehicle state panel | O | child of `SCR-LIV-01`, binds `AeroraUi` | `DESIGNED` | 7 | **HO-TAB7-01 closed by U3**; `Q4-002` still gates fact-group content |
 | `SCR-LIV-03` | Payload supervision panel | O/P | child; `AeroraUi.payload` | `DESIGNED` | 7 + 6 | `P7-PAY-004` reported-value set undefined |
 | `SCR-LIV-04` | Power & tether panel | O | child; `AeroraUi.power` | `DESIGNED` | 7 + 6 | `P7-PWR-006` tether item set undefined |
 | `SCR-LIV-05` | Proposal queue / approval | O | child | `SPECIFIED-NOT-DESIGNED` | 7 + 6 | `P7-AI-001` proposal model; `Q-029` |
-| `SCR-LIV-06` | Mission progress & verification | O | child; `AeroraUi.mission` | `DESIGNED` | 7 + 5 | — |
+| `SCR-LIV-06` | Mission progress & verification | O | `analyzePages()` + overlay child; `AeroraUi.mission` | `VERIFIED` | 7 + 5 | — verification itself still needs `verify()`, which nothing calls |
 | `SCR-LIV-07` | Per-link state panel | O | child | `DESIGNED` | 7 | `P7-RAD-002`; label as `DESIGNED` not supported |
 | `SCR-LIV-08` | Critical-state alert surface | O | child + `QGCPopupDialog` | `DESIGNED` | 7 | `P7-FLY-005` |
 | `SCR-LIV-09` | Aerora pre-flight checklist | C | `QGCOptions::preFlightChecklistUrl()` — replaces wholesale, **no fork** | `DESIGNED` | 7 | `P7-CHK-004` unevaluable-check handling |
@@ -517,7 +517,7 @@ a defect class, not an optional polish item.
 | `SCR-VEH-01` | Aerora setup page index | O | `AeroraAutoPilotPlugin::vehicleComponents()` via `FirmwarePlugin::autopilotPlugin()` (`FirmwarePlugin.h:122`) | `VERIFIED` | 3 | — `AeroraAutoPilotPlugin` exists; `AeroraVehicleConfigUITest` clicks the published entries in the real sidebar |
 | `SCR-VEH-02` | Identity & profile | O | `VehicleComponent` subclass; `AeroraUi.identity` | `VERIFIED` | 3 + 7 | fleet identity format `OPEN` — the page withholds it rather than substituting the system id |
 | `SCR-VEH-03` | Capability report | O | `VehicleComponent`; `AeroraUi.capabilities` | `VERIFIED` | 3 + 7 | — `Q3-009` gates capability *content*, not the screen; see below |
-| `SCR-VEH-04` | Sensor & health | O | `VehicleComponent`, or the JSON-driven `vehicleConfigJson()` path | `DESIGNED` | 3 | `P7-VEH-004` |
+| `SCR-VEH-04` | Sensor & health | O | `VehicleComponent` reading upstream's `SYS_STATUS` parser | `VERIFIED` | 3 | — `P7-VEH-004` is the content rule this screen implements, not a gate on it |
 | `SCR-VEH-05` | Calibration (authorization-gated) | C/O | upstream calibration pages + the ADR-015 authorization seam | `IMPLEMENTED-UNCOMPILED` (gate) / `DESIGNED` (display) | 3 + 2 | `Q-029` — gate permits everything |
 | `SCR-VEH-06` | Service attachment diagnostics | O | `VehicleComponent` reading `AeroraVehicleServices` | `VERIFIED` | 3 | — |
 
@@ -613,7 +613,7 @@ class **R** — reused unchanged, not re-listed.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-SEC-01` | Authorization & enforcement state | O | `analyzePages()`; drill-in from `SCR-SHL-03` | `SPECIFIED-NOT-DESIGNED` | 2 + 7 | `P7-SEC-005`; needs a QML-safe read path |
+| `SCR-SEC-01` | Authorization & enforcement state | O | `analyzePages()` | `VERIFIED` | 2 + 7 | — the QML-safe read path is `AeroraSecurityStatus`, which names this screen as its consumer. `P7-SEC-005` is what the screen delivers |
 | `SCR-SEC-02` | Operator identity & role | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 2 | `Q-029`; `AeroraIdentityProvider`/`AeroraRoleResolver` are `CONTRACT-ONLY` |
 | `SCR-SEC-03` | Audit log viewer | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 2 + 7 | `Q-037` — sink is neither durable nor tamper-evident |
 | `SCR-SEC-04` | Signing key management | R/C | upstream `src/AppSettings/SigningKeyManager.qml` + `AeroraSigningKeyStore` | `IMPLEMENTED-UNCOMPILED` (store) / `DESIGNED` (any Aerora addition) | 2 | `AeroraPlatformKeyProtector` has **no backend on any target platform** |
@@ -647,9 +647,23 @@ startup.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-HLP-01` | Diagnostics report | O | `analyzePages()`; feeds `SCR-SHL-01` | `SPECIFIED-NOT-DESIGNED` | 1 + 7 | `P7-HELP-001` |
+| `SCR-HLP-01` | Diagnostics report | O | — | **`SUPERSEDED`** by `SCR-SHL-01` | 1 + 7 | — see below |
 | `SCR-HLP-02` | State vocabulary reference | O | `analyzePages()` — **not** `showTool()`; see below | `VERIFIED` | 7 | — `P7-HELP-003` is a documentation requirement, which this screen partly answers rather than waits on |
-| `SCR-HLP-03` | Error report assembly | O | `analyzePages()` | `DESIGNED` | 7 | `P7-HELP-002` — explicit operator action only, no auto-send |
+| `SCR-HLP-03` | Error report assembly | O | `analyzePages()` | `VERIFIED` | 7 | — `P7-HELP-002` is satisfied structurally: the screen has no transmit path at all |
+
+#### `SCR-HLP-01` is superseded, not deferred
+
+`P7-HELP-001` asks for "a diagnostics screen [that] reports overlay state: which services attached,
+which interfaces are available, whether authorization is enforced." That is a description of
+`SCR-SHL-01`, which was built and verified first and reports exactly those three things across
+fifteen rows. The inventory listed `SCR-HLP-01` as a separate screen that would *feed* the hub; in
+the delivered shape the hub reads the state directly and there is nothing left for a second screen
+to supply.
+
+Building it anyway would put the same readings on two screens, which is worse than one: the two
+would drift, and an operator finding them disagreeing would have no way to tell which was stale.
+`P7-HELP-001` is answered by `SCR-SHL-01` and `SCR-SEC-01` between them — the hub for attachment and
+posture, the security screen for enforcement scope.
 
 `SCR-HLP-02` is cheap and unusually valuable: the seven-state vocabulary is the product's main claim
 and an operator who does not understand it cannot use the product correctly.
@@ -664,19 +678,40 @@ A `showTool()` button from the hub would be a second, worse route to a screen al
 
 ### Inventory totals
 
-| Status | Count |
-| --- | --- |
-| `IMPLEMENTED-UNCOMPILED` (service behind the screen) | 2 |
-| `DESIGNED` | 24 |
-| `SPECIFIED-NOT-DESIGNED` | 19 |
-| **Total Aerora screens** | **45** |
-| Class X (forks) | **0** |
-| Upstream screens reused unchanged (class R) | Not enumerated — the entire QGC surface |
+| Status | Count | Screens |
+| --- | --- | --- |
+| `VERIFIED` — navigated to and drawn in a booted window | **11** | `SCR-SHL-01`, `SCR-LIV-01`, `SCR-LIV-06`, `SCR-VEH-01`..`04`, `SCR-VEH-06`, `SCR-SEC-01`, `SCR-HLP-02`, `SCR-HLP-03` |
+| `SUPERSEDED` by a delivered screen | 1 | `SCR-HLP-01` |
+| Not delivered | 33 | of which 5 have an implemented service or half behind them |
+| **Total Aerora screens** | **45** | |
+| Class X (forks) | **0** | |
+| Upstream screens reused unchanged (class R) | Not enumerated — the entire QGC surface | |
 
-The 19 `SPECIFIED-NOT-DESIGNED` screens are not a backlog of unwritten code. **16 of them are blocked
-on a product or architecture decision**, not on engineering capacity. Designing them before the
-decision would mean inventing the decision. See
+The 33 undelivered screens are not a backlog of unwritten code. **Every one of them is waiting on a
+product, firmware or architecture decision** — a command set, a reported-value set, a freshness
+budget, an operator role policy, an autonomy proposal model, a durable store, a fleet identity
+format, or a fork point. Designing them before the decision would mean inventing the decision. See
 [05 §4](05-implementation-dependency-graph.md#4-what-is-blocked-and-by-what).
+
+### A recorded blocker is not always a blocker
+
+Five screens were listed as blocked by a requirement that turned out to describe what the screen
+*delivers*. Four of them shipped once that was noticed; the fifth turned out to have a different,
+real blocker underneath:
+
+| Screen | Recorded blocker | What it actually was |
+| --- | --- | --- |
+| `SCR-VID-01` | `P7-VID-004` | A content rule about state labels, satisfied by using `AeroraStateText`. The real blocker is structural and is now recorded separately |
+| `SCR-VEH-03` | `Q3-009` | Gates which capabilities can be *reported*, not whether the station can show the inventory. An empty inventory is the reading the screen exists for |
+| `SCR-VEH-04` | `P7-VEH-004` | "Reported state only, `UNKNOWN` where unreported" is the rule the page implements |
+| `SCR-SEC-01` | `P7-SEC-005` | "A security screen that can say *not enforced*" is the screen itself. `AeroraSecurityStatus` already named it as the consumer of its read path |
+| `SCR-HLP-03` | `P7-HELP-002` | "Transmitted only on explicit operator action" is satisfied by having no transmit path |
+
+The pattern is worth naming because it held four deliverable screens: **the "Blocked by" column was
+being used for both gates and acceptance criteria.** A requirement that describes what a screen
+must do belongs in the screen's own definition, not in the column that decides whether work can
+start. The remaining 33 entries have been re-read against that distinction; their blockers are
+genuine absences of data, decisions or seams.
 
 ## 9. Why there are no action buttons yet
 

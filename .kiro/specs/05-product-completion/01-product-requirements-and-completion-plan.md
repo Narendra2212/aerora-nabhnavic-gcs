@@ -289,7 +289,7 @@ Owner: Tab 6.
 | `P7-VEH-001` | Aerora setup pages are supplied through an `AeroraAutoPilotPlugin` returned from `FirmwarePlugin::autopilotPlugin()`, not by forking `VehicleConfigView.qml` | `DESIGNED` â€” seam confirmed at `src/FirmwarePlugin/FirmwarePlugin.h:122` |
 | `P7-VEH-002` | Firmware-specific behaviour routes through `vehicle->firmwarePlugin()`. No `if (px4)` branch | `IMPLEMENTED-UNCOMPILED` (`AeroraFirmwarePlugin`) |
 | `P7-VEH-003` | Calibration is authorization-gated, evaluated after the parameter switch and before the pack | `IMPLEMENTED-UNCOMPILED` â€” ADR-015 |
-| `P7-VEH-004` | Health and sensor status is reported state only, with `UNKNOWN` where unreported | `DESIGNED` |
+| `P7-VEH-004` | Health and sensor status is reported state only, with `UNKNOWN` where unreported | `VERIFIED` — `SCR-VEH-04`. The page withholds every verdict until a `SYS_STATUS` has arrived, which `AeroraVehicleConfigUITest` asserts against `Vehicle::allSensorsHealthy()`'s default of true |
 | `P7-VEH-005` | Vehicle identity and capability are reported, never assumed. Fleet identity format is `OPEN`; MAVLink sysid is explicitly **not** the fleet identity | `IMPLEMENTED-UNCOMPILED` + `OPEN` |
 | `P7-VEH-006` | A diagnostics screen shows service attachment, capability reports and interface availability, so a missing service is visible rather than silent | `DESIGNED` |
 
@@ -386,7 +386,7 @@ Owner: Tab 7 (checklist), Tab 5 (mission validation).
 | `P7-SEC-002` | An identity provider, role resolver and authorization policy exist as interfaces | `CONTRACT-ONLY` â€” `AeroraIdentityProvider`, `AeroraRoleResolver`, `AeroraAuthorizationPolicy` have no concrete implementation |
 | `P7-SEC-003` | MAVLink signing key storage is protected per platform | `CONTRACT-ONLY` â€” `AeroraPlatformKeyProtector` has no backend on any of the five target platforms |
 | `P7-SEC-004` | Security state is not QML-visible or QML-writable | `IMPLEMENTED-UNCOMPILED` â€” asserted by `AeroraUiSafetyTest` |
-| `P7-SEC-005` | A security screen displays whether enforcement is active. It must be able to say "not enforced" | `SPECIFIED-NOT-DESIGNED` |
+| `P7-SEC-005` | A security screen displays whether enforcement is active. It must be able to say "not enforced" | `VERIFIED` — `SCR-SEC-01`. `AeroraSceneAttachmentUITest` requires the screen to report *not enforced* in this build, and the derivation is written against the enforced enumerator and negated so a resolution failure lands the same way |
 
 Owner: Tab 2.
 
@@ -442,8 +442,8 @@ Owner: Tab 7.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| `P7-HELP-001` | A diagnostics screen reports overlay state: which services attached, which interfaces are available, whether authorization is enforced | `SPECIFIED-NOT-DESIGNED` |
-| `P7-HELP-002` | An error report is assembled locally and transmitted only on explicit operator action | `DESIGNED` |
+| `P7-HELP-001` | A diagnostics screen reports overlay state: which services attached, which interfaces are available, whether authorization is enforced | `VERIFIED` — answered by `SCR-SHL-01` (attachment and posture) and `SCR-SEC-01` (enforcement scope). `SCR-HLP-01` is superseded rather than deferred; a second screen carrying the same readings would drift from the first |
+| `P7-HELP-002` | An error report is assembled locally and transmitted only on explicit operator action | `VERIFIED` — `SCR-HLP-03`. Satisfied structurally: the screen has no network or file path at all, and its one action copies to the station clipboard |
 | `P7-HELP-003` | Operator documentation covers the state vocabulary, because the vocabulary is the product's main claim | `SPECIFIED-NOT-DESIGNED` |
 | `P7-HELP-004` | The station can state its own build provenance: base commit, overlay commit, profile set, enforcement state | `SPECIFIED-NOT-DESIGNED` |
 
