@@ -63,6 +63,11 @@ private slots:
     // reported as unreported rather than as a vehicle with no capabilities.
     void _capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence();
 
+    // SCR-VEH-04's claim, and the sharpest assertion in this suite: Vehicle::allSensorsHealthy()
+    // is initialised to true, so an aircraft that has reported nothing reports every sensor
+    // healthy. The page must not repeat that, and this is what holds it to it.
+    void _healthPageWithholdsAVerdictUntilTheAircraftReportsOne();
+
 private:
     /// Clicks the sidebar entry named @a sidebarObjectName, waits for @a pageObjectName to appear,
     /// and asserts the loaded panel renders visible content.

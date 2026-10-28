@@ -67,6 +67,15 @@ private slots:
     // a scope note - a screen that looks like it works and teaches nothing. This counts the rows.
     void _stateVocabularyPageIsReachableAndRendersEveryClass();
 
+    // SCR-SEC-01's reason for existing: P7-SEC-005 requires a security screen that can say *not
+    // enforced*, which is this build's actual state. A screen that could not say it would be worse
+    // than no screen.
+    void _securityPosturePageIsReachableAndReportsNotEnforced();
+
+    // SCR-HLP-03 assembles its report from live station state. An empty or stub report would load a
+    // page that looks like it works, so this requires the real build version to be in the text.
+    void _errorReportPageIsReachableAndAssemblesRealStationState();
+
 private:
     /// @return The scene's controller for @a flyView, or nullptr when absent.
     PlanMasterController* _sceneController(bool flyView);

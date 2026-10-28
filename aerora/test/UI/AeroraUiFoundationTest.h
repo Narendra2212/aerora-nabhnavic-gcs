@@ -80,6 +80,12 @@ private slots:
     // first open.
     void _capabilityPageListsEveryCategoryAndReadsResolvableMethods();
 
+    // SCR-VEH-04, SCR-SEC-01 and SCR-HLP-03 read upstream state directly rather than through an
+    // Aerora service. Those names belong to another workstream, a rename there compiles fine here,
+    // and the symptom is a QML binding that evaluates to `undefined` - a blank field on a screen
+    // that otherwise looks correct. This is the only thing that would catch it.
+    void _upstreamBindingsTheNewScreensDependOnResolve();
+
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
     // startup self-check reads, so an interface quietly missing its Aerora layer is detectable
     // rather than merely wrong. These are the tests that fail if the AeroraCorePlugin overrides

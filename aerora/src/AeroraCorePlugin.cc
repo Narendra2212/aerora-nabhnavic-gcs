@@ -141,6 +141,21 @@ const QVariantList &AeroraCorePlugin::analyzePages()
             tr("Aerora State Vocabulary"),
             QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraStateVocabularyPage.qml")))));
 
+        // SCR-SEC-01. Vehicle-independent for the reason that matters most on this screen: the
+        // authorization posture is a property of this station, not of whatever is connected to it,
+        // and an operator checking whether commands are evaluated should not have to connect an
+        // aircraft to find out.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Security"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraSecurityPosturePage.qml")))));
+
+        // SCR-HLP-03. Vehicle-independent because the state most worth reporting is often the state
+        // where nothing is connected - a report that could only be assembled from a healthy station
+        // would be useless in the case it exists for.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Error Report"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraErrorReportPage.qml")))));
+
         return list;
     }();
 

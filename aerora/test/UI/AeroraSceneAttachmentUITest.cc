@@ -14,6 +14,7 @@
 
 #include "AeroraPlanBridge.h"
 #include "PlanMasterController.h"
+#include "QGroundControlQmlGlobal.h"
 
 UT_REGISTER_TEST(AeroraSceneAttachmentUITest, TestLabel::Integration)
 
@@ -36,6 +37,13 @@ constexpr const char* kVocabularyFlickable = "aeroraVocabulary_flickable";
 /// Every enumerator of AeroraTelemetryState::Class. The count is what the vocabulary page must
 /// render a row for; AeroraUiFoundationTest holds this set against the meta-object.
 constexpr int kStateClassCount = 7;
+
+/// SCR-SEC-01 and SCR-HLP-03's Analyze entries and the flickables inside their loaded pages. The
+/// titles come from AeroraCorePlugin::analyzePages(), so a rename there breaks these and should.
+constexpr const char* kSecurityEntryButton = "analyzeButton_Aerora Security";
+constexpr const char* kSecurityFlickable = "aeroraSecurity_flickable";
+constexpr const char* kErrorReportEntryButton = "analyzeButton_Aerora Error Report";
+constexpr const char* kErrorReportFlickable = "aeroraErrorReport_flickable";
 
 /// Counts the AeroraStateText samples in the visual subtree rooted at @a item.
 ///
@@ -256,4 +264,70 @@ void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEvery
     QVERIFY2(rendered, qPrintable(QStringLiteral("expected %1 rendered state-class samples, found %2")
                                       .arg(kStateClassCount)
                                       .arg(countStateSamples(flickable))));
+}
+
+void AeroraSceneAttachmentUITest::_securityPosturePageIsReachableAndReportsNotEnforced()
+{
+    startUI();
+    if (QTest::currentTestFailed()) {
+        return;
+    }
+
+    QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
+             "the Analyze view must be reachable from the tool-select dropdown");
+    QVERIFY2(clickButton(QString::fromUtf8(kSecurityEntryButton)),
+             "the Aerora Security entry must appear in the Analyze page list");
+
+    QQuickItem* const flickable =
+        findVisibleItem(_rootItem, QString::fromUtf8(kSecurityFlickable), TestTimeout::mediumMs());
+    QVERIFY2(flickable, "clicking the entry must load the security posture page");
+
+    // The page root carries the reading; the flickable above is its content.
+    QQuickItem* const page =
+        findVisibleItem(_rootItem, QStringLiteral("aeroraSecurityPosturePage"), TestTimeout::mediumMs());
+    QVERIFY2(page, "the security posture page root must be in the scene");
+
+    // P7-SEC-005 in one assertion. No authorization policy is installed in any build shipped so
+    // far, so the honest reading is "not enforced" - and the derivation is written against the
+    // enforced enumerator and negated, so an enumerator that stopped resolving would also land
+    // here rather than claiming enforcement.
+    QVERIFY2(page->property("_notEnforced").toBool(),
+             "with no authorization policy installed the security screen must report not enforced");
+    QVERIFY2(!page->property("_enforced").toBool(), "the screen must not report enforcement that is not happening");
+
+    // And the scope table is populated rather than an empty list under a heading, which would read
+    // as "nothing is uncovered".
+    QVERIFY2(page->property("_paths").toList().size() >= 4,
+             "the screen must enumerate the outbound paths the gate does and does not cover");
+}
+
+void AeroraSceneAttachmentUITest::_errorReportPageIsReachableAndAssemblesRealStationState()
+{
+    startUI();
+    if (QTest::currentTestFailed()) {
+        return;
+    }
+
+    QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
+             "the Analyze view must be reachable from the tool-select dropdown");
+    QVERIFY2(clickButton(QString::fromUtf8(kErrorReportEntryButton)),
+             "the Aerora Error Report entry must appear in the Analyze page list");
+
+    QQuickItem* const flickable =
+        findVisibleItem(_rootItem, QString::fromUtf8(kErrorReportFlickable), TestTimeout::mediumMs());
+    QVERIFY2(flickable, "clicking the entry must load the error report page");
+
+    QQuickItem* const page =
+        findVisibleItem(_rootItem, QStringLiteral("aeroraErrorReportPage"), TestTimeout::mediumMs());
+    QVERIFY2(page, "the error report page root must be in the scene");
+
+    const QString report = page->property("_report").toString();
+    QVERIFY2(!report.isEmpty(), "the page must assemble a report rather than leaving the text empty");
+
+    // Asserted against a value rather than against wording: every line of the report is
+    // translated, so matching prose here would be matching a locale. The build version is data,
+    // and finding it proves the report carries live station state instead of a stub.
+    QVERIFY2(report.contains(QGroundControlQmlGlobal::qgcVersion()),
+             qPrintable(QStringLiteral("the assembled report must carry the station's build version (%1)")
+                            .arg(QGroundControlQmlGlobal::qgcVersion())));
 }

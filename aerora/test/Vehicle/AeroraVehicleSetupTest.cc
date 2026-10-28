@@ -202,8 +202,9 @@ void AeroraVehicleSetupTest::_pagePublishabilityFollowsItsQmlResource()
 
 void AeroraVehicleSetupTest::_publishedPagesAreNamedAndTheRestAreWithheld()
 {
-    // The state of U4 in this build, named rather than derived. SCR-VEH-02, SCR-VEH-03 and
-    // SCR-VEH-06 have their QML and publish; SCR-VEH-04 is declared and waiting for its own.
+    // The state of U4 in this build, named rather than derived. Every declared Aerora page now has
+    // its QML and publishes; SCR-VEH-05 is withheld by decision rather than by a missing resource,
+    // and is asserted separately above.
     //
     // Naming it is the point. Publishability is "does this resource exist", so the failure that
     // matters most here is the one where the resource moves - a changed RESOURCE_PREFIX, a dropped
@@ -224,17 +225,19 @@ void AeroraVehicleSetupTest::_publishedPagesAreNamedAndTheRestAreWithheld()
         publishedResources.append(descriptor.setupResource);
     }
 
-    QCOMPARE(publishedScreenIds,
-             QStringList({QStringLiteral("SCR-VEH-02"), QStringLiteral("SCR-VEH-03"), QStringLiteral("SCR-VEH-06")}));
+    QCOMPARE(publishedScreenIds, QStringList({QStringLiteral("SCR-VEH-02"), QStringLiteral("SCR-VEH-03"),
+                                              QStringLiteral("SCR-VEH-04"), QStringLiteral("SCR-VEH-06")}));
     QCOMPARE(publishedResources,
              QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraIdentityPage.qml"),
                           QStringLiteral(":/qml/Aerora/Controls/AeroraCapabilityPage.qml"),
+                          QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml"),
                           QStringLiteral(":/qml/Aerora/Controls/AeroraServiceDiagnosticsPage.qml")}));
 
-    // And the one that is still waiting says so, by resource, so this fails when it lands rather
-    // than letting the published set grow unremarked.
-    QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(),
-             QStringList({QStringLiteral(":/qml/Aerora/Controls/AeroraHealthPage.qml")}));
+    // Nothing is waiting any more. Asserted as an empty list rather than dropped, because the
+    // emptiness is the claim: a page declared in the catalogue and absent from the build would
+    // reappear here, and a descriptor added without its QML fails this rather than shipping a
+    // sidebar entry that loads nothing.
+    QCOMPARE(AeroraVehicleComponent::unresolvedPageResources(), QStringList());
 }
 
 void AeroraVehicleSetupTest::_indicatorGateRequiresCapabilityReportedAvailable_data()

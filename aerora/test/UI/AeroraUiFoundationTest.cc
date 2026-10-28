@@ -27,6 +27,9 @@
 #include "AeroraVehicleServices.h"
 #include "AeroraVehicleUiContext.h"
 #include "QGCCorePlugin.h"
+#include "QGroundControlQmlGlobal.h"
+#include "SysStatusSensorInfo.h"
+#include "Vehicle.h"
 
 namespace {
 
@@ -56,7 +59,13 @@ constexpr const char *kUiLogCategory = "Aerora.Ui";
 /// the engine's view of the same file cannot drift in step.
 constexpr const char* kIdentityPageFile = "AeroraIdentityPage.qml";
 constexpr const char* kCapabilityPageFile = "AeroraCapabilityPage.qml";
+constexpr const char* kHealthPageFile = "AeroraHealthPage.qml";
 constexpr const char* kServiceDiagnosticsPageFile = "AeroraServiceDiagnosticsPage.qml";
+
+/// The two Aerora Analyze pages that read upstream state rather than an Aerora service. Same
+/// compile check as the setup pages; their upstream bindings get their own slot below.
+constexpr const char* kSecurityPosturePageFile = "AeroraSecurityPosturePage.qml";
+constexpr const char* kErrorReportPageFile = "AeroraErrorReportPage.qml";
 
 /// SCR-HLP-02's page. An AnalyzePage rather than a SetupPage, but the compile check is the same
 /// question - whether the document's types and property names resolve - so it shares the slot.
@@ -377,6 +386,57 @@ void AeroraUiFoundationTest::_capabilityPageListsEveryCategoryAndReadsResolvable
                                                   "AeroraVehicleCapabilities::%1()")
                                        .arg(QString::fromUtf8(signalName))));
     }
+}
+
+void AeroraUiFoundationTest::_upstreamBindingsTheNewScreensDependOnResolve()
+{
+    // Three Aerora screens now read upstream state directly rather than through an Aerora service,
+    // which is a different and sharper exposure: these names belong to another workstream, a rename
+    // there is not a compile error anywhere in this overlay, and the symptom is a QML binding that
+    // silently evaluates to `undefined` - a blank field or a missing row on a screen that otherwise
+    // looks fine. None of the pages can detect it for itself.
+
+    // SCR-VEH-04 reads the SYS_STATUS sensor model off the vehicle.
+    const QMetaObject* const vehicleMeta = &Vehicle::staticMetaObject;
+    for (const char* const property :
+         {"sysStatusSensorInfo", "allSensorsHealthy", "firmwareMajorVersion", "firmwareMinorVersion",
+          "firmwarePatchVersion", "firmwareVersionTypeString", "gitHash"}) {
+        QVERIFY2(vehicleMeta->indexOfProperty(property) != -1,
+                 qPrintable(QStringLiteral("an Aerora screen reads Vehicle.%1").arg(QString::fromUtf8(property))));
+    }
+
+    // The two parallel lists AeroraHealthPage.qml indexes into. They must stay parallel as well as
+    // present, which is upstream's own invariant and is asserted against a live vehicle in
+    // AeroraVehicleConfigUITest rather than here.
+    const QMetaObject* const sensorMeta = &SysStatusSensorInfo::staticMetaObject;
+    for (const char* const property : {"sensorNames", "sensorStatus"}) {
+        QVERIFY2(
+            sensorMeta->indexOfProperty(property) != -1,
+            qPrintable(
+                QStringLiteral("AeroraHealthPage.qml reads sysStatusSensorInfo.%1").arg(QString::fromUtf8(property))));
+    }
+
+    // SCR-HLP-03's build provenance lines, and the one action on any Aerora screen.
+    const QMetaObject* const globalMeta = &QGroundControlQmlGlobal::staticMetaObject;
+    for (const char* const property : {"qgcVersion", "qgcAppDate", "qgcDailyBuild"}) {
+        QVERIFY2(
+            globalMeta->indexOfProperty(property) != -1,
+            qPrintable(
+                QStringLiteral("AeroraErrorReportPage.qml reads QGroundControl.%1").arg(QString::fromUtf8(property))));
+    }
+
+    // copyToClipboard() is the only operator action in the overlay. A rename would leave a button
+    // that throws a TypeError when pressed, which no other test here would see.
+    bool copyFound = false;
+    for (int i = globalMeta->methodOffset(); i < globalMeta->methodCount(); ++i) {
+        const QMetaMethod candidate = globalMeta->method(i);
+        if ((candidate.methodType() == QMetaMethod::Method) && (candidate.name() == "copyToClipboard")) {
+            copyFound = true;
+            break;
+        }
+    }
+    QVERIFY2(copyFound,
+             "AeroraErrorReportPage.qml calls QGroundControl.copyToClipboard(), which must stay Q_INVOKABLE");
 }
 
 void AeroraUiFoundationTest::_selfCheckResolvesTheDeclaredOverride()
@@ -763,8 +823,11 @@ void AeroraUiFoundationTest::_aeroraPageDocumentsCompile_data()
 
     QTest::newRow("identity") << QByteArray(kIdentityPageFile);
     QTest::newRow("capabilities") << QByteArray(kCapabilityPageFile);
+    QTest::newRow("health") << QByteArray(kHealthPageFile);
     QTest::newRow("service diagnostics") << QByteArray(kServiceDiagnosticsPageFile);
     QTest::newRow("state vocabulary") << QByteArray(kStateVocabularyPageFile);
+    QTest::newRow("security posture") << QByteArray(kSecurityPosturePageFile);
+    QTest::newRow("error report") << QByteArray(kErrorReportPageFile);
 }
 
 void AeroraUiFoundationTest::_aeroraPageDocumentsCompile()

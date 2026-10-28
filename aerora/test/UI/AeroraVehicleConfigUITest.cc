@@ -20,12 +20,14 @@ namespace {
 /// are the same string.
 constexpr const char* kIdentitySidebarButton = "vehicleConfig_comp_AeroraIdentity";
 constexpr const char* kCapabilitySidebarButton = "vehicleConfig_comp_AeroraCapabilities";
+constexpr const char* kHealthSidebarButton = "vehicleConfig_comp_AeroraHealth";
 constexpr const char* kServicesSidebarButton = "vehicleConfig_comp_AeroraServices";
 
 /// The page roots. Finding these proves the click loaded the intended page rather than leaving the
 /// previous one up, which a content check alone cannot distinguish.
 constexpr const char* kIdentityPageObject = "aeroraIdentityPage";
 constexpr const char* kCapabilityPageObject = "aeroraCapabilityPage";
+constexpr const char* kHealthPageObject = "aeroraHealthPage";
 constexpr const char* kServicesPageObject = "aeroraServiceDiagnosticsPage";
 
 /// Every enumerator of AeroraVehicleCapabilities::Category. The capability page must publish one
@@ -112,6 +114,7 @@ void AeroraVehicleConfigUITest::_aeroraSetupPagesRenderInTheConfigureView()
             QVERIFY(_openAeroraPage(QString::fromUtf8(kIdentitySidebarButton), QString::fromUtf8(kIdentityPageObject)));
             QVERIFY(
                 _openAeroraPage(QString::fromUtf8(kCapabilitySidebarButton), QString::fromUtf8(kCapabilityPageObject)));
+            QVERIFY(_openAeroraPage(QString::fromUtf8(kHealthSidebarButton), QString::fromUtf8(kHealthPageObject)));
             QVERIFY(_openAeroraPage(QString::fromUtf8(kServicesSidebarButton), QString::fromUtf8(kServicesPageObject)));
 
             // And the identity page is gone, so the panel was replaced rather than stacked.
@@ -197,12 +200,14 @@ void AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperation
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kVehicleConfigRoot), TestTimeout::mediumMs()),
                      "the hub button must open the Vehicle Configuration view");
 
-            // And the destination is the one the hub's text promises: all three Aerora pages are in
-            // the sidebar it just opened.
+            // And the destination is the one the hub's text promises: every published Aerora page is
+            // in the sidebar it just opened.
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kIdentitySidebarButton), TestTimeout::mediumMs()),
                      "the opened view must list the Aerora Identity page");
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kCapabilitySidebarButton), TestTimeout::mediumMs()),
                      "the opened view must list the Aerora Capabilities page");
+            QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kHealthSidebarButton), TestTimeout::mediumMs()),
+                     "the opened view must list the Aerora Health page");
             QVERIFY2(findVisibleItem(_rootItem, QString::fromUtf8(kServicesSidebarButton), TestTimeout::mediumMs()),
                      "the opened view must list the Aerora Services page");
 
@@ -251,4 +256,52 @@ void AeroraVehicleConfigUITest::_capabilityPageReportsAnEmptyInventoryWithoutCla
 
             waitForParamRefreshQuiet(vehicle);
         });
+}
+
+void AeroraVehicleConfigUITest::_healthPageWithholdsAVerdictUntilTheAircraftReportsOne()
+{
+    runWithMockLink([] { return MockLink::startGenericMockLink(); },
+                    [this](QPointer<MockLink>, Vehicle* vehicle) {
+                        QVERIFY(vehicle);
+
+                        navigateToConfigureView();
+                        if (QTest::currentTestFailed()) {
+                            return;
+                        }
+
+                        QQuickItem* const page = _openAeroraPage(QString::fromUtf8(kHealthSidebarButton),
+                                                                 QString::fromUtf8(kHealthPageObject));
+                        QVERIFY(page);
+
+                        // Read the same source the page reads, through the same property, so the comparison is
+                        // between the page and the vehicle rather than between the page and this test's idea of
+                        // the vehicle.
+                        QObject* const sensorInfo = vehicle->property("sysStatusSensorInfo").value<QObject*>();
+                        QVERIFY2(sensorInfo, "Vehicle must publish its SYS_STATUS sensor model");
+
+                        const QStringList vehicleSensorNames = sensorInfo->property("sensorNames").toStringList();
+                        const bool anythingReported = !vehicleSensorNames.isEmpty();
+
+                        // The page renders one row per reported sensor and invents none.
+                        QCOMPARE(page->property("_sensorNames").toList().size(), qsizetype(vehicleSensorNames.size()));
+                        QCOMPARE(page->property("_anyReported").toBool(), anythingReported);
+
+                        // The assertion this slot exists for. Vehicle::allSensorsHealthy() starts true
+                        // (Vehicle.h:969) and only moves when a SYS_STATUS disagrees, so before any report it
+                        // says every sensor is healthy for an aircraft that has named none. The page's reading
+                        // must be gated on a report having arrived - which means that when nothing has been
+                        // reported it must be false even while the vehicle's own property is true.
+                        const bool vehicleClaimsHealthy = vehicle->property("allSensorsHealthy").toBool();
+                        const bool pageClaimsHealthy = page->property("_allHealthy").toBool();
+
+                        if (anythingReported) {
+                            QCOMPARE(pageClaimsHealthy, vehicleClaimsHealthy);
+                        } else {
+                            QVERIFY2(!pageClaimsHealthy,
+                                     "nothing has been reported, so the page must show no health verdict even though "
+                                     "Vehicle::allSensorsHealthy() defaults to true");
+                        }
+
+                        waitForParamRefreshQuiet(vehicle);
+                    });
 }

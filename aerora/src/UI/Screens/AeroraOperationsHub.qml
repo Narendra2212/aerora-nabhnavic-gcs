@@ -378,8 +378,8 @@ AnalyzePage {
                 QGCLabel {
                     Layout.fillWidth: true
                     text: root._servicesAvailable
-                          ? qsTr("Aerora Identity, Aerora Capabilities and Aerora Services appear in the "
-                                 + "configuration sidebar. All are read-only.")
+                          ? qsTr("Aerora Identity, Aerora Capabilities, Aerora Health and Aerora Services "
+                                 + "appear in the configuration sidebar. All are read-only.")
                           : qsTr("Disabled: no Aerora vehicle is connected, so the configuration view would "
                                  + "have no pages to show.")
                     color: qgcPal.colorGrey
