@@ -1,0 +1,27 @@
+// Generated from aerora/src/aerora_provenance.h.in by aerora/CMakeLists.txt. Do not edit the
+// generated copy.
+//
+// Configured into ${CMAKE_BINARY_DIR}, which src/CMakeLists.txt:92 already puts on the application
+// target's include path - the same route the upstream src/qgc_version.h.in template takes. No
+// include-directory change is needed, and no core file is edited to get these values: the Git
+// module computes them at configure time for the summary and the package release strings
+// (cmake/modules/Git.cmake, cmake/PrintSummary.cmake) and they are simply read here.
+#pragma once
+
+/// Short hash of the commit this overlay was built from, or "0000000" when the build happened
+/// outside a git checkout. AeroraProvenance treats the sentinel as "not known" rather than
+/// reporting it as a commit.
+#define AERORA_BUILD_COMMIT "@QGC_GIT_HASH@"
+
+/// Branch name at configure time, or "unknown" outside a checkout.
+#define AERORA_BUILD_BRANCH "@QGC_GIT_BRANCH@"
+
+/// 1 when the working tree had uncommitted changes at configure time.
+///
+/// Mapped to an integer literal in CMake rather than passed through as a CMake boolean: TRUE and
+/// FALSE are not C++, and a preprocessor comparison against them would silently take the wrong
+/// branch.
+#define AERORA_BUILD_WORKING_TREE_DIRTY @AERORA_BUILD_WORKING_TREE_DIRTY_LITERAL@
+
+/// Version string as git describe produced it, e.g. "v5.0.4-123-gabcdef0".
+#define AERORA_BUILD_VERSION "@QGC_APP_VERSION_STR@"

@@ -13,6 +13,7 @@
 #include "AeroraMissionObserver.h"
 #include "AeroraPayloadModel.h"
 #include "AeroraPowerModel.h"
+#include "AeroraProvenance.h"
 #include "AeroraReportedValue.h"
 #include "AeroraSecurityStatus.h"
 #include "AeroraStateValue.h"
@@ -48,7 +49,7 @@ namespace {
 /// dependency.
 const QList<const QMetaObject *> &auditedTypes()
 {
-    static const QList<const QMetaObject *> types = {
+    static const QList<const QMetaObject*> types = {
         &AeroraVehicleUiContext::staticMetaObject,
         &AeroraVehicleServices::staticMetaObject,
         &AeroraVehicleIdentity::staticMetaObject,
@@ -64,6 +65,10 @@ const QList<const QMetaObject *> &auditedTypes()
         // arrived with WP2-B, and neither was audited.
         &AeroraFreshness::staticMetaObject,
         &AeroraSecurityStatus::staticMetaObject,
+        // Same shape again: an independent singleton with no route from the root, so the walk
+        // cannot find it and listing it here is the only thing that audits it. Arrived with
+        // SCR-SHL-04.
+        &AeroraProvenance::staticMetaObject,
     };
     return types;
 }
@@ -240,6 +245,10 @@ QStringList reviewedMethodsFor(const QString &typeName)
         // Nothing. Every property is a computed read and the type holds no security state, so its
         // whole QML surface is property getters and one signal. See AeroraSecurityStatus.h.
         {QStringLiteral("AeroraSecurityStatus"), {}},
+        // Nothing. Every property is a build-time constant read through an accessor, the type
+        // declares no data member, and there is no setting on it to change - a provenance type
+        // with a writable property would let the interface claim a different build.
+        {QStringLiteral("AeroraProvenance"), {}},
     };
 
     return reviewed.value(typeName);

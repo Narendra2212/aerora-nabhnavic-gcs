@@ -86,6 +86,12 @@ private slots:
     // that otherwise looks correct. This is the only thing that would catch it.
     void _upstreamBindingsTheNewScreensDependOnResolve();
 
+    // SCR-SHL-04. The provenance values come from a template configured into the build directory,
+    // and a configure_file() that did not run leaves the literal placeholder behind - every screen
+    // would then display "@QGC_GIT_HASH@" as a commit with nothing in the build failing. This is
+    // what catches that, and it holds the recorded gap at "not claimed".
+    void _provenanceReportsASubstitutedBuildIdentity();
+
     // U1 / HO-TAB7-02 - the installation state machine. isInstalled() is what the IF-UIS-015
     // startup self-check reads, so an interface quietly missing its Aerora layer is detectable
     // rather than merely wrong. These are the tests that fail if the AeroraCorePlugin overrides

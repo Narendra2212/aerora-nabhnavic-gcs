@@ -76,6 +76,11 @@ private slots:
     // page that looks like it works, so this requires the real build version to be in the text.
     void _errorReportPageIsReachableAndAssemblesRealStationState();
 
+    // SCR-SHL-04. The page's every row reads a QML singleton, so a registration that did not happen
+    // renders as a build with no recorded provenance rather than as an error. This compares the
+    // singleton the page reads against a C++ instance of the same type.
+    void _provenancePageIsReachableAndReadsTheRegisteredSingleton();
+
 private:
     /// @return The scene's controller for @a flyView, or nullptr when absent.
     PlanMasterController* _sceneController(bool flyView);

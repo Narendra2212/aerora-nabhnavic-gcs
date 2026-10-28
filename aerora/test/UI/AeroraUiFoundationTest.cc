@@ -19,6 +19,7 @@
 #include "AeroraMissionIndex.h"
 #include "AeroraMissionObserver.h"
 #include "AeroraMissionSnapshot.h"
+#include "AeroraProvenance.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSecurityStatus.h"
 #include "AeroraTelemetryState.h"
@@ -67,6 +68,7 @@ constexpr const char* kServiceDiagnosticsPageFile = "AeroraServiceDiagnosticsPag
 /// compile check as the setup pages; their upstream bindings get their own slot below.
 constexpr const char* kSecurityPosturePageFile = "AeroraSecurityPosturePage.qml";
 constexpr const char* kErrorReportPageFile = "AeroraErrorReportPage.qml";
+constexpr const char* kProvenancePageFile = "AeroraProvenancePage.qml";
 
 /// SCR-HLP-02's page. An AnalyzePage rather than a SetupPage, but the compile check is the same
 /// question - whether the document's types and property names resolve - so it shares the slot.
@@ -448,6 +450,40 @@ void AeroraUiFoundationTest::_upstreamBindingsTheNewScreensDependOnResolve()
     }
     QVERIFY2(copyFound,
              "AeroraErrorReportPage.qml calls QGroundControl.copyToClipboard(), which must stay Q_INVOKABLE");
+}
+
+void AeroraUiFoundationTest::_provenanceReportsASubstitutedBuildIdentity()
+{
+    const AeroraProvenance provenance;
+
+    // The plumbing assertion, and the reason this slot exists. The values come from a template
+    // configured by aerora/CMakeLists.txt into the build directory; if configure_file() did not
+    // run, or ran against an empty variable, the macro would still hold the literal placeholder
+    // and every screen would display "@QGC_GIT_HASH@" as a commit. Nothing else in the build
+    // fails when that happens.
+    for (const QString& value : {provenance.commit(), provenance.branch(), provenance.version()}) {
+        QVERIFY2(!value.contains(QLatin1Char('@')),
+                 qPrintable(QStringLiteral("a provenance value still holds an unsubstituted template "
+                                           "placeholder: %1")
+                                .arg(value)));
+    }
+
+    // Always present: the generator substitutes a fallback version even outside a checkout.
+    QVERIFY2(!provenance.version().isEmpty(), "the version string must always be reported");
+
+    // The sentinel must never reach a consumer. Seven zeros look like a commit and are not one, so
+    // commit() maps them to empty and commitKnown() is how a screen asks before displaying.
+    QVERIFY2(provenance.commit() != QString::fromUtf8(AeroraProvenance::kAbsentCommitSentinel),
+             "the absent-commit sentinel must not be reported as a commit");
+    QCOMPARE(provenance.isCommitKnown(), !provenance.commit().isEmpty());
+    QVERIFY2(provenance.branch() != QString::fromUtf8(AeroraProvenance::kAbsentBranchSentinel),
+             "the absent-branch sentinel must not be reported as a branch");
+
+    // The recorded gap in P7-HELP-004. A true here would mean something claimed the upstream base
+    // commit without a source for it, which is the one mistake a provenance screen must not make -
+    // the fork's own hash presented as the upstream one.
+    QVERIFY2(!provenance.isUpstreamBaseCommitKnown(),
+             "nothing in the build records the upstream base commit, so it must not be claimed");
 }
 
 void AeroraUiFoundationTest::_selfCheckResolvesTheDeclaredOverride()
@@ -839,6 +875,7 @@ void AeroraUiFoundationTest::_aeroraPageDocumentsCompile_data()
     QTest::newRow("state vocabulary") << QByteArray(kStateVocabularyPageFile);
     QTest::newRow("security posture") << QByteArray(kSecurityPosturePageFile);
     QTest::newRow("error report") << QByteArray(kErrorReportPageFile);
+    QTest::newRow("provenance") << QByteArray(kProvenancePageFile);
 }
 
 void AeroraUiFoundationTest::_aeroraPageDocumentsCompile()

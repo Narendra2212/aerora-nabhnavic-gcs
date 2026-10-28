@@ -156,6 +156,13 @@ const QVariantList &AeroraCorePlugin::analyzePages()
             tr("Aerora Error Report"),
             QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraErrorReportPage.qml")))));
 
+        // SCR-SHL-04. Every value on it is a build-time constant or a station setting, so a vehicle
+        // gate would withhold the answer to "which build is this" from an operator who has not
+        // connected anything - which is when the question is usually asked.
+        list.append(QVariant::fromValue(new QmlComponentInfo(
+            tr("Aerora Build"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/Aerora/Controls/AeroraProvenancePage.qml")))));
+
         return list;
     }();
 

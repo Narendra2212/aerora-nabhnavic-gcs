@@ -54,6 +54,33 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/src/PayloadPower.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/UI/Ui.cmake)
 
 # ----------------------------------------------------------------------------
+# Build provenance header
+#
+# SCR-SHL-04 needs the commit this overlay was built from, and the values already exist: the Git
+# module computes QGC_GIT_HASH, QGC_GIT_BRANCH and QGC_GIT_DIRTY at configure time for the build
+# summary and the package release strings. They had simply never reached C++.
+#
+# Generated here rather than by extending src/qgc_version.h.in, so no core file is edited for an
+# overlay claim. Written into ${CMAKE_BINARY_DIR} because src/CMakeLists.txt:92 already puts that
+# directory on the application target's include path - the same route qgc_version.h takes - so
+# AeroraProvenance.cc includes it with no include-directory change anywhere.
+#
+# QGC_GIT_DIRTY is a CMake boolean and TRUE/FALSE are not C++, so it is mapped to an integer
+# literal here. Substituting it directly would leave a preprocessor comparison that silently took
+# the wrong branch.
+if(QGC_GIT_DIRTY)
+    set(AERORA_BUILD_WORKING_TREE_DIRTY_LITERAL 1)
+else()
+    set(AERORA_BUILD_WORKING_TREE_DIRTY_LITERAL 0)
+endif()
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/aerora_provenance.h.in"
+    "${CMAKE_BINARY_DIR}/aerora_provenance.h"
+    @ONLY
+)
+
+# ----------------------------------------------------------------------------
 # Cross-module dependency assertion
 #
 # AeroraFirmwarePlugin::initializeVehicle() is the per-vehicle composition root and references four

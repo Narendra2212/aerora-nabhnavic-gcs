@@ -13,6 +13,7 @@
 #include <QtTest/QTest>
 
 #include "AeroraPlanBridge.h"
+#include "AeroraProvenance.h"
 #include "PlanMasterController.h"
 #include "QGroundControlQmlGlobal.h"
 
@@ -44,6 +45,8 @@ constexpr const char* kSecurityEntryButton = "analyzeButton_Aerora Security";
 constexpr const char* kSecurityFlickable = "aeroraSecurity_flickable";
 constexpr const char* kErrorReportEntryButton = "analyzeButton_Aerora Error Report";
 constexpr const char* kErrorReportFlickable = "aeroraErrorReport_flickable";
+constexpr const char* kProvenanceEntryButton = "analyzeButton_Aerora Build";
+constexpr const char* kProvenanceFlickable = "aeroraProvenance_flickable";
 
 /// The Analyze view's own page-list flickable. Every Aerora entry is appended after the upstream
 /// ones, so the list is taller than an offscreen window and an entry has to be scrolled into view
@@ -337,4 +340,35 @@ void AeroraSceneAttachmentUITest::_errorReportPageIsReachableAndAssemblesRealSta
     QVERIFY2(report.contains(QGroundControlQmlGlobal::qgcVersion()),
              qPrintable(QStringLiteral("the assembled report must carry the station's build version (%1)")
                             .arg(QGroundControlQmlGlobal::qgcVersion())));
+}
+
+void AeroraSceneAttachmentUITest::_provenancePageIsReachableAndReadsTheRegisteredSingleton()
+{
+    startUI();
+    if (QTest::currentTestFailed()) {
+        return;
+    }
+
+    QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
+             "the Analyze view must be reachable from the tool-select dropdown");
+    QVERIFY2(clickButtonScrolled(QString::fromUtf8(kProvenanceEntryButton), QString::fromUtf8(kAnalyzeListFlickable)),
+             "the Aerora Build entry must appear in the Analyze page list");
+
+    QQuickItem* const flickable =
+        findVisibleItem(_rootItem, QString::fromUtf8(kProvenanceFlickable), TestTimeout::mediumMs());
+    QVERIFY2(flickable, "clicking the entry must load the provenance page");
+
+    QQuickItem* const page =
+        findVisibleItem(_rootItem, QStringLiteral("aeroraProvenancePage"), TestTimeout::mediumMs());
+    QVERIFY2(page, "the provenance page root must be in the scene");
+
+    // The assertion this slot exists for. Every row on the page reads the AeroraProvenance
+    // singleton, so a registration that silently did not happen leaves each binding evaluating
+    // against `undefined` - and the page then renders as a build with no recorded provenance,
+    // which is indistinguishable from an honest answer. Comparing the singleton the page read
+    // against a C++ instance of the same type is what separates the two.
+    const AeroraProvenance reference;
+    const QVariant pageReading = page->property("_commitKnown");
+    QVERIFY2(pageReading.isValid(), "the page must expose the reading it took from the singleton");
+    QCOMPARE(pageReading.toBool(), reference.isCommitKnown());
 }

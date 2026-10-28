@@ -121,6 +121,8 @@ set(AERORA_UI_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 
 set(AERORA_UI_SOURCES
+    ${AERORA_UI_DIR}/AeroraProvenance.cc
+    ${AERORA_UI_DIR}/AeroraProvenance.h
     ${AERORA_UI_DIR}/AeroraQmlOverrides.cc
     ${AERORA_UI_DIR}/AeroraQmlOverrides.h
     ${AERORA_UI_DIR}/AeroraUiLog.cc
@@ -128,6 +130,13 @@ set(AERORA_UI_SOURCES
     ${AERORA_UI_DIR}/AeroraVehicleUiContext.cc
     ${AERORA_UI_DIR}/AeroraVehicleUiContext.h
 )
+
+# AeroraProvenance.cc includes the generated aerora_provenance.h, which the aggregation point
+# configures into ${CMAKE_BINARY_DIR} - already on the application target's include path
+# (src/CMakeLists.txt:92), which is how upstream's own qgc_version.h is reached. No addition to
+# AERORA_UI_INCLUDE_DIRECTORIES is required and no core file is edited: the git values the template
+# substitutes are computed at configure time by cmake/modules/Git.cmake for the build summary and
+# the package release strings, and are simply read.
 
 set(AERORA_UI_INCLUDE_DIRECTORIES ${AERORA_UI_DIR})
 
@@ -160,6 +169,7 @@ set(AERORA_UI_QML_FILES
     ${AERORA_UI_DIR}/Screens/AeroraIdentityPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraMissionProgressPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraOperationsHub.qml
+    ${AERORA_UI_DIR}/Screens/AeroraProvenancePage.qml
     ${AERORA_UI_DIR}/Screens/AeroraSecurityPosturePage.qml
     ${AERORA_UI_DIR}/Screens/AeroraServiceDiagnosticsPage.qml
     ${AERORA_UI_DIR}/Screens/AeroraStateVocabularyPage.qml

@@ -36,9 +36,11 @@ import QGroundControl.AnalyzeView
 /// Two absences are stated in the report rather than omitted from it, because a reader who does not
 /// find them would otherwise not know they were missing:
 ///
-/// \li **no commit is recorded.** `P7-HELP-004` asks the station to state its base and overlay
-///     commits; neither is embedded in the build, so the report says so instead of leaving the
-///     field out. `SCR-SHL-04` is where that gets fixed, and it is blocked on the same gap.
+/// \li **no upstream base commit is recorded.** The report carries this build's own commit, branch
+///     and working-tree state, which `SCR-SHL-04` added. What is still absent is the upstream
+///     QGroundControl commit the fork diverged from - nothing in the build records it - so the
+///     report names the field as not recorded rather than offering the fork's own hash in its
+///     place.
 /// \li **no durable log is attached.** There is no local store (`Q-037`, `P7-DAT-002`), so the
 ///     report is a snapshot of now and carries no history. A report that silently omitted history
 ///     would read as a report that found none.
@@ -96,9 +98,21 @@ AnalyzePage {
         lines.push(qsTr("  Application version: %1").arg(QGroundControl.qgcVersion))
         lines.push(qsTr("  Build date: %1").arg(QGroundControl.qgcAppDate))
         lines.push(qsTr("  Daily build: %1").arg(root._yesNo(QGroundControl.qgcDailyBuild)))
+        // One hash for both the base and the overlay: they are the same git tree. SCR-SHL-04 is
+        // where this is laid out; the report carries it because a report without a build identity
+        // cannot be acted on.
+        lines.push(qsTr("  Commit: %1").arg(AeroraProvenance.commitKnown
+                                            ? AeroraProvenance.commit
+                                            : qsTr("not recorded - built outside a checkout")))
+        lines.push(qsTr("  Branch: %1").arg(AeroraProvenance.branch === ""
+                                            ? qsTr("not recorded")
+                                            : AeroraProvenance.branch))
+        lines.push(qsTr("  Working tree at build: %1").arg(AeroraProvenance.workingTreeDirty
+                                                           ? qsTr("had uncommitted changes")
+                                                           : qsTr("clean")))
+        lines.push(qsTr("  Version: %1").arg(AeroraProvenance.version))
         // Stated, not omitted. See \section content.
-        lines.push(qsTr("  Base commit: not recorded in this build"))
-        lines.push(qsTr("  Overlay commit: not recorded in this build"))
+        lines.push(qsTr("  Upstream base commit: not recorded in this build"))
         lines.push("")
 
         lines.push(qsTr("Command authorization"))
