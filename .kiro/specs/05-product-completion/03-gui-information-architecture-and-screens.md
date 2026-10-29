@@ -308,7 +308,7 @@ technologies and expert accessibility review, neither of which has occurred (`P7
 
 ## 8. Screen inventory
 
-45 screens across 12 areas. Every one maps to a verified seam or a named new interface.
+52 screens across 13 areas. Every one maps to a verified seam or a named new interface.
 
 Columns: **Class** per [§4](#4-delivery-classes) · **Seam** the exact mechanism · **Status** per
 [00-README](00-README.md#status-vocabulary) · **Owner** the tab · **Blocked by** the gating item.
@@ -540,7 +540,7 @@ substantially less QML than writing it by hand.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-TEL-01` | Telemetry explorer | O | `analyzePages()`; iterates `AeroraTelemetrySet` fact groups | `DESIGNED` | 4 + 7 | `Q4-002` — all 6 fact groups are `CONTRACT-ONLY`, `isRegistrationAvailable()` is false |
+| `SCR-TEL-01` | Telemetry explorer | O | `analyzePages()`; iterates `AeroraTelemetrySet` fact groups | `DESIGNED` | 4 + 7 | `Q4-002` — all 6 fact groups are `CONTRACT-ONLY`, so there is nothing to explore. `isRegistrationAvailable()` returns `true` (both ADR-016 halves applied, authorisation unresolved and owned by Tab 1), so the registration path is not what blocks this screen |
 | `SCR-TEL-02` | Event timeline | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 4 | `P7-TEL-004`; needs the local store (`P7-DAT-002`) |
 | `SCR-TEL-03` | Freshness / quality dashboard | O | `analyzePages()` | `DESIGNED` | 4 + 7 | `Q-036` — no budget values exist |
 
@@ -700,12 +700,12 @@ A `showTool()` button from the hub would be a second, worse route to a screen al
 | --- | --- | --- |
 | `VERIFIED` — navigated to and drawn in a booted window | **14** | `SCR-SHL-01`, `SCR-SHL-03`, `SCR-SHL-04`, `SCR-LIV-01`, `SCR-LIV-06`, `SCR-LIV-07`, `SCR-VEH-01`..`04`, `SCR-VEH-06`, `SCR-SEC-01`, `SCR-HLP-02`, `SCR-HLP-03` |
 | `SUPERSEDED` by a delivered screen | 1 | `SCR-HLP-01` |
-| Not delivered | 30 | of which 4 have an implemented service or half behind them |
-| **Total Aerora screens** | **45** | |
+| Not delivered | 37 | of which 4 have an implemented service or half behind them |
+| **Total Aerora screens** | **52** | |
 | Class X (forks) | **0** | |
 | Upstream screens reused unchanged (class R) | Not enumerated — the entire QGC surface | |
 
-The 30 undelivered screens are not a backlog of unwritten code. **Every one of them is waiting on a
+The 37 undelivered screens are not a backlog of unwritten code. **Every one of them is waiting on a
 product, firmware or architecture decision** — a command set, a reported-value set, a freshness
 budget, an operator role policy, an autonomy proposal model, a durable store, a fleet identity
 format, or a fork point. Designing them before the decision would mean inventing the decision. See
@@ -733,7 +733,7 @@ genuine absences of data, decisions or seams.
 
 ## 9. Why there are no action buttons yet
 
-The screen inventory has 45 entries and, today, **zero operator action controls**. That is deliberate
+The screen inventory has 52 entries and, today, **zero operator action controls**. That is deliberate
 and worth stating plainly, because it looks like an omission.
 
 An operator action requires a command path. A command path requires authorization. Authorization

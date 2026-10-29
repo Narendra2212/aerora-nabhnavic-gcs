@@ -117,9 +117,9 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
     // Follows the same pattern as the two friends above, which upstream grants for this exact
     // purpose. The class is defined in the Aerora overlay, so in a stock build this names a class
     // that is never defined, which is legal and has no effect. The registrar's privileged call is
-    // additionally gated on AERORA_VEHICLE_FACTGROUP_FRIENDSHIP, which is deliberately NOT defined
-    // yet: until Aerora facts and metadata exist there is nothing to register, so the registrar
-    // refuses and reports why rather than registering empty groups.
+    // additionally gated on AERORA_VEHICLE_FACTGROUP_FRIENDSHIP, which the overlay defines in
+    // CUSTOM_DEFINITIONS, so isRegistrationAvailable() returns true in an Aerora build. Whether this
+    // applied pair carries the authorisation it needs is unresolved and is Tab 1's to record.
     friend class AeroraVehicleFactGroupRegistrar;
 
 public:

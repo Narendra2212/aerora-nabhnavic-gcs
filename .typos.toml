@@ -2,8 +2,20 @@
 # https://github.com/crate-ci/typos
 
 [default]
-# Color literals (#RRGGBB / #AARRGGBB); the # keeps real words out of the match.
-extend-ignore-re = ["#[0-9a-fA-F]{3,8}\\b"]
+extend-ignore-re = [
+    # Color literals (#RRGGBB / #AARRGGBB); the # keeps real words out of the match.
+    "#[0-9a-fA-F]{3,8}\\b",
+    # Aerora gate and screen identifiers (DG-MIS, SCR-MIS-05). These cannot be matched as
+    # identifiers: the hyphen splits them, so only a bare MIS survives to that stage. Anchored on
+    # the prefix and the digit shape, so MIS is exempt only inside a whole identifier and a bare
+    # MIS is still reported.
+    "\\bDG-[A-Z]{3}\\b",
+    "\\bSCR-[A-Z]{3}-[0-9]{2}\\b",
+    # Phase 7 requirement identifiers (P7-MIS-003, P7-PWR-006), which the gate specs cite by ID.
+    # Same rule: the literal P7- prefix and the three-digit suffix bound the match, so the three- or
+    # four-letter area code is exempt only inside a whole identifier.
+    "\\bP7-[A-Z]{3,4}-[0-9]{3}\\b",
+]
 extend-ignore-identifiers-re = [
     # 0x-prefixed hex literals and hash-like bare hex (SHAs). Must stay anchored and
     # long — shorter bounds exempt all-hex-letter words (facade, decade), hiding typos.

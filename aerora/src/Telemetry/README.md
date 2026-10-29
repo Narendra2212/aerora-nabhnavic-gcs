@@ -339,8 +339,9 @@ own per-vehicle fact-group map. That is Q4-002, resolved below.
 
 ## ADR — Q4-002: Aerora fact groups enter the vehicle's fact-group map
 
-**Status:** DECIDED by M-Telemetry. **Implementation:** telemetry side complete; blocked on one
-authorised QGroundControl core edit.
+**Status:** DECIDED by M-Telemetry. **Implementation:** telemetry side complete; both halves of the
+QGroundControl core edit are applied in the tree, and the authorisation of the applied pair is
+unresolved and owned by Tab 1.
 
 ### Decision
 
@@ -414,8 +415,11 @@ inside core. If that ordering changes the failure is silent.
 
 ### The core edit required
 
-Not performed. Reported for Tab 1's authorisation. The telemetry side is complete, so the
-integration is **two coordinated lines** and no new code.
+Both lines below are applied at `e7b38eef1`: the friend declaration at `src/Vehicle/Vehicle.h:123`
+and the define in `aerora/CMakeLists.txt` `CUSTOM_DEFINITIONS`, so
+`isRegistrationAvailable()` returns true in an Aerora build. The authorisation of that applied pair
+is unresolved and is Tab 1's to record. The specification below is kept as the record of what was
+asked for and why; it was two coordinated lines and no new code.
 
 ```text
 File:            src/Vehicle/Vehicle.h
@@ -478,13 +482,13 @@ reaches the vehicle map is correct and should be inverted as part of the same ch
 | **Maintenance** | One friend line to re-apply on upstream merge. No parallel dispatch, picker or CSV implementation to maintain |
 | **Future products** | A new product profile's fact group is registered by the same `registerGroup()` + `publishTo()` path. Nothing per-product is added to the core edit |
 
-### Until the core edit lands
+### While the dialect is absent
 
 `publishTo()` is callable and correct, and publishes nothing, because no concrete Aerora fact group
 exists — no dialect. So the practical state is unchanged and nothing is blocked: the decision is
-recorded, the telemetry half is written and tested, and the core edit can be authorised whenever Tab 1
-chooses. Aerora telemetry remains `IMPLEMENTATION-PLANNED`, now for multi-vehicle as well as
-single-vehicle.
+recorded, the telemetry half is written and tested, and both halves of the core edit are applied
+with their authorisation unresolved and owned by Tab 1. Aerora telemetry remains
+`IMPLEMENTATION-PLANNED`, now for multi-vehicle as well as single-vehicle.
 
 ## UI boundary
 

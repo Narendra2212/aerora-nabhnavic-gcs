@@ -10,7 +10,7 @@ Verified against `HEAD = 9459a4b57986f40df8bdc193d5453c0596fbb416`.
 | ADR | Subject | Status | Core edit |
 | --- | --- | --- | --- |
 | ADR-015 | Calibration authorization seam | **ACCEPTED, IMPLEMENTED-UNCOMPILED** | Yes, 1 file |
-| ADR-016 | Q4-002 telemetry FactGroup membership | **ACCEPTED (direction), NOT IMPLEMENTED** | None yet, deliberately |
+| ADR-016 | Q4-002 telemetry FactGroup membership | **ACCEPTED, IMPLEMENTED-UNCOMPILED** — both halves applied; authorisation unresolved, owned by Tab 1 | Yes, 1 file — the friend declaration in `src/Vehicle/Vehicle.h` |
 
 ---
 
@@ -239,32 +239,39 @@ edit and a parallel mechanism.
 
 ### Status
 
-**ACCEPTED. Core edit APPLIED, registration deliberately NOT ENABLED.**
+**ACCEPTED. Both halves of the core edit are applied in the tree. The authorisation of the applied
+pair is unresolved and is Tab 1's to record.**
 
 Tab 4 built both halves of the telemetry side: `AeroraFactGroupRegistrar` as the interface and
 `AeroraVehicleFactGroupRegistrar` as the one concrete registrar, whose single privileged call is
 compiled only when `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` is defined. Granting the friendship is the
 only part Tab 4 cannot do for itself, so it was handed to Tab 1.
 
-Tab 1 has applied it:
+Both halves are present at `e7b38eef1`:
 
 | Half | State | Detail |
 | --- | --- | --- |
-| `friend class AeroraVehicleFactGroupRegistrar;` on `Vehicle` | **APPLIED** | `src/Vehicle/Vehicle.h`, alongside the two friends upstream grants for the same purpose |
-| `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` compile definition | **NOT DEFINED** | Deliberate |
+| `friend class AeroraVehicleFactGroupRegistrar;` on `Vehicle` | **APPLIED** | `src/Vehicle/Vehicle.h:123`, alongside the two friends upstream grants for the same purpose |
+| `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` compile definition | **DEFINED** | `aerora/CMakeLists.txt` `CUSTOM_DEFINITIONS`; both `aerora-linux.yml` and `aerora-windows.yml` fail the job if the define is absent from the generated build |
 
-This is the safe half, and the asymmetry is Tab 4's design, not an accident: a friend declaration
-without the flag leaves the registrar **inert** — it validates, refuses, and reports why — whereas
-the flag without the friend declaration is a compile error. Applying only the declaration therefore
-cannot break a build, which matters because `D-006` means no build can verify it either way. In a
-stock build the declaration names a class that is never defined, which is legal and has no effect.
+So the privileged call is compiled and `isRegistrationAvailable()` returns `true` in an Aerora build
+(`aerora/src/Telemetry/AeroraVehicleFactGroupRegistrar.cc:22-28`). Whether the applied pair carries
+the authorisation this ADR hands to Tab 1 is **unresolved** — that answer is Tab 1's, and this record
+states what the tree holds rather than standing in for it.
 
-Enabling the flag stays gated on the original precondition: until Aerora facts and metadata exist
-(`Q-023`, `Q-024`), registration would add empty groups. `isRegistrationAvailable()` exists so a
-startup self-check can detect the inert case rather than discovering it as absent telemetry in
-flight.
+The asymmetry is Tab 4's design, not an accident, and it is why applying the declaration first was
+safe: a friend declaration without the flag leaves the registrar **inert** — it validates, refuses,
+and reports why — whereas the flag without the friend declaration is a compile error. `D-006` means
+no build has verified either half here. In a stock build the declaration names a class that is never
+defined, which is legal and has no effect.
 
-Remaining work to enable: **one compile definition**, plus the facts to justify it.
+The original precondition is unchanged by the define: until Aerora facts and metadata exist
+(`Q-023`, `Q-024`) there is no concrete fact group to register, so registration adds nothing.
+`isRegistrationAvailable()` exists so a startup self-check can detect the inert case rather than
+discovering it as absent telemetry in flight.
+
+Remaining work: the facts to justify registration, plus Tab 1's record of the authorisation the
+applied pair still needs.
 
 ### Verification requirements
 

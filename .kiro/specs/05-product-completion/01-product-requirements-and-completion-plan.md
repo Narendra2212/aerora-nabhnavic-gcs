@@ -301,7 +301,7 @@ Owner: Tab 3.
 | --- | --- | --- |
 | `P7-TEL-001` | Every telemetry item carries a declared kind, an observation and a derived state class | `IMPLEMENTED-UNCOMPILED` (`AeroraTelemetryState`) |
 | `P7-TEL-002` | Freshness is evaluated against a per-item budget. Budgets are `Q-036`, `OPEN` â€” none invented | `IMPLEMENTED-UNCOMPILED` (mechanism) + `OPEN` (values) |
-| `P7-TEL-003` | Aerora fact groups attach per-vehicle through the ADR-016 registrar | `CONTRACT-ONLY` â€” `isRegistrationAvailable()` is false; six groups are contract-only |
+| `P7-TEL-003` | Aerora fact groups attach per-vehicle through the ADR-016 registrar | `CONTRACT-ONLY` â€” `isRegistrationAvailable()` returns `true` (both `ADR-016` halves are applied; the authorisation of the applied pair is unresolved and owned by Tab 1), and the six groups are contract-only, which is the remaining gate |
 | `P7-TEL-004` | An event timeline records state transitions, operator actions and authorization outcomes on one time axis | `SPECIFIED-NOT-DESIGNED` |
 | `P7-TEL-005` | Telemetry source attribution is carried where the source is known. `IF-MAV-022` is `OPEN`; no attribution is invented | `OPEN` |
 

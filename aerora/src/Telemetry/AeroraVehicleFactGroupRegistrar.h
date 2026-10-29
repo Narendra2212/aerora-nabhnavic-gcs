@@ -22,12 +22,15 @@ class Vehicle;
 ///
 /// `FactGroup::_addFactGroup()` is `protected`. Calling it on a `Vehicle` requires friendship, which
 /// upstream grants to exactly two classes for exactly this purpose
-/// (`src/Vehicle/Vehicle.h:108, 115`). Aerora does not hold it yet.
+/// (`src/Vehicle/Vehicle.h:108, 115`). `Vehicle` now names this class as a friend as well
+/// (`src/Vehicle/Vehicle.h:123`); whether that grant carries the authorisation it needs is
+/// unresolved and is Tab 1's to record (ADR-016).
 ///
 /// So the single privileged statement is compiled only when \c AERORA_VEHICLE_FACTGROUP_FRIENDSHIP
-/// is defined. Without it this class validates, refuses, and says why — which is the honest
-/// behaviour for a build whose core edit has not been applied, and it keeps the telemetry module
-/// compiling and testable in the meantime.
+/// is defined, which the overlay does in `CUSTOM_DEFINITIONS`, so \c isRegistrationAvailable()
+/// returns true in an Aerora build. Without the define this class validates, refuses, and says why —
+/// which is the honest behaviour for a build whose core edit has not been applied, and it keeps the
+/// telemetry module compiling and testable in the meantime.
 ///
 /// **The two halves must be applied together.** Adding the friend declaration without defining the
 /// flag leaves this class inert; defining the flag without the friend declaration is a compile
