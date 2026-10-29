@@ -1,0 +1,930 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Aerora Gate_Register",
+  "description": "Shape of the single authoritative record of the ten Aerora decision Gates: the Gate_Dossiers, the per-screen blocking-entry classifications, the guard registry, the read-only exception and the contract-surface inventory. This schema carries element names and owner labels only. It names no fact, unit, value range, enumeration member, freshness threshold, operator role, permission, payload, tether or consumable item, fleet identifier format, proposal schema element, or MAVLink message, command or enumeration identifier, because each of those is Decision_Content an owner has still to settle. Every object closes additionalProperties, so an unrecognised key is a validation error rather than data the authority silently ignores.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "inventory",
+    "gates",
+    "screens",
+    "guards",
+    "readOnly",
+    "contractSurface"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema reference carried by the instance; ignored by validators."
+    },
+    "inventory": {
+      "type": "object",
+      "description": "The screen inventory this register references. The register restates nothing the inventory is authoritative for.",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "authoritativeFor"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Repository-relative path to the screen inventory document."
+        },
+        "authoritativeFor": {
+          "type": "array",
+          "description": "The facts the inventory owns, so a register that restated one is a reviewable addition rather than an accident.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "description": "Exactly ten Gate_Dossiers, one per Gate identifier, each identifier recorded once and no further Gate recorded (Requirement 1 criterion 1). uniqueItems rejects a verbatim duplicate; the per-identifier contains bounds below reject a repeated id whatever else the dossier carries.",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/gateDossier"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-MIS"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-TLM"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-FRS"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-ROL"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-PAY"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-AUT"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-STO"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-FLT"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-VID"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "const": "DG-SIM"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "screens": {
+      "type": "array",
+      "description": "One record per screen inventory row, carrying only the axes the inventory has no column for: Released, the observation behind a VERIFIED claim, and the classification of each blocking entry.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/screenRecord"
+      }
+    },
+    "guards": {
+      "type": "array",
+      "description": "The guard registry, and the only place the guard-to-Gate mapping is recorded.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/guard"
+      }
+    },
+    "readOnly": {
+      "type": "object",
+      "description": "The read-only posture of Requirement 5, which reads DG-ROL and nothing else.",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "exceptions",
+        "forbiddenUntil",
+        "preApprovedUndeclaredSeams"
+      ],
+      "properties": {
+        "gate": {
+          "const": "DG-ROL",
+          "description": "The Gate whose closure lifts read-only presentation. Requirement 5 names DG-ROL, so a posture reading another Gate is unrepresentable."
+        },
+        "exceptions": {
+          "type": "array",
+          "description": "The single recorded exception to read-only presentation (Requirement 5 criteria 1 and 11). A second exception cannot be written down.",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "screen",
+              "file",
+              "control",
+              "reason"
+            ],
+            "properties": {
+              "screen": {
+                "const": "SCR-HLP-03",
+                "description": "The one screen Requirement 5 criterion 1 records the exception on."
+              },
+              "file": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "The document carrying the excepted control."
+              },
+              "control": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "The excepted control's objectName, so the exception cannot drift onto another control in the same file."
+              },
+              "reason": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "Why the control needs no authority."
+              },
+              "requirement": {
+                "$ref": "#/$defs/requirementRef"
+              }
+            }
+          }
+        },
+        "forbiddenUntil": {
+          "type": "array",
+          "description": "Each item held FORBIDDEN-UNTIL a Gate is recorded CLOSED (Requirement 5 criterion 8).",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "gate"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "gate": {
+                "$ref": "#/$defs/gateId"
+              },
+              "requirement": {
+                "$ref": "#/$defs/requirementRef"
+              }
+            }
+          }
+        },
+        "preApprovedUndeclaredSeams": {
+          "type": "array",
+          "description": "The seams retained as pre-approved and undeclared while the read-only Gate is OPEN (Requirement 5 criterion 4).",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "contractSurface": {
+      "type": "array",
+      "description": "The recorded inventory of enumerators, declared constants and registry string keys the guard check compares against source, each mapped to the Gate whose Decision_Content would record it or to none with a reason.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/contractSurfaceElement"
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gateId": {
+      "description": "The ten Gate identifiers of Requirement 1 criterion 1. There is no eleventh.",
+      "enum": [
+        "DG-MIS",
+        "DG-TLM",
+        "DG-FRS",
+        "DG-ROL",
+        "DG-PAY",
+        "DG-AUT",
+        "DG-STO",
+        "DG-FLT",
+        "DG-VID",
+        "DG-SIM"
+      ]
+    },
+    "screenId": {
+      "type": "string",
+      "description": "A screen identifier of the screen inventory. The register references the id and restates nothing else about the screen.",
+      "pattern": "^SCR-[A-Z]{3}-[0-9]{2}$"
+    },
+    "slug": {
+      "type": "string",
+      "description": "A lower-case token. A Gate part's id is also a Closure_Record filename component, so it stays filename-safe.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "partRef": {
+      "type": "string",
+      "description": "A reference to one part of one Gate, as <GATE>:<part>.",
+      "pattern": "^(?:DG-MIS|DG-TLM|DG-FRS|DG-ROL|DG-PAY|DG-AUT|DG-STO|DG-FLT|DG-VID|DG-SIM):[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "requirementRef": {
+      "type": "string",
+      "description": "A requirement criterion reference, as <requirement>.<criterion>.",
+      "pattern": "^[0-9]{1,2}\\.[0-9]{1,2}$"
+    },
+    "ownerLabel": {
+      "description": "The programme owner labels requirements.md names as authorised to sign, to implement or to approve. These are not operator role names: those are Decision_Content of DG-ROL and no schema here names one.",
+      "enum": [
+        "Product",
+        "Firmware",
+        "Architecture",
+        "operations",
+        "engineering",
+        "security architecture",
+        "the external interface authority",
+        "the process owner",
+        "Tab 1",
+        "Tab 2",
+        "Tab 3",
+        "Tab 4",
+        "Tab 5",
+        "Tab 6",
+        "Tab 7",
+        "Tab 8"
+      ]
+    },
+    "classification": {
+      "description": "Exactly one of a Gate or an Acceptance_Criterion (Requirement 2 criterion 1).",
+      "enum": [
+        "Gate",
+        "Acceptance_Criterion"
+      ]
+    },
+    "settlementShape": {
+      "description": "How a Decision_Content element is settled: one entry, one entry per key, or a relation total in both directions.",
+      "enum": [
+        "single",
+        "keyed",
+        "mapping"
+      ]
+    },
+    "gateDossier": {
+      "type": "object",
+      "description": "One Gate's dossier: its status, Decision_Content as element names, the signing owner of each part, the implementing owner, the Sign_Off_Conditions, the Release_Set and the excluded Acceptance_Criteria (Requirement 1 criterion 2).",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "implementingOwner",
+        "rationale",
+        "parts",
+        "releaseSet",
+        "excludedAcceptanceCriteria",
+        "guards",
+        "openStateReading"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/gateId"
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "CLOSED"
+          ]
+        },
+        "implementingOwner": {
+          "$ref": "#/$defs/ownerLabel"
+        },
+        "rationale": {
+          "type": "object",
+          "description": "A reference to the narrative rather than a copy of it.",
+          "additionalProperties": false,
+          "required": [
+            "document",
+            "anchor"
+          ],
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "anchor": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        },
+        "parts": {
+          "type": "array",
+          "description": "Always a list, so a one-part Gate and a four-part Gate read the same way to the checker.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/gatePart"
+          }
+        },
+        "releaseSet": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "screen"
+            ],
+            "properties": {
+              "screen": {
+                "$ref": "#/$defs/screenId"
+              },
+              "part": {
+                "$ref": "#/$defs/slug",
+                "description": "The half of the screen this Gate releases, where a screen is released in halves."
+              }
+            }
+          }
+        },
+        "excludedAcceptanceCriteria": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "screen": {
+                "$ref": "#/$defs/screenId"
+              },
+              "requirement": {
+                "$ref": "#/$defs/requirementRef"
+              }
+            }
+          }
+        },
+        "guards": {
+          "type": "array",
+          "description": "The guards that hold this Gate visible, named by symbol. An empty list is permitted only alongside restsOnReviewAlone, because Requirement 4 criterion 8 requires the absence to be recorded rather than inferred.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "restsOnReviewAlone": {
+          "type": "boolean",
+          "description": "That no guard holds this Gate visible and it rests on the Gate_Review alone."
+        },
+        "openStateReading": {
+          "type": "object",
+          "description": "The reading this Gate requires while it is OPEN. The class itself is the Gate's own recorded content, not a schema enumeration.",
+          "additionalProperties": false,
+          "required": [
+            "class",
+            "reportsGateIdentifier"
+          ],
+          "properties": {
+            "class": {
+              "$ref": "#/$defs/nonEmptyString",
+              "description": "The one State_Vocabulary class this Gate's criteria require."
+            },
+            "reportsGateIdentifier": {
+              "type": "boolean",
+              "description": "Whether the station reports the Gate identifier in place of each value the Gate settles."
+            }
+          }
+        }
+      },
+      "if": {
+        "required": [
+          "guards"
+        ],
+        "properties": {
+          "guards": {
+            "maxItems": 0
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "restsOnReviewAlone"
+        ],
+        "properties": {
+          "restsOnReviewAlone": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "restsOnReviewAlone": {
+            "const": false
+          }
+        }
+      }
+    },
+    "gatePart": {
+      "type": "object",
+      "description": "One part of a Gate's Decision_Content: the unit of signature, of Sign_Off_Condition and of acceptance (Requirement 3 criterion 6).",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "signingOwners",
+        "state",
+        "closureRecord",
+        "elements",
+        "signOffConditions"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "signingOwners": {
+          "type": "array",
+          "description": "Each owner authorised to sign this part. An empty list is representable on purpose: Requirement 15 criterion 18 requires a part recording no owner to be named as such, which it cannot be if the register cannot express it.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ownerLabel"
+          }
+        },
+        "state": {
+          "enum": [
+            "open",
+            "submitted",
+            "accepted"
+          ]
+        },
+        "closureRecord": {
+          "description": "Repository-relative path to the Closure_Record that settles this part, or null while none does.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          ]
+        },
+        "elements": {
+          "type": "array",
+          "description": "The Decision_Content this part settles, recorded as element names rather than as element values.",
+          "items": {
+            "$ref": "#/$defs/decisionContentElement"
+          }
+        },
+        "signOffConditions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/signOffCondition"
+          }
+        }
+      },
+      "if": {
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "const": "accepted"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "closureRecord"
+        ],
+        "properties": {
+          "closureRecord": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "decisionContentElement": {
+      "type": "object",
+      "description": "One element of a Gate's Decision_Content, named rather than valued.",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "settlementShape"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The element name, verbatim from requirements.md."
+        },
+        "source": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The decision or interface record this element comes from."
+        },
+        "settlementShape": {
+          "$ref": "#/$defs/settlementShape"
+        },
+        "requiredAttributes": {
+          "type": "array",
+          "description": "The attribute names a settled entry must carry, named rather than valued.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "keySource": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Where the key set comes from, where the Closure_Record does not enumerate it."
+        },
+        "excludedSource": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "A source a settled entry may not be derived from, so a record declaring it holds the part OPEN."
+        }
+      }
+    },
+    "signOffCondition": {
+      "type": "object",
+      "description": "A condition a reviewer checks against a Closure_Record by inspection. The verdict is the reviewer's; the register records that one is required.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "requirement",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "requirement": {
+          "$ref": "#/$defs/requirementRef"
+        },
+        "text": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "verification": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "How the condition is checked."
+        }
+      }
+    },
+    "screenRecord": {
+      "type": "object",
+      "description": "One screen's Released flag, its VERIFIED observation and its classified blocking entries. No delivery status, name, class, seam or owner: the inventory is authoritative for those.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "released",
+        "observation",
+        "blockingEntries"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/screenId"
+        },
+        "released": {
+          "type": "boolean",
+          "description": "That the screen's remaining work may start. Recorded and derived, and the check compares the two: there is no disagreement record on this axis."
+        },
+        "observation": {
+          "description": "The recorded observation of the screen navigated to and drawn in a booted application window, or null where none exists. An observation naming only a suite is unrepresentable.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "suite",
+                "slot"
+              ],
+              "properties": {
+                "suite": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "slot": {
+                  "$ref": "#/$defs/nonEmptyString"
+                }
+              }
+            }
+          ]
+        },
+        "blockingEntries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/blockingEntry"
+          }
+        }
+      }
+    },
+    "blockingEntry": {
+      "type": "object",
+      "description": "One entry of a screen's blocking list, classified as exactly one of a Gate or an Acceptance_Criterion (Requirement 2 criterion 1). A Gate-classified entry names its Gate, because the Release_Set derives from that name; an Acceptance_Criterion names none, because it is recorded against the screen's own definition.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "classification"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The inventory's entry identifier, or a register-assigned key for an entry that carries none."
+        },
+        "classification": {
+          "$ref": "#/$defs/classification"
+        },
+        "gate": {
+          "$ref": "#/$defs/gateId"
+        },
+        "reclassifiedFrom": {
+          "$ref": "#/$defs/classification",
+          "description": "The classification the entry was misread as, where it was."
+        },
+        "requirement": {
+          "$ref": "#/$defs/requirementRef"
+        },
+        "inventoryText": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The inventory substring an entry with no identifier matches on, so rewording the cell requires the classification to be re-read."
+        }
+      },
+      "if": {
+        "required": [
+          "classification"
+        ],
+        "properties": {
+          "classification": {
+            "const": "Gate"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "gate"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "gate"
+          ]
+        }
+      }
+    },
+    "guard": {
+      "type": "object",
+      "description": "One mechanical guard that holds an open Gate visible: the value it holds, the Gate or Gates that value holds open, where it is declared, where it is asserted, and which Gate parts could permit it to move.",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "declaredIn",
+        "recordedValue",
+        "assertedIn",
+        "holdsOpen",
+        "permittedToChangeBy"
+      ],
+      "properties": {
+        "symbol": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "declaredIn": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "recordedValue": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The literal the declaring source must carry, recorded as text because the check compares text."
+        },
+        "assertedIn": {
+          "type": "array",
+          "description": "The recorded assertion sites. Removing the assertion is as serious as removing the guard, so the sites are recorded rather than discovered.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "holdsOpen": {
+          "type": "array",
+          "description": "The Gate or Gates this value holds open.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/gateId"
+          }
+        },
+        "permittedToChangeBy": {
+          "type": "array",
+          "description": "The Gate parts whose acceptance could permit this guard to move. The register says which signature could unlock a guard; the Closure_Record says whether it did.",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/partRef"
+          }
+        },
+        "disagreement": {
+          "$ref": "#/$defs/disagreement"
+        }
+      }
+    },
+    "disagreement": {
+      "type": "object",
+      "description": "The one optional escape in this document, and it is confined to a guard: no Release_Set, classification, signature or released flag can carry one, so the derivations have no escape hatch at all. It pins the observed value as well as the recorded one, so a guard moving to a third value is still a failure.",
+      "additionalProperties": false,
+      "required": [
+        "observedValue",
+        "against",
+        "owner",
+        "remedies",
+        "handOnRow"
+      ],
+      "properties": {
+        "observedValue": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The value the declaring source actually holds."
+        },
+        "against": {
+          "type": "array",
+          "description": "The requirement criteria the gap is against.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/requirementRef"
+          }
+        },
+        "owner": {
+          "$ref": "#/$defs/ownerLabel",
+          "description": "Who resolves it. A disagreement cannot be added without saying who owns it."
+        },
+        "remedies": {
+          "type": "array",
+          "description": "At least one named remedy, so a disagreement cannot be recorded without a way out of it.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "handOnRow": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The handed-on row that tracks this disagreement. Whether the row says the right thing is a reviewer's call; whether one was named is not."
+        }
+      }
+    },
+    "contractSurfaceElement": {
+      "type": "object",
+      "description": "One enumerator, declared constant or registry string key of the recorded contract surface, mapped to the Gate whose Decision_Content would record it or to none with a reason.",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "kind",
+        "gate"
+      ],
+      "properties": {
+        "symbol": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "kind": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The source element category this symbol was found as."
+        },
+        "gate": {
+          "description": "The Gate whose Decision_Content would record this element, or none.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gateId"
+            },
+            {
+              "const": "none"
+            }
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Why no Gate records it."
+        }
+      },
+      "if": {
+        "required": [
+          "gate"
+        ],
+        "properties": {
+          "gate": {
+            "const": "none"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
+    }
+  }
+}

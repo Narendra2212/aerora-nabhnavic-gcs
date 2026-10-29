@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Aerora Closure_Record",
+  "description": "Shape of one part of one Gate's Closure_Record: the settled entries, the signatures, the Sign_Off_Condition verdicts, the guard permissions and the commit at which the record entered the repository. The unit of signature is the part, so the unit of file is the part. This schema carries element names and owner labels only; every settled value is an owner's signature and none is named here. Every object closes additionalProperties, so an unrecognised key is a validation error rather than data the record silently ignores.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gate",
+    "part",
+    "state",
+    "signOffDate",
+    "entryCommit",
+    "signatures",
+    "signOffConditionVerdicts",
+    "guardPermissions",
+    "settled"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema reference carried by the instance; ignored by validators."
+    },
+    "gate": {
+      "$ref": "#/$defs/gateId"
+    },
+    "part": {
+      "$ref": "#/$defs/slug",
+      "description": "The part of the Gate's Decision_Content this record settles, matching the part id the Gate_Dossier records and the <GATE>.<part>.json filename."
+    },
+    "state": {
+      "description": "Submitted for review, or accepted by a Gate_Review.",
+      "enum": [
+        "submitted",
+        "accepted"
+      ]
+    },
+    "signOffDate": {
+      "$ref": "#/$defs/isoDate"
+    },
+    "entryCommit": {
+      "description": "The commit at which this record enters the repository, which the record cannot know about itself: null while the record is submitted, and the add-commit git history reports once it is accepted. The check resolves the add-commit and fails on disagreement.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/commitSha"
+        }
+      ]
+    },
+    "signatures": {
+      "type": "array",
+      "description": "One row per signing owner, naming the owner label the Gate_Dossier records. This is recorded identity, not cryptographic authorship, and the check says so in its own output.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/signature"
+      }
+    },
+    "signOffConditionVerdicts": {
+      "type": "array",
+      "description": "One verdict per Sign_Off_Condition the Gate_Dossier records for this part. The check establishes totality; the verdict's value is the reviewer's and the check never evaluates it. The list is required so that an unanswered condition is a named omission rather than an absent key.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/signOffConditionVerdict"
+      }
+    },
+    "guardPermissions": {
+      "type": "array",
+      "description": "One verdict per guard the Gate_Dossier maps to this part, recording whether accepting this part permits that guard to change value. Required for the same reason: omission is a finding, not a default.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/guardPermission"
+      }
+    },
+    "settled": {
+      "type": "array",
+      "description": "One settled element per Decision_Content element this part settles.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/settledElement"
+      }
+    },
+    "amendments": {
+      "type": "array",
+      "description": "An amendment settles one key and carries its own signatures and sign-off date against that key alone, leaving every acceptance already recorded in place.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/amendment"
+      }
+    }
+  },
+  "if": {
+    "required": [
+      "state"
+    ],
+    "properties": {
+      "state": {
+        "const": "accepted"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "entryCommit": {
+        "$ref": "#/$defs/commitSha"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "entryCommit": {
+        "type": "null"
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gateId": {
+      "description": "The ten Gate identifiers of Requirement 1 criterion 1. There is no eleventh.",
+      "enum": [
+        "DG-MIS",
+        "DG-TLM",
+        "DG-FRS",
+        "DG-ROL",
+        "DG-PAY",
+        "DG-AUT",
+        "DG-STO",
+        "DG-FLT",
+        "DG-VID",
+        "DG-SIM"
+      ]
+    },
+    "slug": {
+      "type": "string",
+      "description": "A lower-case token, kept filename-safe because a part id is a Closure_Record filename component.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "isoDate": {
+      "type": "string",
+      "description": "An ISO-8601 calendar date. The pattern bounds the shape whether or not a validator asserts formats.",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "commitSha": {
+      "type": "string",
+      "description": "A full commit hash as git reports it: forty lower-case hex characters, anchored so a short or non-hex string is rejected.",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "ownerLabel": {
+      "description": "The programme owner labels requirements.md names as authorised to sign, to implement or to approve. These are not operator role names: those are Decision_Content of DG-ROL and no schema here names one.",
+      "enum": [
+        "Product",
+        "Firmware",
+        "Architecture",
+        "operations",
+        "engineering",
+        "security architecture",
+        "the external interface authority",
+        "the process owner",
+        "Tab 1",
+        "Tab 2",
+        "Tab 3",
+        "Tab 4",
+        "Tab 5",
+        "Tab 6",
+        "Tab 7",
+        "Tab 8"
+      ]
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "date"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/ownerLabel"
+        },
+        "date": {
+          "$ref": "#/$defs/isoDate"
+        },
+        "trailer": {
+          "type": "string",
+          "description": "The commit trailer on the commit adding this record, which git log can read back.",
+          "pattern": "^Gate-Signed-By: .+$"
+        },
+        "signatureVerified": {
+          "type": "boolean",
+          "description": "Whether the adding commit carries a signature git verify-commit accepts."
+        }
+      }
+    },
+    "signOffConditionVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "satisfied",
+        "reviewer"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The Sign_Off_Condition this verdict answers."
+        },
+        "satisfied": {
+          "type": "boolean"
+        },
+        "reviewer": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "date": {
+          "$ref": "#/$defs/isoDate"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "guardPermission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "permits"
+      ],
+      "properties": {
+        "symbol": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "A guard the Gate_Dossier maps to this part."
+        },
+        "permits": {
+          "type": "boolean",
+          "description": "Whether accepting this part permits that guard to change value. There is no default: a guard carrying no verdict is a finding."
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "settledElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "element",
+        "shape",
+        "entries"
+      ],
+      "properties": {
+        "element": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The Decision_Content element name this settles, as the Gate_Dossier records it."
+        },
+        "shape": {
+          "description": "The settlement shape the Gate_Dossier records for the element.",
+          "enum": [
+            "single",
+            "keyed",
+            "mapping"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/settledEntry"
+          }
+        }
+      },
+      "if": {
+        "required": [
+          "shape"
+        ],
+        "properties": {
+          "shape": {
+            "const": "keyed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "entries": {
+            "items": {
+              "required": [
+                "key"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "settledEntry": {
+      "type": "object",
+      "description": "One settled entry. Its value is what an owner's signature decides, so the schema constrains the shape and not the content: value takes any JSON type and this document names none.",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "value": {
+          "description": "The settled value, whatever type the signing owner settles it as."
+        },
+        "source": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The issued document the entry is traced to."
+        },
+        "exception": {
+          "type": "boolean",
+          "description": "That this key is settled as an explicit exception rather than by a value, which is what lets a key with no answer be a recorded pass rather than a gap."
+        }
+      }
+    },
+    "amendment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "signOffDate",
+        "signatures",
+        "entryCommit"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The one key this amendment settles."
+        },
+        "signOffDate": {
+          "$ref": "#/$defs/isoDate"
+        },
+        "signatures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/signature"
+          }
+        },
+        "entryCommit": {
+          "description": "The commit at which this amendment enters the repository, or null while it is not yet in.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/commitSha"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
