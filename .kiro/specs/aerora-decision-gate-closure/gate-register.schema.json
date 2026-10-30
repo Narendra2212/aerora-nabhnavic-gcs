@@ -203,7 +203,7 @@
     },
     "guards": {
       "type": "array",
-      "description": "The guard registry, and the only place the guard-to-Gate mapping is recorded.",
+      "description": "The guard registry, which is the authority for the guard-to-Gate mapping. Each Gate_Dossier carries its own guards list because Requirement 4 criterion 8 puts the empty-list obligation on the Gate side, and the check compares that list against this registry rather than trusting either alone.",
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/guard"
@@ -814,11 +814,15 @@
         },
         "holdsOpen": {
           "type": "array",
-          "description": "The Gate or Gates this value holds open.",
+          "description": "The Gate or Gates this value holds open. An empty list is permitted only alongside holdsNoGateOpen, because Requirement 4 criterion 8's obligation runs in both directions and the absence is recorded rather than inferred.",
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/gateId"
           }
+        },
+        "holdsNoGateOpen": {
+          "type": "boolean",
+          "description": "That no Gate rests on this guard. The guard-side counterpart of a Gate_Dossier's restsOnReviewAlone."
         },
         "permittedToChangeBy": {
           "type": "array",
@@ -830,6 +834,33 @@
         },
         "disagreement": {
           "$ref": "#/$defs/disagreement"
+        }
+      },
+      "if": {
+        "required": [
+          "holdsOpen"
+        ],
+        "properties": {
+          "holdsOpen": {
+            "maxItems": 0
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "holdsNoGateOpen"
+        ],
+        "properties": {
+          "holdsNoGateOpen": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "holdsNoGateOpen": {
+            "const": false
+          }
         }
       }
     },

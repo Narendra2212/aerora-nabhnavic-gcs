@@ -19,6 +19,7 @@ precommit = [
 test = [
   {include-group = "scripts"},
   "pytest",
+  "hypothesis",
   "jsonschema>=4.23",
   "jinja2",
   "pyyaml",

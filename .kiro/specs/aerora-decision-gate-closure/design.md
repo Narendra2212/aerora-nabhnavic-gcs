@@ -336,8 +336,9 @@ rather than inventing a mechanism. There is no PKI here, and `.github/CODEOWNERS
 in it is commented out, so it routes no review today. A signature is therefore:
 
 - a row in the record naming the owner **label the Gate_Dossier records** — `Product`, `Firmware`,
-  `Architecture`, `operations`, `security architecture`, `the external interface authority`,
-  `the process owner`, `Tab 1`..`Tab 8`, all verbatim from requirements.md — with the sign-off date;
+  `Architecture`, `operations`, `engineering`, `security architecture`,
+  `the external interface authority`, `the process owner`, `Tab 1`..`Tab 8`, all verbatim from
+  requirements.md — with the sign-off date;
 - the git identity that authored the commit adding the record, recorded as a commit trailer on that
   commit (`Gate-Signed-By:`), which `git log --format=%(trailers)` can read back;
 - optionally a GPG-signed commit, recorded as `signatureVerified` when `git verify-commit` succeeds.
@@ -738,6 +739,11 @@ Notes on the shape:
   part signed by `Product` for the whole of its Decision_Content (6.2); `DG-TLM` has two, with Tab 1
   signing only the `ADR-016` core edit (7.3); `DG-PAY` has four (10.5). A one-part Gate and a
   four-part Gate then read the same way to the checker, and `gateOpen` is one equation.
+- A Decision_Content element records `excludedSource` for a source a settled entry may **not** be
+  derived from, which is what Property 19 and Requirements 13.4, 13.9 and 15.10 need a key for: an
+  entry declaring that source holds the part `OPEN`. It sits beside `source` and `keySource` and is
+  named rather than valued like both of them, so the exclusion is a recorded constraint on the
+  element and not a judgement the reviewer re-derives per record.
 - `holdsOpen` is a list because Requirement 4 criterion 5 asks which Gate *or Gates* a value holds
   open: `kGroundStationActuatorPathImplemented` and `kAutonomousPayloadActionImplemented` hold both
   `DG-PAY` and `DG-ROL` (10.17, 10.18, 9.17).
@@ -747,14 +753,25 @@ Notes on the shape:
   criterion 5 as outside the Gate (8.15, 11.19, 12.20, 13.16, 15.16), with their own named guard
   instead — the three-outcome freshness evaluation, the `UNKNOWN` autonomy source status, the audit
   sink's reported durability and lost-record count, the `UNKNOWN` fleet identifier field.
+- A guard with no Gate behind it records `"holdsOpen": []` **and** an explicit
+  `holdsNoGateOpen: true`, for the same reason and with the same `if`/`then` construction as the Gate
+  side. Those two records are the two halves of one obligation — the Gate side says which guards hold
+  it visible, the guard side says which Gates rest on it — so representing one as an explicit boolean
+  and the other as an empty list would leave half the relation inferred from emptiness, which is what
+  Requirement 4 criterion 8 declines. It is the field Property 26 means by "carries the explicit
+  record that no Gate rests on it", and it is named after the key it qualifies the way
+  `restsOnReviewAlone` is named after `guards`.
 - `Release_Set` entries carry an optional `part`, because six screens are released in halves:
   `SCR-MIS-09` (screen half, 6.10), `SCR-SHL-02` (per-vehicle half, 10.9), `SCR-LIV-05` (proposal
   half and approval half, 9.7 and 11.7), `SCR-VEH-05` (calibration display, 9.7). `released` stays a
   per-screen boolean, because Requirement 1 criterion 6 partitions screens, not halves.
-- The guard registry is the **only** place the guard-to-Gate mapping is recorded. The C++ suites assert
-  values, not mappings, so there is no second copy to keep in step and no C++ table for the Python
-  check to parse. That answers Requirement 4 criteria 6 through 9 with one authority: the register maps
-  and permits, the source declares, the tests assert, the check compares.
+- The guard registry is the **authority** for the guard-to-Gate mapping, and the Gate_Dossier's own
+  `guards` list is checked against it rather than trusted alongside it. The mapping is written twice
+  because Requirement 4 criterion 8 puts the empty-list obligation on the Gate side, so a dossier has
+  to carry its own list; `guard-registry` asserts the two agree in both directions and the registry
+  wins. No *third* copy exists: the C++ suites assert values, not mappings, so there is no C++ table
+  for the Python check to parse. That answers Requirement 4 criteria 6 through 9 with one authority:
+  the register maps and permits, the source declares, the tests assert, the check compares.
 - `permittedToChangeBy` names Gate *parts*, not Gates, and the Closure_Record's `guardPermissions`
   carries the verdict for each guard the dossier maps to the part it settles. The register says which
   signature *could* unlock a guard; the record says whether it *did*. Separating them is what makes
@@ -824,9 +841,9 @@ be derivable from the record instead of remembered.
 
 ### Blocking entries that carry no identifier
 
-`entry-classification` compares ID tokens in the inventory cell against the register. Three of the 37
-undelivered screens have a blocking entry with no ID — `SCR-VID-01`'s absent video overlay seam,
-`SCR-SET-01`'s accessor naming constraint, `SCR-SHL-01`'s deferred navigation half. Each gets a
+`entry-classification` compares ID tokens in the inventory cell against the register. Two of the 37
+undelivered screens have a blocking entry with no ID — `SCR-VID-01`'s absent video overlay seam and
+`SCR-SET-01`'s accessor naming constraint. Each gets a
 register-assigned key with the `seam:` or `note:` prefix plus an `inventoryText` substring that must
 appear in the cell. The key is stable under rewording of the cell only if `inventoryText` is updated
 with it, which is the intent: rewording a blocking entry is a change to a classified entry and should
@@ -1297,4 +1314,5 @@ does not change it.
 | requirements.md carries the same 45/30 figures | Tab 1 | Follows whichever way Finding 2 resolves |
 | `hypothesis` added to the `test` dependency group | Tab 1 | One new test-only dependency, with `tools/uv.lock` regenerated through the existing `uv-lock` hook |
 | Signatures are recorded identities, not cryptographic ones | Tab 1 | `.github/CODEOWNERS` exists with every rule commented out, so it routes no review. Requiring code-owner review on the register path needs a branch-protection setting outside this repository |
-| Three blocking entries carry no identifier | Tab 7 | `SCR-VID-01`'s absent video overlay seam, `SCR-SET-01`'s accessor naming constraint and `SCR-SHL-01`'s deferred navigation half each need a register key and a matching inventory substring before `entry-classification` can compare the two documents for them |
+| Two blocking entries carry no identifier | Tab 7 | `SCR-VID-01`'s absent video overlay seam and `SCR-SET-01`'s accessor naming constraint each need a register key and a matching inventory substring before `entry-classification` can compare the two documents for them |
+| The inventory's "re-read against that distinction" entry count | Tab 7 | §8 states "the remaining 33 entries". The figure has not moved while the undelivered count went 41 → 39 → 37 across three revisions, so it derives from nothing the document maintains. What "entry" counts — a screen with a blocking cell, or an item inside one — is what `entry-classification` and the register's `blockingEntries` settle, so the number is left for the pass that classifies them |

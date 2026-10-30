@@ -24,6 +24,7 @@ from common.proc import run_captured
 | `errors.py` | Shared tooling exceptions |
 | `file_traversal.py` | Repository-root discovery and filtered C++ file traversal |
 | `format.py` | Human-readable byte and size-delta formatting |
+| `gate_register.py` | Aerora Gate_Register and Closure_Record model, with JSON load and dump |
 | `gh_actions.py` | GitHub CLI calls, read-only API retries, annotations, outputs, and summaries |
 | `git.py` | Captured Git commands and default-branch discovery |
 | `io.py` | JSON/TOML I/O, checksums, atomic writes, and safe archive extraction |
