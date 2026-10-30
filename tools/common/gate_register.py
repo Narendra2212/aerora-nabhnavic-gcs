@@ -26,6 +26,13 @@ module knows.
 the Gate_Review reads, it is the authority for the screen set and for each screen's delivery status,
 and the checks over it are predicates over its rows -- so the rows belong beside the model the
 predicates read, and the parser takes the document's text rather than finding the document.
+
+The design's five derivation equations are here on the same terms: :func:`gate_open`,
+:func:`release_sets`, :func:`released`, :func:`two_gate_screens` and :func:`undelivered` are pure
+functions over the model and the parsed rows, and every check the Gate_Review runs compares a
+recorded value against one of them. Each derives from the register and the rows at call time and
+holds no screen count, no Gate count beyond the ten identifiers and no Release_Set membership,
+because a remembered figure is the one that goes stale.
 """
 
 from __future__ import annotations
@@ -45,7 +52,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ABSENT",
+    "ACCEPTED_PART_STATE",
     "CLASSIFICATIONS",
+    "DELIVERED_STATUSES",
+    "GATE_CLASSIFICATION",
     "GATE_IDS",
     "GATE_STATUSES",
     "INVENTORY_COLUMNS",
@@ -64,6 +74,7 @@ __all__ = [
     "ExcludedAcceptanceCriterion",
     "ForbiddenUntil",
     "GateDossier",
+    "GateOpenness",
     "GatePart",
     "GateRegister",
     "GateRegisterError",
@@ -81,16 +92,23 @@ __all__ = [
     "ScreenInventory",
     "ScreenInventoryError",
     "ScreenRecord",
+    "ScreenRelease",
     "SettledElement",
     "SettledEntry",
     "SignOffCondition",
     "SignOffConditionVerdict",
     "Signature",
+    "blocking_gates",
     "dump_closure_record",
     "dump_gate_register",
+    "gate_open",
     "load_closure_record",
     "load_gate_register",
     "parse_screen_inventory",
+    "release_sets",
+    "released",
+    "two_gate_screens",
+    "undelivered",
 ]
 
 # The ten Gate identifiers of Requirement 1 criterion 1, in the order it names them. There is no
@@ -1405,3 +1423,230 @@ def parse_screen_inventory(text: str, *, path: str = "screen-inventory") -> Scre
     if not inventory.rows:
         raise ScreenInventoryError(f"{path}: the {len(areas)} area tables carry no screen row")
     return inventory
+
+
+# ---------------------------------------------------------------------------
+# The derivation equations
+# ---------------------------------------------------------------------------
+
+# The one member of PART_STATES that is acceptance. Equation one reads the negation of it, so both
+# of the other members -- a part not yet submitted, and a part submitted and not yet accepted --
+# hold the Gate open.
+ACCEPTED_PART_STATE: Final = "accepted"
+
+# The member of CLASSIFICATIONS the three set equations read. The other member is read for nothing,
+# which is what makes an Acceptance_Criterion unable to hold a screen back.
+GATE_CLASSIFICATION: Final = "Gate"
+
+# The two members of the screen inventory's status vocabulary that make a row a Delivered_Screen.
+# Equation five removes exactly these rows; the vocabulary is the inventory's and nothing here adds
+# to it.
+DELIVERED_STATUSES: Final = frozenset({"VERIFIED", "SUPERSEDED"})
+
+_GATE_ORDER: Final = {gate: index for index, gate in enumerate(GATE_IDS)}
+
+
+@dataclass(frozen=True)
+class GateOpenness:
+    """Whether one Gate is open, with every unaccepted part named.
+
+    ``unaccepted_parts`` is empty exactly when ``is_open`` is false. It is named rather than counted
+    because Requirement 3 criterion 7 and Requirement 1 criterion 10 both require the caller to say
+    which part, and therefore which decision, is holding the Gate.
+    """
+
+    gate: str
+    is_open: bool
+    unaccepted_parts: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ScreenRelease:
+    """Whether one screen is Released, with the Gates that hold it named.
+
+    ``open_gates`` is empty exactly when ``released`` is true, and carries the Gate identifiers in
+    :data:`GATE_IDS` order, so reordering a blocking list changes neither the verdict nor the way the
+    finding reads. It records no delivery status: that axis is the screen inventory's and a release
+    derivation does not touch it.
+    """
+
+    screen: str
+    released: bool
+    open_gates: tuple[str, ...]
+
+
+def _gate_sort_key(gate: str) -> tuple[int, str]:
+    """Order Gate identifiers as :data:`GATE_IDS` does, and anything else after them by name."""
+    return (_GATE_ORDER.get(gate, len(GATE_IDS)), gate)
+
+
+def _gate_dossiers(register: GateRegister) -> dict[str, GateDossier]:
+    """Index the Gate_Dossiers by identifier, rejecting a Gate recorded twice.
+
+    Two dossiers for one Gate leave ``gateOpen`` with two answers, so the equations cannot run over
+    them. The schema already rejects it; this says so when a caller builds the model by hand.
+    """
+    dossiers: dict[str, GateDossier] = {}
+    for dossier in register.gates:
+        if dossier.id in dossiers:
+            raise GateRegisterError(
+                f"{dossier.id}: the register records more than one Gate_Dossier"
+            )
+        dossiers[dossier.id] = dossier
+    return dossiers
+
+
+def _screen_records(register: GateRegister) -> dict[str, ScreenRecord]:
+    """Index the screen records by identifier, rejecting a screen recorded twice."""
+    records: dict[str, ScreenRecord] = {}
+    for record in register.screens:
+        if record.id in records:
+            raise GateRegisterError(
+                f"{record.id}: the register records more than one screen record"
+            )
+        records[record.id] = record
+    return records
+
+
+def gate_open(register: GateRegister) -> dict[str, GateOpenness]:
+    """Derive ``gateOpen(g) <=> there is a part p of g with p not accepted``, for each recorded Gate.
+
+    One entry per Gate_Dossier, in the order the register records them. There is no special case at
+    one part: a Gate with one part is open exactly when that part is unaccepted, which is the same
+    quantifier a four-part Gate answers.
+
+    The Gate's own recorded ``status`` is not read. Comparing the two is the
+    ``gate-status-derivation`` check's finding, and a derivation that read the record would have
+    nothing to compare it against.
+
+    A Gate_Dossier recording no part is a named failure. The quantifier over no part is false, so
+    such a Gate would derive closed with nothing signed, and an unresolved premise is not a pass.
+    """
+    openness: dict[str, GateOpenness] = {}
+    for gate, dossier in _gate_dossiers(register).items():
+        if not dossier.parts:
+            raise GateRegisterError(
+                f"{gate}: the Gate_Dossier records no part, so no part could be unaccepted and the "
+                f"Gate would derive closed with nothing signed"
+            )
+        unaccepted = tuple(part.id for part in dossier.parts if part.state != ACCEPTED_PART_STATE)
+        openness[gate] = GateOpenness(
+            gate=gate, is_open=bool(unaccepted), unaccepted_parts=unaccepted
+        )
+    return openness
+
+
+def blocking_gates(register: GateRegister) -> dict[str, tuple[str, ...]]:
+    """Derive ``{ gate(e) : e in blocking(s), class(e) = Gate }`` for each recorded screen.
+
+    This is the sub-expression the Release_Set, release and Two_Gate_Screen equations share, exposed
+    once rather than repeated three times: the Release_Sets transpose it, the release derivation
+    quantifies over it, and the Two_Gate_Screen set is the screens whose value has two members. It
+    also leaves a screen carrying three Gate-classified entries visible, which none of the three
+    equations names and the ``two-gate`` check has to report.
+
+    The Gates are distinct and in :data:`GATE_IDS` order, so two entries naming one Gate are one
+    Gate.
+
+    An entry classified ``Gate`` that names no Gate, or that names a Gate the register records no
+    Gate_Dossier for, is a named failure rather than an entry skipped: skipping it would read the
+    screen as released by a blocker nothing could resolve.
+    """
+    dossiers = _gate_dossiers(register)
+    gates: dict[str, tuple[str, ...]] = {}
+    for screen, record in _screen_records(register).items():
+        named: set[str] = set()
+        for entry in record.blocking_entries:
+            if entry.classification != GATE_CLASSIFICATION:
+                continue
+            if entry.gate is None:
+                raise GateRegisterError(
+                    f"{screen}: the blocking entry {entry.id!r} is classified "
+                    f"{GATE_CLASSIFICATION} and names no Gate"
+                )
+            if entry.gate not in dossiers:
+                raise GateRegisterError(
+                    f"{screen}: the blocking entry {entry.id!r} names {entry.gate}, which the "
+                    f"register records no Gate_Dossier for"
+                )
+            named.add(entry.gate)
+        gates[screen] = tuple(sorted(named, key=_gate_sort_key))
+    return gates
+
+
+def release_sets(register: GateRegister) -> dict[str, frozenset[str]]:
+    """Derive ``releaseSet(g) = { s : there is e in blocking(s) with class(e) = Gate, gate(e) = g }``.
+
+    One entry per Gate_Dossier, including a Gate no screen names, whose derived Release_Set is
+    empty. The recorded Release_Sets are not read: comparing recorded against derived is the
+    ``release-set-derivation`` check's finding, screen by screen and Gate by Gate.
+    """
+    derived: dict[str, set[str]] = {gate: set() for gate in _gate_dossiers(register)}
+    for screen, gates in blocking_gates(register).items():
+        for gate in gates:
+            derived[gate].add(screen)
+    return {gate: frozenset(screens) for gate, screens in derived.items()}
+
+
+def released(register: GateRegister) -> dict[str, ScreenRelease]:
+    """Derive the release of each recorded screen.
+
+    ``released(s) <=> for every e in blocking(s): class(e) = Acceptance_Criterion or not
+    gateOpen(gate(e))``.
+
+    The Two_Gate_Screen rule falls out of this rather than being a special case: a screen with two
+    Gate-classified entries is Released when neither Gate is open, so the first closure leaves it
+    held by the second Gate, which the finding names, and the order the two close in cannot matter.
+
+    An entry classified ``Acceptance_Criterion`` is read for nothing. That is what Requirement 2
+    criterion 5 asks for, and it is why adding, removing or reordering those entries cannot move a
+    screen's release.
+    """
+    openness = gate_open(register)
+    releases: dict[str, ScreenRelease] = {}
+    for screen, gates in blocking_gates(register).items():
+        open_gates = tuple(gate for gate in gates if openness[gate].is_open)
+        releases[screen] = ScreenRelease(
+            screen=screen, released=not open_gates, open_gates=open_gates
+        )
+    return releases
+
+
+def two_gate_screens(register: GateRegister) -> dict[str, tuple[str, ...]]:
+    """Derive ``twoGateScreens = { s : |{ gate(e) : e in blocking(s), class(e) = Gate }| = 2 }``.
+
+    Keyed by screen and valued with the two Gates, because a caller reporting a Two_Gate_Screen has
+    to name both of the decisions it waits on.
+
+    The cardinality is the equation's: two entries naming one Gate are one Gate and no member, and a
+    screen carrying three Gate-classified entries is no member either. That the register may not
+    record a third is a rule over the register rather than part of this set, and the ``two-gate``
+    check reports it from :func:`blocking_gates`.
+    """
+    return {screen: gates for screen, gates in blocking_gates(register).items() if len(gates) == 2}
+
+
+def undelivered(inventory: ScreenInventory) -> frozenset[str]:
+    """Derive ``undelivered = rows(inventory) minus { s : status(s) in { VERIFIED, SUPERSEDED } }``.
+
+    The screen inventory is the authority for the screen set and for each row's delivery status, so
+    this reads the inventory and nothing from the register. A Gate closure therefore cannot move it:
+    Requirement 3 criterion 8 leaves the delivery status of every screen in a Release_Set unchanged,
+    and the two axes do not meet in this equation.
+
+    The count is the set's own. Nothing here holds a screen total, a delivered total or an
+    undelivered total, because every one of those is a figure that goes stale in the document that
+    declares it.
+
+    Two rows for one screen is a named failure: the two could record different statuses, and the
+    equation has no way to choose between them.
+    """
+    seen: set[str] = set()
+    screens: set[str] = set()
+    for row in inventory.rows:
+        if row.screen in seen:
+            raise ScreenInventoryError(f"{row.screen}: the inventory carries more than one row")
+        seen.add(row.screen)
+        if row.status not in DELIVERED_STATUSES:
+            screens.add(row.screen)
+    return frozenset(screens)

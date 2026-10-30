@@ -186,7 +186,7 @@ Constraints every task inherits:
     - **Property 29: The inventory row parser round-trips through the markdown table form**
     - **Validates: Requirements 1.7, 2.10**
 
-  - [~] 2.8 Implement the five derivation equations
+  - [x] 2.8 Implement the five derivation equations
     - `gateOpen`, `releaseSet`, `released`, `twoGateScreens`, `undelivered`, exactly as the design
       states them. The Two_Gate_Screen rule falls out of `released` rather than being a special case
     - Each derivation returns its findings with the screen and the Gate named, because every caller
