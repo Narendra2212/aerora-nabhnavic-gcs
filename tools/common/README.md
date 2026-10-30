@@ -24,12 +24,12 @@ from common.proc import run_captured
 | `errors.py` | Shared tooling exceptions |
 | `file_traversal.py` | Repository-root discovery and filtered C++ file traversal |
 | `format.py` | Human-readable byte and size-delta formatting |
-| `gate_register.py` | Aerora Gate_Register and Closure_Record model, with JSON load and dump |
+| `gate_register.py` | Aerora Gate_Register and Closure_Record model, and the screen inventory's rows |
 | `gh_actions.py` | GitHub CLI calls, read-only API retries, annotations, outputs, and summaries |
 | `git.py` | Captured Git commands and default-branch discovery |
 | `io.py` | JSON/TOML I/O, checksums, atomic writes, and safe archive extraction |
 | `logging.py` | Color-aware terminal logging |
-| `markdown.py` | Escaped GitHub-Flavored Markdown tables |
+| `markdown.py` | Escaped GitHub-Flavored Markdown tables, written and read back |
 | `net.py` | Dependency-free atomic downloads with retries and optional SHA-256 verification |
 | `opener.py` | Cross-platform default-application launching |
 | `patterns.py` | QGC-specific source-analysis regular expressions |

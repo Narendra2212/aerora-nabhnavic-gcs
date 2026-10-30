@@ -147,14 +147,14 @@ Constraints every task inherits:
     - _Requirements: 1.1, 1.2, 2.1, 3.1, 3.6, 4.8, 5.1, 5.11_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/*.schema.json`
 
-  - [~] 2.3 Create `tools/common/gate_register.py` with the register and Closure_Record models
+  - [x] 2.3 Create `tools/common/gate_register.py` with the register and Closure_Record models
     - Dataclasses mirroring the schema, plus JSON load and dump. Pure model and derivation only — no
       file discovery, no git, no subprocess, so both entry points and the property tests import it
     - Imports nothing from `analyzers`, `generators`, `qgc_tools` or `setup`
     - _Requirements: 1.1, 1.2, 2.1, 3.1, 3.6_
     - **Local**: `uv run --quiet --with "ruff==0.16.5" ruff check tools/common/gate_register.py`
 
-  - [~] 2.4 Parse the screen inventory's area tables into rows
+  - [x] 2.4 Parse the screen inventory's area tables into rows
     - Build on `tools/common/markdown.py`. Each row yields the screen ID, the delivery status and the
       blocking-entry token set of its "Blocked by" cell. Scope to the thirteen area tables, so the
       misread-blocker table and the totals table are not read as screen rows

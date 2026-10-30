@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pytest
-from common.markdown import md_table
+from common.markdown import md_table, parse_md_tables
 
 
 def test_basic_table() -> None:
@@ -47,3 +47,49 @@ def test_row_length_mismatch_raises() -> None:
 def test_crlf_flattened_to_br() -> None:
     assert "| a<br>b |" in md_table(["H"], [["a\r\nb"]])
     assert "\r" not in md_table(["H"], [["a\rb"]])
+
+
+def test_parse_md_tables_reads_back_what_md_table_wrote() -> None:
+    rows = [["1", "2"], ["3", "4"]]
+    (table,) = parse_md_tables(md_table(["A", "B"], rows))
+    assert table.headers == ("A", "B")
+    assert [list(row.cells) for row in table.rows] == rows
+
+
+def test_parse_md_tables_reports_one_based_lines() -> None:
+    document = f"# Title\n\n{md_table(['A'], [['1'], ['2']])}\n"
+    (table,) = parse_md_tables(document)
+    assert table.line == 3
+    assert [row.line for row in table.rows] == [5, 6]
+
+
+def test_parse_md_tables_undoes_the_cell_escaping() -> None:
+    (table,) = parse_md_tables(md_table(["H"], [["a|b"], ["c\\d"]]))
+    assert [row.cells[0] for row in table.rows] == ["a|b", "c\\d"]
+
+
+def test_parse_md_tables_keeps_a_windows_path_as_written() -> None:
+    (table,) = parse_md_tables("| H |\n| --- |\n| C:\\new |\n")
+    assert table.rows[0].cells == ("C:\\new",)
+
+
+def test_parse_md_tables_skips_a_fenced_table() -> None:
+    document = f"```markdown\n{md_table(['A'], [['1']])}\n```\n"
+    assert parse_md_tables(document) == []
+
+
+def test_parse_md_tables_requires_a_delimiter_row() -> None:
+    assert parse_md_tables("| not | a table |\n| nor | this |\n") == []
+
+
+def test_parse_md_tables_keeps_a_ragged_row_for_the_caller() -> None:
+    (table,) = parse_md_tables("| A | B |\n| --- | --- |\n| 1 |\n")
+    assert table.rows[0].cells == ("1",)
+
+
+def test_parse_md_tables_finds_every_table_in_order() -> None:
+    document = f"{md_table(['A'], [['1']])}\n\n{md_table(['B'], [['2'], ['3']])}\n"
+    assert [(table.headers, len(table.rows)) for table in parse_md_tables(document)] == [
+        (("A",), 1),
+        (("B",), 2),
+    ]

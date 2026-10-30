@@ -21,23 +21,34 @@ schemas' string patterns, lengths or formats -- the schemas are the authority fo
 point validates against them first -- and it reads no Decision_Content: a Gate's
 ``openStateReading.class`` and every settled value are an owner's record, not a vocabulary this
 module knows.
+
+:func:`parse_screen_inventory` is here on the same terms. The screen inventory is the other document
+the Gate_Review reads, it is the authority for the screen set and for each screen's delivery status,
+and the checks over it are predicates over its rows -- so the rows belong beside the model the
+predicates read, and the parser takes the document's text rather than finding the document.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Final, TypeVar
 
+from .markdown import parse_md_tables
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection
+
+    from .markdown import MarkdownRow
 
 __all__ = [
     "ABSENT",
     "CLASSIFICATIONS",
     "GATE_IDS",
     "GATE_STATUSES",
+    "INVENTORY_COLUMNS",
     "NO_GATE",
     "OWNER_LABELS",
     "PART_STATES",
@@ -58,13 +69,17 @@ __all__ = [
     "GateRegisterError",
     "Guard",
     "GuardPermission",
+    "InventoryArea",
     "InventoryReference",
+    "InventoryRow",
     "Observation",
     "OpenStateReading",
     "RationaleReference",
     "ReadOnlyException",
     "ReadOnlyPosture",
     "ReleaseSetEntry",
+    "ScreenInventory",
+    "ScreenInventoryError",
     "ScreenRecord",
     "SettledElement",
     "SettledEntry",
@@ -75,6 +90,7 @@ __all__ = [
     "dump_gate_register",
     "load_closure_record",
     "load_gate_register",
+    "parse_screen_inventory",
 ]
 
 # The ten Gate identifiers of Requirement 1 criterion 1, in the order it names them. There is no
@@ -142,6 +158,14 @@ ABSENT: Final = Absent.TOKEN
 
 class GateRegisterError(ValueError):
     """Raised when a document does not match the shape of its schema."""
+
+
+class ScreenInventoryError(GateRegisterError):
+    """Raised when the screen inventory's area tables cannot be read.
+
+    A subclass, so an entry point reading both documents catches one type. Where the register's
+    reader names the key at fault, this one names the line.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -1232,3 +1256,152 @@ def dump_closure_record(record: ClosureRecord) -> dict[str, Any]:
             _OMITTED if amendments is None else [_dump_amendment(item) for item in amendments],
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# The screen inventory
+# ---------------------------------------------------------------------------
+
+# The seven columns every area table carries. A table with any other header is not an area table,
+# and that check is what stops a differently shaped table that happens to cite screen identifiers
+# from being read as screens.
+INVENTORY_COLUMNS: Final = ("ID", "Screen", "Class", "Seam", "Status", "Owner", "Blocked by")
+
+# An area table announces itself and declares its own row count: "### Shell -- 4 screens". The
+# parser anchors on the heading rather than on the shape of a row, because the document carries
+# screen identifiers in two further tables -- the misread-blocker table and the totals table -- and
+# a table added later with the same columns would otherwise be swept in silently.
+_AREA_HEADING: Final = re.compile(r"^###\s+(?P<heading>.*?(?P<declared>\d+)\s+screens?)\s*$")
+
+_CODE_SPAN: Final = re.compile(r"`([^`]+)`")
+
+# A code span of upper-case segments ending in a numeric one: the shape of every decision,
+# requirement, hand-off and screen identifier the inventory cites. The parser knows the shape; the
+# identifiers stay the document's. The shape excludes the status words the same cells carry and the
+# C++ and QML symbols they name, neither of which is a blocking entry.
+_ENTRY_ID: Final = re.compile(r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]+")
+
+
+@dataclass(frozen=True)
+class InventoryRow:
+    """One screen's row of an area table.
+
+    ``blocking_tokens`` is the identifier set of the "Blocked by" cell, which is what a
+    classification reads. ``blocked_by`` keeps the cell as written as well, because an entry that
+    carries no identifier is matched on its text.
+    """
+
+    screen: str
+    status: str
+    blocked_by: str
+    blocking_tokens: frozenset[str]
+
+
+@dataclass(frozen=True)
+class InventoryArea:
+    """One area table, with the row count its own heading declares.
+
+    ``declared_screens`` is recorded, not enforced. Whether a heading agrees with its own rows is
+    the ``inventory-totals`` check's finding to report for the inventory's owner, and a parser that
+    rejected the disagreement would leave the check with nothing to report it from.
+    """
+
+    heading: str
+    declared_screens: int
+    line: int
+    rows: list[InventoryRow]
+
+
+@dataclass(frozen=True)
+class ScreenInventory:
+    """The screen rows of the inventory's area tables, by area."""
+
+    areas: list[InventoryArea]
+
+    @property
+    def rows(self) -> list[InventoryRow]:
+        """Every screen row, in document order."""
+        return [row for area in self.areas for row in area.rows]
+
+
+def _entry_ids(cell: str) -> list[str]:
+    """Return the identifier-shaped code spans of *cell*, in the order they appear."""
+    return [span for span in _CODE_SPAN.findall(cell) if _ENTRY_ID.fullmatch(span)]
+
+
+def _read_inventory_row(row: MarkdownRow, path: str) -> InventoryRow:
+    if len(row.cells) != len(INVENTORY_COLUMNS):
+        raise ScreenInventoryError(
+            f"{path}:{row.line}: expected {len(INVENTORY_COLUMNS)} cells, found {len(row.cells)}"
+        )
+    cells = dict(zip(INVENTORY_COLUMNS, row.cells, strict=True))
+    screens = _entry_ids(cells["ID"])
+    if len(screens) != 1:
+        raise ScreenInventoryError(
+            f"{path}:{row.line}: the ID cell must carry one screen identifier, found {screens}"
+        )
+    # The delivery status is the cell's leading code span. What follows it is prose: the evidence a
+    # VERIFIED row rests on, or the half an undelivered row has implemented.
+    status = _CODE_SPAN.search(cells["Status"])
+    if status is None:
+        raise ScreenInventoryError(f"{path}:{row.line}: the Status cell carries no delivery status")
+    return InventoryRow(
+        screen=screens[0],
+        status=status.group(1),
+        blocked_by=cells["Blocked by"],
+        blocking_tokens=frozenset(_entry_ids(cells["Blocked by"])),
+    )
+
+
+def parse_screen_inventory(text: str, *, path: str = "screen-inventory") -> ScreenInventory:
+    """Read the screen inventory's area tables into rows, naming the line at fault on rejection.
+
+    *text* is the document's text, so this stays a model: callers read the file. *path* names the
+    document in each message, and every message carries the line the reader could not get past.
+
+    The scope is the area tables alone. An area is a heading declaring a screen count, and its
+    table is the first one under it; the table must carry :data:`INVENTORY_COLUMNS`. The
+    misread-blocker table and the totals table cite screen identifiers in differently shaped
+    tables, and neither is read as screen rows.
+
+    Zero rows is a failure rather than an empty inventory. Every check over the inventory is a
+    predicate over these rows, so all of them would pass over none of them.
+    """
+    lines = text.splitlines()
+    headings = [
+        (index + 1, match)
+        for index, line in enumerate(lines)
+        if (match := _AREA_HEADING.match(line))
+    ]
+    if not headings:
+        raise ScreenInventoryError(
+            f"{path} carries no area table heading matching {_AREA_HEADING.pattern!r}"
+        )
+
+    tables = parse_md_tables(text)
+    areas: list[InventoryArea] = []
+    for position, (line, heading) in enumerate(headings):
+        end = headings[position + 1][0] if position + 1 < len(headings) else len(lines) + 1
+        table = next((item for item in tables if line < item.line < end), None)
+        if table is None:
+            raise ScreenInventoryError(
+                f"{path}:{line}: the area {heading['heading']!r} carries no table"
+            )
+        if table.headers != INVENTORY_COLUMNS:
+            raise ScreenInventoryError(
+                f"{path}:{table.line}: expected the columns {list(INVENTORY_COLUMNS)}, "
+                f"found {list(table.headers)}"
+            )
+        areas.append(
+            InventoryArea(
+                heading=heading["heading"],
+                declared_screens=int(heading["declared"]),
+                line=line,
+                rows=[_read_inventory_row(row, path) for row in table.rows],
+            )
+        )
+
+    inventory = ScreenInventory(areas=areas)
+    if not inventory.rows:
+        raise ScreenInventoryError(f"{path}: the {len(areas)} area tables carry no screen row")
+    return inventory
