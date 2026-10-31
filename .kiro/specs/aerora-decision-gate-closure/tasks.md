@@ -244,7 +244,7 @@ Constraints every task inherits:
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py` fails with
       a named reason while the register does not yet exist
 
-  - [~] 4.2 Implement the set checks over the register and the inventory
+  - [x] 4.2 Implement the set checks over the register and the inventory
     - `partition`: the ten recorded Release_Sets plus the Released-with-no-Gate set partition the
       derived undelivered set exactly
     - `release-set-derivation`: each recorded Release_Set equals the set derived from the
