@@ -124,7 +124,7 @@ Constraints every task inherits:
     - **Local**: `git grep -n -E "\b(45|30)\b" -- .kiro/specs/aerora-decision-gate-closure/requirements.md`
       returns no screen-count use
 
-- [ ] 2. Register schema, shared model and the pure derivations
+- [x] 2. Register schema, shared model and the pure derivations
 
   - [x] 2.1 Add `hypothesis` to the `test` dependency group and regenerate the lock
     - `tools/pyproject.toml`, `test` group only. This is the one new dependency the design asks for,
@@ -226,14 +226,14 @@ Constraints every task inherits:
     - **Property 25: The read-only posture reads `DG-ROL` and nothing else**
     - **Validates: Requirements 5.7, 9.18, 11.18**
 
-- [~] 3. Checkpoint — the model proves itself on this host
+- [x] 3. Checkpoint — the model proves itself on this host
   - Run `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py`
     and the lint and type-check commands on the new Python
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 4. `tools/validate_gate_register.py` — the cross-document half
 
-  - [~] 4.1 Entry point, loading, schema validation and the error contract
+  - [x] 4.1 Entry point, loading, schema validation and the error contract
     - Entry point at `tools/` root following `tools/validate_configs.py`, `pass_filenames: false`,
       non-zero exit on any finding, and it never rewrites the register
     - Implement the error contract in full: a register that is missing or cannot be parsed fails
