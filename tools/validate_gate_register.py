@@ -1,18 +1,19 @@
 """Validate the Aerora Gate_Register against the screen inventory and its own schema.
 
-The data half of the Gate_Review. It reads the register, the schema beside it and the screen
-inventory the register names, and reports every disagreement between what an owner recorded and
-what the documents derive. It never writes: the only thing an auto-fix could write here is a
-Released flag, a classification or a guard value that no owner signed, so a finding is reported and
-the exit status is non-zero.
+The data half of the Gate_Review. It reads the register, the schema beside it, the screen inventory
+the register names and the Closure_Record each Gate part names, and reports every disagreement
+between what an owner recorded and what the documents derive. It never writes: the only thing an
+auto-fix could write here is a Released flag, a classification, a guard value or a settled entry
+that no owner signed, so a finding is reported and the exit status is non-zero.
 
 Premises are established before any derived check runs, and the order is the error contract's. A
 missing register, a register that is not JSON, a register the schema rejects, an inventory whose
-area tables cannot be parsed, or an inventory carrying no screen row each stop the run there and
-are reported as themselves. The governing rule is the one ``aerora-manifest-check.ps1`` states for
-its own ``ASSUMED`` rows: **an unresolved premise is a failure, never a pass.** A derived check over
-a malformed register would report noise that hides the real error, and one over an inventory
-silently parsed as zero rows would satisfy every predicate over those rows trivially.
+area tables cannot be parsed, an inventory carrying no screen row, or a Closure_Record a part names
+and the tree lacks each stop the run there and are reported as themselves. The governing rule is
+the one ``aerora-manifest-check.ps1`` states for its own ``ASSUMED`` rows: **an unresolved premise
+is a failure, never a pass.** A derived check over a malformed register would report noise that
+hides the real error, and one over an inventory silently parsed as zero rows would satisfy every
+predicate over those rows trivially.
 
 This module establishes those premises. Every derived check the design's table names is a predicate
 over :class:`Premises`, reporting :class:`Finding` values that carry its own check name, so that one
@@ -23,19 +24,23 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Final
 
 from common.gate_register import (
+    ABSENT,
     ACCEPTANCE_CRITERION_CLASSIFICATION,
     DELIVERED_STATUSES,
     GATE_CLASSIFICATION,
     GATE_IDS,
+    RECORD_STATES,
     GateRegisterError,
     ScreenInventoryError,
     blocking_gates,
     is_entry_id,
+    load_closure_record,
     load_gate_register,
     parse_screen_inventory,
     release_sets,
@@ -48,9 +53,19 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Sequence
 
-    from common.gate_register import GateRegister, Observation, ScreenInventory, ScreenRelease
+    from common.gate_register import (
+        ClosureRecord,
+        DecisionContentElement,
+        GatePart,
+        GateRegister,
+        Observation,
+        ScreenInventory,
+        ScreenRelease,
+        SettledElement,
+        SettledEntry,
+    )
     from common.markdown import MarkdownTable
 
 ROOT: Final = Path(__file__).resolve().parents[1]
@@ -61,6 +76,12 @@ ROOT: Final = Path(__file__).resolve().parents[1]
 _SPEC_DIR: Final = ".kiro/specs/aerora-decision-gate-closure"
 REGISTER_PATH: Final = f"{_SPEC_DIR}/gate-register.json"
 REGISTER_SCHEMA_PATH: Final = f"{_SPEC_DIR}/gate-register.schema.json"
+
+# The Closure_Records are not among them either, for the reason the inventory is not: each Gate
+# part names the record that settles it, and naming a directory here would make this module a
+# second authority for where a record lives. The schema beside them is this module's to read,
+# because it is the schema a record is validated against rather than a document a record names.
+CLOSURE_RECORD_SCHEMA_PATH: Final = f"{_SPEC_DIR}/closure-record.schema.json"
 
 # The two checks that run before any derived one, kept apart from them so that a premise which
 # cannot be established is reported as itself rather than as the many findings a missing register
@@ -76,8 +97,22 @@ DELIVERED_OUTSIDE: Final = "delivered-outside"
 INVENTORY_COVERAGE: Final = "inventory-coverage"
 ENTRY_CLASSIFICATION: Final = "entry-classification"
 RECLASSIFICATIONS: Final = "reclassifications"
+CLOSURE_COMPLETENESS: Final = "closure-completeness"
 VERIFIED_OBSERVATION: Final = "verified-observation"
 INVENTORY_TOTALS: Final = "inventory-totals"
+
+# The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
+# RECORD_STATES: a part is `submitted` or `accepted` exactly when a record settles it, and the
+# third part state -- `open` -- is a part nobody has signed.
+SETTLING_PART_STATES: Final = RECORD_STATES
+
+# The three members of SETTLEMENT_SHAPES by name. The settlement rules branch on these and on
+# nothing else: the shape, the required attributes, the key source and the excluded source are what
+# the Gate_Dossier records for an element, so the ten Gates settle very different content through
+# the same three rules and no rule here reads a Gate identifier.
+SINGLE_SHAPE: Final = "single"
+KEYED_SHAPE: Final = "keyed"
+MAPPING_SHAPE: Final = "mapping"
 
 # Requirement 1 criterion 5: the four Two_Gate_Screens, each with the two Gates whose Release_Sets
 # must both carry it. Recorded here rather than derived from the register, because a check that took
@@ -235,17 +270,36 @@ class Derived:
 
 
 @dataclass(frozen=True)
+class NamedClosureRecord:
+    """One part's Closure_Record, with the Gate, the part and the path that name it.
+
+    The path travels with the record because the record is the only document here that a part names
+    rather than this module knowing: a finding about it has to say which file to repair.
+    """
+
+    gate: str
+    part: str
+    path: str
+    record: ClosureRecord
+
+
+@dataclass(frozen=True)
 class Premises:
     """The documents every derived check reads, read and validated once each.
 
     ``root`` is how a check reaches a third file -- a test source, a guard declaration, git history
     -- without discovering the repository for itself.
+
+    ``closures`` is keyed by the part that names the record, in the ``<GATE>:<part>`` notation the
+    register already uses for a part reference in ``permittedToChangeBy``. A part recording no
+    Closure_Record has no entry: that is a part nobody has signed rather than a missing premise.
     """
 
     root: Path
     register: GateRegister
     inventory: ScreenInventory
     derived: Derived
+    closures: dict[str, NamedClosureRecord]
 
 
 def _pointer(tokens: Sequence[object]) -> str:
@@ -283,12 +337,12 @@ def _read_json(root: Path, relative: str) -> tuple[Any, list[Finding]]:
         return None, [Finding(PREMISES, f"{relative}:{error.lineno}:{error.colno}: {error.msg}")]
 
 
-def _schema_findings(document: Any, schema: Any) -> list[Finding]:
+def _schema_findings(document: Any, schema: Any, *, path: str, schema_path: str) -> list[Finding]:
     """Validate *document* against *schema*, reporting a JSON pointer per error.
 
     A schema that is not itself a valid schema is a premise failure rather than a schema finding:
-    nothing was validated, so reporting it as a rejection of the register would name the wrong
-    document.
+    nothing was validated, so reporting it as a rejection of the document would name the wrong
+    file.
 
     The errors are ordered by the pointer they address, so a run reports the same findings in the
     same order and a reviewer can read them against the document top to bottom.
@@ -297,16 +351,102 @@ def _schema_findings(document: Any, schema: Any) -> list[Finding]:
         Draft202012Validator.check_schema(schema)
     except SchemaError as error:
         pointer = _pointer(error.absolute_path)
-        return [Finding(PREMISES, f"{REGISTER_SCHEMA_PATH}: {pointer}: {error.message}")]
+        return [Finding(PREMISES, f"{schema_path}: {pointer}: {error.message}")]
 
     errors = sorted(
         Draft202012Validator(schema).iter_errors(document),
         key=lambda error: ([str(token) for token in error.absolute_path], error.message),
     )
     return [
-        Finding(SCHEMA, f"{REGISTER_PATH}: {_pointer(error.absolute_path)}: {error.message}")
+        Finding(SCHEMA, f"{path}: {_pointer(error.absolute_path)}: {error.message}")
         for error in errors
     ]
+
+
+def _part_reference(gate: str, part: str) -> str:
+    """Name one Gate part the way the register names one in ``permittedToChangeBy``."""
+    return f"{gate}:{part}"
+
+
+def _load_closures(
+    root: Path, register: GateRegister
+) -> tuple[dict[str, NamedClosureRecord], list[Finding]]:
+    """Read the Closure_Record each part names, on the error contract the register is read on.
+
+    A record a part names and the tree lacks, a record that is not JSON, a record the schema
+    rejects and a record the model rejects after the schema accepted it are reported the way the
+    register's own failures are, against the path the part named. A part recording ``null`` is not
+    among them: that is a part nobody has signed.
+
+    Two inconsistencies between the two sides are reported here as well, because they leave a
+    record that cannot be attributed to a part: a record whose own ``gate`` or ``part`` disagrees
+    with the part naming it, and two parts naming one record file.
+
+    The schema is read only once a part names a record. Reading it unconditionally would fail a
+    tree that carries no record against a premise that nothing in it rests on.
+    """
+    named: list[tuple[str, GatePart, str]] = [
+        (dossier.id, part, record)
+        for dossier in register.gates
+        for part in dossier.parts
+        if (record := part.closure_record) is not None
+    ]
+    if not named:
+        return {}, []
+
+    schema, findings = _read_json(root, CLOSURE_RECORD_SCHEMA_PATH)
+    if findings:
+        return {}, findings
+
+    closures: dict[str, NamedClosureRecord] = {}
+    naming: dict[str, str] = {}
+    for gate, part, path in named:
+        reference = _part_reference(gate, part.id)
+        if path in naming:
+            findings.append(
+                Finding(
+                    PREMISES,
+                    f"{reference} names {path} as the Closure_Record that settles it, and so does "
+                    f"{naming[path]}. The unit of signature is the part, so one record settles one "
+                    f"part",
+                )
+            )
+            continue
+        naming[path] = reference
+
+        document, failures = _read_json(root, path)
+        if failures:
+            findings.extend(failures)
+            continue
+        failures = _schema_findings(
+            document, schema, path=path, schema_path=CLOSURE_RECORD_SCHEMA_PATH
+        )
+        if failures:
+            findings.extend(failures)
+            continue
+        try:
+            record = load_closure_record(document, path=path)
+        except GateRegisterError as error:
+            findings.append(
+                Finding(
+                    PREMISES,
+                    f"{error}. The record validates against {CLOSURE_RECORD_SCHEMA_PATH}, so the "
+                    f"schema and the model disagree about its shape",
+                )
+            )
+            continue
+        if (record.gate, record.part) != (gate, part.id):
+            findings.append(
+                Finding(
+                    PREMISES,
+                    f"{path} records that it settles "
+                    f"{_part_reference(record.gate, record.part)}, and {reference} names it as the "
+                    f"Closure_Record that settles that part",
+                )
+            )
+            continue
+        closures[reference] = NamedClosureRecord(gate=gate, part=part.id, path=path, record=record)
+    return closures, findings
 
 
 def derive(register: GateRegister, inventory: ScreenInventory) -> Derived:
@@ -338,7 +478,9 @@ def load_premises(root: Path) -> Premises | list[Finding]:
     if findings:
         return findings
 
-    findings = _schema_findings(document, schema)
+    findings = _schema_findings(
+        document, schema, path=REGISTER_PATH, schema_path=REGISTER_SCHEMA_PATH
+    )
     if findings:
         return findings
 
@@ -373,7 +515,20 @@ def load_premises(root: Path) -> Premises | list[Finding]:
     except (GateRegisterError, ScreenInventoryError) as error:
         return [Finding(PREMISES, str(error))]
 
-    return Premises(root=root, register=register, inventory=inventory, derived=derived)
+    # Last, because every check reads the register and the inventory and only the closure checks
+    # read a record: a malformed register reports itself rather than reporting one failure per part
+    # of it.
+    closures, findings = _load_closures(root, register)
+    if findings:
+        return findings
+
+    return Premises(
+        root=root,
+        register=register,
+        inventory=inventory,
+        derived=derived,
+        closures=closures,
+    )
 
 
 def _gate_sort_key(gate: str) -> tuple[int, str]:
@@ -772,6 +927,575 @@ def check_reclassifications(premises: Premises) -> list[Finding]:
                 f"{_retained(expected)}, and {observed}",
             )
         )
+    return findings
+
+
+def _element_named(element: DecisionContentElement, key: str | None = None) -> str:
+    """Name the element a finding is about, and the key where the finding is about one."""
+    named = f"the element {element.name!r}"
+    return named if key is None else f"the key {key!r} of {named}"
+
+
+def _key_set_named(element: DecisionContentElement) -> str:
+    """Name where the key set came from, which is half of what an unmapped member means."""
+    source = element.key_source
+    if source is None:
+        return "the key set the record enumerates"
+    return f"the key set of the keySource {source!r}"
+
+
+def _json_type(value: Any) -> str:
+    """Name *value*'s JSON type, so a finding says what the record carried and not only what it
+    lacked."""
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, list):
+        return "an array"
+    if isinstance(value, Mapping):
+        return "an object"
+    return "null"
+
+
+def _carried(value: Any) -> frozenset[str]:
+    """The attribute names a settled value carries.
+
+    An object's keys, less the keys whose value is null. The rest of the JSON types name no
+    attribute at all: a settled value is whatever an owner signs it as, and a string, a number or
+    an array carries no name this check could read an attribute off.
+    """
+    if not isinstance(value, Mapping):
+        return frozenset()
+    return frozenset(str(name) for name, carried in value.items() if carried is not None)
+
+
+def _carrying(entry: SettledEntry) -> str:
+    """Describe what a settled entry carries, so a reviewer reads the repair and not a verdict."""
+    if entry.value is ABSENT:
+        return "the settled entry carries no value"
+    if not isinstance(entry.value, Mapping):
+        return (
+            f"the settled entry's value is {_json_type(entry.value)} rather than an object naming "
+            f"its attributes"
+        )
+    carried = _carried(entry.value)
+    if not carried:
+        return "the settled entry's value names no attribute"
+    return f"the settled entry's value names {', '.join(sorted(carried))}"
+
+
+def _attributes(
+    reference: str,
+    element: DecisionContentElement,
+    entry: SettledEntry,
+    key: str | None = None,
+) -> list[Finding]:
+    """Every name in ``requiredAttributes``, named one at a time where the entry omits it.
+
+    One finding per omitted attribute, because a reviewer repairs them one at a time and a finding
+    that said "three attributes are missing" would have to be read against the element to find out
+    which.
+
+    What "carries" means is as much as the schema admits: ``entries[].value`` takes any JSON type,
+    so the only reading available is that the value is an object and the attribute is a key of it.
+    A key whose value is null is an omission too -- null and a placeholder are indistinguishable,
+    and Requirement 4 criterion 10 leaves an unsettled value absent rather than carrying a
+    placeholder in its place. What the check cannot see is anything inside a carried value: whether
+    it is right, whether it is issued, whether anyone approved it. That stays with the reviewer,
+    which is what the Sign_Off_Conditions are for.
+
+    An entry recorded as an explicit ``exception`` settles its element or key as an exception rather
+    than by a value, so no attribute is demanded of it.
+    """
+    required = element.required_attributes
+    if not required or entry.exception:
+        return []
+    carried = _carried(entry.value)
+    return [
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: {_element_named(element, key)} records the required attribute "
+            f"{attribute!r}, and {_carrying(entry)}",
+        )
+        for attribute in required
+        if attribute not in carried
+    ]
+
+
+def _excluded_source(
+    reference: str, element: DecisionContentElement, settled: SettledElement
+) -> list[Finding]:
+    """An element recording an excluded source rejects a settled entry declaring that source.
+
+    The finding says *why* the source is excluded rather than only that it is: the Gate_Dossier
+    records it as a source a settled entry may not be derived from, which is the Sign_Off_Condition
+    behind Requirement 13 criterion 4 and the carrier Requirement 15 criterion 6 requires. An entry
+    traced to it settles the element from the one source the Gate excludes, so the part stays
+    `OPEN` until the entry is traced to another.
+    """
+    excluded = element.excluded_source
+    if excluded is None:
+        return []
+    return [
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: {_element_named(element, entry.key)} is settled by an entry traced to "
+            f"{excluded!r}, which the Gate_Dossier records as the source a settled entry of that "
+            f"element may not be derived from",
+        )
+        for entry in settled.entries
+        if entry.source == excluded
+    ]
+
+
+def _single(
+    reference: str, element: DecisionContentElement, settled: SettledElement
+) -> list[Finding]:
+    """Exactly one settled entry, carrying every name the element records as required.
+
+    Zero entries and more than one are distinct findings. The first is the omission Requirement 3
+    criterion 3 names; the second is a record carrying two answers for one element, with nothing to
+    choose between them.
+    """
+    entries = settled.entries
+    if not entries:
+        return [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{reference}: {_element_named(element)} is recorded {SINGLE_SHAPE}-shaped, and "
+                f"the record settles it with no entry",
+            )
+        ]
+    if len(entries) > 1:
+        return [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{reference}: {_element_named(element)} is recorded {SINGLE_SHAPE}-shaped, and "
+                f"the record settles it with {len(entries)} entries, so the record carries "
+                f"{len(entries)} answers for one element",
+            )
+        ]
+    return _attributes(reference, element, entries[0])
+
+
+def _named_key_set(
+    premises: Premises, reference: str, element: DecisionContentElement, source: str
+) -> tuple[frozenset[str] | None, list[Finding]]:
+    """The key set an element's ``keySource`` names, or the finding that it names none.
+
+    A ``keySource`` names a Decision_Content element the register records, and the keys the record
+    settling that element carries are the key set. That is where a key set this check can see
+    lives: the register records element *names*, so a set named rather than enumerated is another
+    element's settled keys -- which is the relation Requirement 8 criterion 5 reads when `DG-TLM`
+    names a freshness class an accepted `DG-FRS` record has not settled.
+
+    Every branch that cannot get there names the ``keySource`` and establishes no set, because a
+    per-key rule over a set this check cannot see would pass over nothing.
+    """
+    named = [
+        _part_reference(dossier.id, part.id)
+        for dossier in premises.register.gates
+        for part in dossier.parts
+        for item in part.elements
+        if item.name == source
+    ]
+    unresolved = f"{reference}: {_element_named(element)} names the keySource {source!r}, and "
+    if source == element.name:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}that is the element's own name, so the key set would be the keys the "
+                f"record already enumerates and every rule over it would pass over nothing",
+            )
+        ]
+    if not named:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}the register records no Decision_Content element with that name, so "
+                f"the key set could not be established",
+            )
+        ]
+    if len(named) > 1:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}the register records that element in {', '.join(sorted(named))}, so "
+                f"the key set has more than one answer",
+            )
+        ]
+    (settles,) = named
+    closure = premises.closures.get(settles)
+    if closure is None:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}{settles}, which settles that element, names no Closure_Record, so "
+                f"the key set could not be established",
+            )
+        ]
+    item = next((entry for entry in closure.record.settled if entry.element == source), None)
+    if item is None:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}{closure.path} settles no entry for that element, so the key set "
+                f"could not be established",
+            )
+        ]
+    keys = frozenset(entry.key for entry in item.entries if entry.key is not None)
+    if not keys:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{unresolved}{closure.path} settles that element with no keyed entry, so the key "
+                f"set is empty and every rule over it would pass over nothing",
+            )
+        ]
+    return keys, []
+
+
+def _key_set(
+    premises: Premises,
+    reference: str,
+    element: DecisionContentElement,
+    enumerated: frozenset[str],
+) -> tuple[frozenset[str] | None, list[Finding]]:
+    """The key set the per-key rule runs over, or the finding that it could not be established.
+
+    One of two places, and the element records which: the keys the record itself enumerates, or the
+    set the element's ``keySource`` names. ``None`` is returned exactly when no set could be
+    established, which is a failure rather than a pass.
+    """
+    source = element.key_source
+    if source is not None:
+        return _named_key_set(premises, reference, element, source)
+    if not enumerated:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{reference}: {_element_named(element)} records no keySource and the record "
+                f"enumerates no key, so the key set is empty and every rule over it would pass "
+                f"over nothing",
+            )
+        ]
+    return enumerated, []
+
+
+def _keyed(
+    premises: Premises, reference: str, element: DecisionContentElement, settled: SettledElement
+) -> list[Finding]:
+    """Exactly one entry per key, or one explicit exception per key.
+
+    A key with no entry and a key with more than one are distinct findings, each naming the key:
+    the first is a key nobody settled, the second is a key settled twice with nothing to choose
+    between the two, and a reviewer repairs them differently.
+
+    An entry recorded as an explicit ``exception`` settles its key as an exception rather than by a
+    value, which is what lets a key with no answer be a recorded pass rather than a gap. It is one
+    entry for that key like any other, so a key carrying an exception *and* a value is settled
+    twice.
+
+    A key the record settles that the key set does not carry is reported as well, so a mistyped key
+    reads as the entry nothing resolves against rather than only as the key that went missing.
+    """
+    findings: list[Finding] = []
+    entries: dict[str, list[SettledEntry]] = {}
+    for entry in settled.entries:
+        if entry.key is None:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: {_element_named(element)} is recorded {KEYED_SHAPE}-shaped, and "
+                    f"the record settles it with an entry carrying no key",
+                )
+            )
+            continue
+        entries.setdefault(entry.key, []).append(entry)
+
+    keys, failures = _key_set(premises, reference, element, frozenset(entries))
+    findings.extend(failures)
+    if keys is None:
+        return findings
+
+    for key in sorted(keys):
+        settling = entries.get(key, [])
+        if not settling:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: {_element_named(element, key)} is settled by no entry, and "
+                    f"{_key_set_named(element)} carries that key",
+                )
+            )
+            continue
+        if len(settling) > 1:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: {_element_named(element, key)} is settled by {len(settling)} "
+                    f"entries, and exactly one entry or one explicit exception settles a key",
+                )
+            )
+            continue
+        findings.extend(_attributes(reference, element, settling[0], key))
+
+    findings.extend(
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: the record settles {_element_named(element, key)}, and "
+            f"{_key_set_named(element)} does not carry that key",
+        )
+        for key in sorted(entries.keys() - keys)
+    )
+    return findings
+
+
+def _related(
+    reference: str, element: DecisionContentElement, entry: SettledEntry
+) -> tuple[frozenset[str], list[Finding]]:
+    """The members of the second set one mapping entry relates its key to.
+
+    A string is one member and an array of strings is several. An absent value, a null value and an
+    empty array are an entry relating its key to nothing, which the totality rule names rather than
+    this one, as is an entry recorded as an explicit exception. Any other value names no member at
+    all, and the finding says so with the type the record carried: a relation this check cannot
+    read is not a relation it found total.
+    """
+    value = entry.value
+    if entry.exception or value is ABSENT or value is None:
+        return frozenset(), []
+    if isinstance(value, str):
+        return frozenset({value}), []
+    if isinstance(value, list) and all(isinstance(member, str) for member in value):
+        return frozenset(value), []
+    return frozenset(), [
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: {_element_named(element, entry.key)} is settled by an entry whose value "
+            f"is {_json_type(value)}, and a {MAPPING_SHAPE} entry relates its key to one member "
+            f"named as a string or to several named as an array of them",
+        )
+    ]
+
+
+def _mapping(
+    premises: Premises, reference: str, element: DecisionContentElement, settled: SettledElement
+) -> list[Finding]:
+    """A relation total in both directions, naming the unmapped member and the set it came from.
+
+    How a mapping entry records its two sides: the entry's ``key`` is a member of the first set,
+    and its ``value`` names the members of the second set that key relates to -- one as a string,
+    several as an array of them. The first set is the keys the record settles; the second is the
+    set the element's ``keySource`` names, resolved the way a `keyed` element's key set is. That is
+    the shape Requirement 9 criteria 4, 5 and 11 read: each role relates to at least one command
+    class, each command class the station can emit is related to by at least one role, and the
+    finding names the unmapped member *together with the set it came from*, because "unmapped" says
+    nothing without saying which side was being exhausted.
+
+    A `mapping` element recording no ``keySource`` is a finding. The second set would otherwise be
+    whatever the entries happen to name, which every entry satisfies by construction, and a
+    direction that cannot fail is not a direction that was checked.
+
+    Two entries naming one key are two pairs of one relation rather than a key settled twice. That
+    is the one place `keyed` and `mapping` read the same record differently, because cardinality is
+    `keyed`'s rule and totality is this one's.
+    """
+    findings: list[Finding] = []
+    relation: dict[str, set[str]] = {}
+    excused: set[str] = set()
+    for entry in settled.entries:
+        if entry.key is None:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: {_element_named(element)} is recorded {MAPPING_SHAPE}-shaped, "
+                    f"and the record settles it with an entry carrying no key, so the entry names "
+                    f"no member of the first set",
+                )
+            )
+            continue
+        members, failures = _related(reference, element, entry)
+        findings.extend(failures)
+        relation.setdefault(entry.key, set()).update(members)
+        # Two reasons a key is excused from the first direction: an explicit exception, which is a
+        # recorded pass, and a value this check could not read, which is reported as itself above
+        # rather than again as the consequence that the key relates to nothing.
+        if entry.exception or failures:
+            excused.add(entry.key)
+
+    second, failures = _second_set(premises, reference, element)
+    findings.extend(failures)
+    if second is None:
+        return findings
+
+    findings.extend(
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: the member {key!r} of the keys the record settles relates to no member "
+            f"of {_key_set_named(element)} under {_element_named(element)}",
+        )
+        for key, members in sorted(relation.items())
+        if not members and key not in excused
+    )
+    related = {member for members in relation.values() for member in members}
+    findings.extend(
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: the member {member!r} of {_key_set_named(element)} is related to by no "
+            f"member of the keys the record settles under {_element_named(element)}",
+        )
+        for member in sorted(second - related)
+    )
+    findings.extend(
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: the record relates a key of {_element_named(element)} to {member!r}, "
+            f"and {_key_set_named(element)} does not carry that member",
+        )
+        for member in sorted(related - second)
+    )
+    return findings
+
+
+def _second_set(
+    premises: Premises, reference: str, element: DecisionContentElement
+) -> tuple[frozenset[str] | None, list[Finding]]:
+    """The second set of a mapping relation, which the element has to name."""
+    source = element.key_source
+    if source is None:
+        return None, [
+            Finding(
+                CLOSURE_COMPLETENESS,
+                f"{reference}: {_element_named(element)} is recorded {MAPPING_SHAPE}-shaped and "
+                f"records no keySource, so the second set of the relation could not be established "
+                f"and the direction over it would pass over nothing",
+            )
+        ]
+    return _named_key_set(premises, reference, element, source)
+
+
+def _shaped(
+    premises: Premises, reference: str, element: DecisionContentElement, settled: SettledElement
+) -> list[Finding]:
+    """Apply the one settlement rule the element's recorded shape names, and the excluded source.
+
+    Three rules and no fourth: ``SETTLEMENT_SHAPES`` has three members, so the last branch is
+    `mapping`.
+    """
+    findings = _excluded_source(reference, element, settled)
+    shape = element.settlement_shape
+    if shape == SINGLE_SHAPE:
+        findings.extend(_single(reference, element, settled))
+    elif shape == KEYED_SHAPE:
+        findings.extend(_keyed(premises, reference, element, settled))
+    else:
+        findings.extend(_mapping(premises, reference, element, settled))
+    return findings
+
+
+def _part_settlement(
+    premises: Premises, reference: str, part: GatePart, record: ClosureRecord
+) -> list[Finding]:
+    """Every Decision_Content element the part records, settled by the shape the part records.
+
+    The Gate_Dossier is the authority for the shape, so a record declaring a different one for an
+    element is reported and no settlement rule runs over that element: applying either shape would
+    check a rule one of the two documents does not record, and the repair is to one of them.
+
+    An element the record settles that the part does not record is reported too. A record settling
+    content the dossier never named settles something no owner was recorded as owning.
+    """
+    findings: list[Finding] = []
+    settled: dict[str, SettledElement] = {}
+    for item in record.settled:
+        if item.element in settled:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: the record settles the element {item.element!r} more than once, "
+                    f"so the settlement rule has more than one set of entries to read",
+                )
+            )
+            continue
+        settled[item.element] = item
+
+    for element in part.elements:
+        item = settled.get(element.name)
+        if item is None:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: the record settles no entry for {_element_named(element)}, "
+                    f"which the Gate_Dossier records as Decision_Content of the part, so the Gate "
+                    f"stays OPEN until an amendment settles it",
+                )
+            )
+            continue
+        if item.shape != element.settlement_shape:
+            findings.append(
+                Finding(
+                    CLOSURE_COMPLETENESS,
+                    f"{reference}: the Gate_Dossier records {_element_named(element)} as "
+                    f"{element.settlement_shape}-shaped, and the record settles it as "
+                    f"{item.shape}-shaped, so no settlement rule runs over it until the two agree",
+                )
+            )
+            continue
+        findings.extend(_shaped(premises, reference, element, item))
+
+    recorded = {element.name for element in part.elements}
+    findings.extend(
+        Finding(
+            CLOSURE_COMPLETENESS,
+            f"{reference}: the record settles the element {name!r}, and the Gate_Dossier records "
+            f"no Decision_Content element of that name for the part",
+        )
+        for name in sorted(settled.keys() - recorded)
+    )
+    return findings
+
+
+def check_closure_completeness(premises: Premises) -> list[Finding]:
+    """Every Decision_Content element a part records is settled by the record that settles the part.
+
+    Requirement 3 criterion 3 is the governing rule: a submitted record carrying no settled entry
+    for an element of the Decision_Content it settles holds the Gate at `OPEN`, and the finding
+    names the omitted element. Every finding here names the Gate, the part and the element, because
+    a reviewer repairs one element of one part at a time.
+
+    The rule runs over the parts a record is in front of -- the ones recorded `submitted` or
+    `accepted`. A part recorded `open` names no record and there is nothing to read one against.
+
+    Three generic rules and no per-Gate schema. The element's recorded ``settlementShape`` chooses
+    between `single`, `keyed` and `mapping`, and ``requiredAttributes``, ``keySource`` and
+    ``excludedSource`` are the rest of what those rules read. Nothing here branches on a Gate
+    identifier: the ten Gates settle very different content, and a rule that knew which Gate it was
+    reading would be a schema per Gate wearing one function's name.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            if part.state not in SETTLING_PART_STATES:
+                continue
+            reference = _part_reference(dossier.id, part.id)
+            closure = premises.closures.get(reference)
+            if closure is not None:
+                findings.extend(_part_settlement(premises, reference, part, closure.record))
+            elif part.closure_record is None:
+                findings.append(
+                    Finding(
+                        CLOSURE_COMPLETENESS,
+                        f"{reference}: the part is recorded {part.state} and names no "
+                        f"Closure_Record, so no element of the Decision_Content it settles is "
+                        f"settled",
+                    )
+                )
+            # A part naming a record that did not load is the premise failure load_premises
+            # reported against the path. Reporting it again per element would bury it.
     return findings
 
 
@@ -1223,6 +1947,7 @@ _CHECKS: Final = (
     check_inventory_coverage,
     check_entry_classification,
     check_reclassifications,
+    check_closure_completeness,
     check_verified_observation,
     check_inventory_totals,
 )
@@ -1255,6 +1980,7 @@ def main() -> int:
         f"{REGISTER_PATH} validates against {REGISTER_SCHEMA_PATH} and agrees with "
         f"{premises.register.inventory.path}: {len(premises.register.gates)} Gate_Dossiers, "
         f"{len(premises.register.screens)} screen records, "
+        f"{len(premises.closures)} Closure_Records, "
         f"{len(premises.derived.undelivered)} undelivered of {len(premises.inventory.rows)} rows"
     )
     return 0

@@ -307,7 +307,7 @@ Constraints every task inherits:
 
 - [ ] 5. `tools/validate_gate_register.py` — the Closure_Record half
 
-  - [~] 5.1 Implement the three settlement shapes and `closure-completeness`
+  - [x] 5.1 Implement the three settlement shapes and `closure-completeness`
     - `single`: exactly one settled entry carrying every name in `requiredAttributes`, with each
       omitted attribute named
     - `keyed`: exactly one entry per key or an explicit exception per key, with a missing key and a

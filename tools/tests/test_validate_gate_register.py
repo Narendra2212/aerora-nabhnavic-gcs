@@ -39,12 +39,16 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import replace
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import pytest
 from common.gate_register import (
+    ABSENT,
     INVENTORY_COLUMNS,
     BlockingEntry,
+    ClosureRecord,
+    DecisionContentElement,
     GateDossier,
     GatePart,
     GateRegister,
@@ -56,17 +60,25 @@ from common.gate_register import (
     ReadOnlyPosture,
     ReleaseSetEntry,
     ScreenRecord,
+    SettledElement,
+    SettledEntry,
+    Signature,
+    dump_closure_record,
     dump_gate_register,
     is_entry_id,
     parse_screen_inventory,
 )
 from common.markdown import md_table
 from validate_gate_register import (
+    CLOSURE_COMPLETENESS,
+    CLOSURE_RECORD_SCHEMA_PATH,
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
     INVENTORY_COVERAGE,
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
+    KEYED_SHAPE,
+    MAPPING_SHAPE,
     NOT_DELIVERED_LABEL,
     OVERLAY_TREE,
     PARTITION,
@@ -80,6 +92,7 @@ from validate_gate_register import (
     RELEASED_WITH_NO_GATE,
     RETAINED_GATES,
     SCHEMA,
+    SINGLE_SHAPE,
     SUPERSEDED_STATUS,
     TEST_TREE,
     TOTAL_LABEL,
@@ -88,8 +101,10 @@ from validate_gate_register import (
     TWO_GATE_SCREENS,
     VERIFIED_OBSERVATION,
     VERIFIED_STATUS,
+    NamedClosureRecord,
     Premises,
     _pointer,
+    check_closure_completeness,
     check_delivered_outside,
     check_entry_classification,
     check_inventory_coverage,
@@ -432,14 +447,23 @@ def _baseline_rows(register: GateRegister) -> dict[str, str]:
     }
 
 
-def _premises_from_text(register: GateRegister, text: str) -> Premises:
-    """Premises over a register and an inventory document the caller wrote."""
+def _premises_from_text(
+    register: GateRegister,
+    text: str,
+    closures: Mapping[str, NamedClosureRecord] | None = None,
+) -> Premises:
+    """Premises over a register and an inventory document the caller wrote.
+
+    *closures* is empty by default, which is the shape the register is in while no part names a
+    Closure_Record. A settlement test attaches the records its parts name.
+    """
     inventory = parse_screen_inventory(text, path=INVENTORY_PATH)
     return Premises(
         root=REPO_ROOT,
         register=register,
         inventory=inventory,
         derived=derive(register, inventory),
+        closures=dict(closures or {}),
     )
 
 
@@ -447,6 +471,7 @@ def _premises(
     register: GateRegister | None = None,
     rows: Mapping[str, str] | None = None,
     blocked: Mapping[str, str] | None = None,
+    closures: Mapping[str, NamedClosureRecord] | None = None,
 ) -> Premises:
     """Premises built the way load_premises builds them, over a fixture register and inventory."""
     recorded = _register() if register is None else register
@@ -456,6 +481,7 @@ def _premises(
             _baseline_rows(recorded) if rows is None else rows,
             _blocked_by(recorded) if blocked is None else blocked,
         ),
+        closures,
     )
 
 
@@ -1133,6 +1159,760 @@ def test_classification_inventory_totals_reports_every_row_of_a_table_it_cannot_
 
 
 # ---------------------------------------------------------------------------
+# closure-completeness, and the Closure_Record half of the premises it rests on
+#
+# Named with the `settlement` prefix for the reason the inventory-totals tests carry
+# `classification`: the three settlement shapes and the record loading underneath them are
+# implemented and selected as one pass. The loading tests sit here rather than with the rest of the
+# error contract for the same reason.
+#
+# `closures/` does not exist and no Closure_Record is authored by this spec, because the content of
+# one is an owner's signature. Every record below is therefore a fixture in this file, and every
+# value in one is obviously a fixture: the register records element *names*, and a fixture value
+# that read like a real Contract_Value would outlive the decision it stood in for.
+# ---------------------------------------------------------------------------
+
+# The parts a settlement test records against UNUSED_GATE, which no fixture screen names: accepting
+# a part of it releases no screen, so every set check reads the baseline unchanged.
+SETTLED_PART = "a-fixture-part"
+SECOND_PART = "another-fixture-part"
+
+# One element name per shape, plus the element a `keySource` resolves against and two names nothing
+# records.
+FIXTURE_ELEMENT = "a fixture single element"
+FIXTURE_KEY_SOURCE_ELEMENT = "a fixture key-source element"
+FIXTURE_KEYED_ELEMENT = "a fixture keyed element"
+FIXTURE_MAPPED_ELEMENT = "a fixture mapped element"
+UNRECORDED_ELEMENT = "a fixture element no part records"
+UNRESOLVABLE_KEY_SOURCE = "a fixture key source the register records no element for"
+
+FIXTURE_ATTRIBUTES = ("aFixtureAttribute", "anotherFixtureAttribute")
+FIXTURE_KEYS = ("a-fixture-key", "another-fixture-key")
+FIXTURE_MEMBERS = ("a-fixture-member", "another-fixture-member")
+FIXTURE_VALUE = "a fixture settled value"
+FIXTURE_SOURCE = "a fixture issued document"
+EXCLUDED_SOURCE = "a fixture source the Gate excludes"
+
+FIXTURE_DATE = "2001-02-03"
+FIXTURE_COMMIT = "0" * 40
+
+
+def _record_path(gate: str, part: str) -> str:
+    """Where a Closure_Record lives: one file per part, under the spec directory.
+
+    Derived from the register's own path, so no test here invents a second place for a record to
+    live. The path is only ever a string the register records and this check reads back.
+    """
+    return f"{PurePosixPath(REGISTER_PATH).parent}/closures/{gate}.{part}.json"
+
+
+def _content(
+    name: str,
+    shape: str,
+    *,
+    required: Sequence[str] = (),
+    key_source: str | None = None,
+    excluded_source: str | None = None,
+) -> DecisionContentElement:
+    """One Decision_Content element, named rather than valued, in the shape the dossier records."""
+    return DecisionContentElement(
+        name=name,
+        source=None,
+        settlement_shape=shape,
+        required_attributes=list(required) or None,
+        key_source=key_source,
+        excluded_source=excluded_source,
+    )
+
+
+def _settled_entry(
+    key: str | None = None,
+    value: object = ABSENT,
+    source: str | None = None,
+    exception: bool | None = None,
+) -> SettledEntry:
+    """One settled entry. The default carries no value, which is what an exception entry is."""
+    return SettledEntry(key=key, value=value, source=source, exception=exception)
+
+
+def _settled_element(element: str, shape: str, *entries: SettledEntry) -> SettledElement:
+    return SettledElement(element=element, shape=shape, entries=list(entries))
+
+
+def _carrying(*attributes: str) -> dict[str, str]:
+    """A settled value carrying *attributes*, which is what "carries" can mean to the check.
+
+    An object whose keys are the attribute names. The check can see the names and nothing inside
+    them, which is why every value here is the same fixture string.
+    """
+    return dict.fromkeys(attributes, FIXTURE_VALUE)
+
+
+def _elements() -> list[DecisionContentElement]:
+    """One element of each of the three shapes, plus the element both key sources resolve against.
+
+    The keyed element and the mapped element both name the key-source element, so one settled
+    element supplies the key set of the first and the second set of the relation of the second.
+    """
+    return [
+        _content(FIXTURE_ELEMENT, SINGLE_SHAPE, required=FIXTURE_ATTRIBUTES),
+        _content(FIXTURE_KEY_SOURCE_ELEMENT, KEYED_SHAPE),
+        _content(
+            FIXTURE_KEYED_ELEMENT,
+            KEYED_SHAPE,
+            required=FIXTURE_ATTRIBUTES,
+            key_source=FIXTURE_KEY_SOURCE_ELEMENT,
+        ),
+        _content(FIXTURE_MAPPED_ELEMENT, MAPPING_SHAPE, key_source=FIXTURE_KEY_SOURCE_ELEMENT),
+    ]
+
+
+def _settled_elements() -> list[SettledElement]:
+    """The settlement that satisfies all three shapes, which is what the accepting case records.
+
+    The mapped element relates one member of its first set to one member of its second, which makes
+    the relation total in both directions: both members relate to something, and both keys of the
+    key-source element are related to by something.
+    """
+    return [
+        _settled_element(
+            FIXTURE_ELEMENT,
+            SINGLE_SHAPE,
+            _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES), source=FIXTURE_SOURCE),
+        ),
+        _settled_element(
+            FIXTURE_KEY_SOURCE_ELEMENT,
+            KEYED_SHAPE,
+            *(_settled_entry(key=key, value=FIXTURE_VALUE) for key in FIXTURE_KEYS),
+        ),
+        _settled_element(
+            FIXTURE_KEYED_ELEMENT,
+            KEYED_SHAPE,
+            *(
+                _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES))
+                for key in FIXTURE_KEYS
+            ),
+        ),
+        _settled_element(
+            FIXTURE_MAPPED_ELEMENT,
+            MAPPING_SHAPE,
+            *(
+                _settled_entry(key=member, value=key)
+                for member, key in zip(FIXTURE_MEMBERS, FIXTURE_KEYS, strict=True)
+            ),
+        ),
+    ]
+
+
+def _resettled(element: str, *entries: SettledEntry) -> list[SettledElement]:
+    """The accepting settlement with one element's entries replaced by *entries*."""
+    return [
+        replace(item, entries=list(entries)) if item.element == element else item
+        for item in _settled_elements()
+    ]
+
+
+def _recontented(name: str, element: DecisionContentElement) -> list[DecisionContentElement]:
+    """The accepting Decision_Content with the element named *name* replaced."""
+    return [element if item.name == name else item for item in _elements()]
+
+
+def _gate_part(
+    part: str, elements: Sequence[DecisionContentElement] = (), *, state: str = "accepted"
+) -> GatePart:
+    """A Gate part recording *elements* and naming the Closure_Record that settles it."""
+    return GatePart(
+        id=part,
+        signing_owners=["Product"],
+        state=state,
+        closure_record=_record_path(UNUSED_GATE, part),
+        elements=list(elements),
+        sign_off_conditions=[],
+    )
+
+
+def _closure_record(
+    settled: Sequence[SettledElement] = (),
+    *,
+    gate: str = UNUSED_GATE,
+    part: str = SETTLED_PART,
+    state: str = "accepted",
+) -> ClosureRecord:
+    """One part's Closure_Record. Every field a signature settles is a fixture."""
+    return ClosureRecord(
+        schema_ref=None,
+        gate=gate,
+        part=part,
+        state=state,
+        sign_off_date=FIXTURE_DATE,
+        entry_commit=FIXTURE_COMMIT if state == "accepted" else None,
+        signatures=[
+            Signature(owner="Product", date=FIXTURE_DATE, trailer=None, signature_verified=None)
+        ],
+        sign_off_condition_verdicts=[],
+        guard_permissions=[],
+        settled=list(settled),
+        amendments=None,
+    )
+
+
+def _settling_register(*parts: GatePart) -> GateRegister:
+    """The baseline register with UNUSED_GATE's dossier recording *parts* instead of its open one.
+
+    The Gate's recorded status follows its parts, so the derivations read a Gate that is closed
+    exactly when every part of it is accepted.
+    """
+    register = _register()
+    closed = all(part.state == "accepted" for part in parts)
+    dossier = replace(
+        next(item for item in register.gates if item.id == UNUSED_GATE),
+        status="CLOSED" if closed else "OPEN",
+        parts=list(parts),
+    )
+    return replace(
+        register, gates=[dossier if item.id == UNUSED_GATE else item for item in register.gates]
+    )
+
+
+def _closures(*records: ClosureRecord) -> dict[str, NamedClosureRecord]:
+    """Each record attached to the part that names it, the way load_premises attaches them."""
+    return {
+        f"{record.gate}:{record.part}": NamedClosureRecord(
+            gate=record.gate,
+            part=record.part,
+            path=_record_path(record.gate, record.part),
+            record=record,
+        )
+        for record in records
+    }
+
+
+def _settlement(
+    settled: Sequence[SettledElement] | None = None,
+    elements: Sequence[DecisionContentElement] | None = None,
+) -> Premises:
+    """Premises over the baseline plus one accepted part of UNUSED_GATE and the record settling it.
+
+    Both axes default to the accepting case, so a test rewrites one element of the dossier or one
+    element's entries in the record and nothing else moves.
+    """
+    part = _gate_part(SETTLED_PART, _elements() if elements is None else elements)
+    record = _closure_record(_settled_elements() if settled is None else settled)
+    return _premises(_settling_register(part), closures=_closures(record))
+
+
+def _settlement_messages(premises: Premises) -> list[str]:
+    return _messages(check_closure_completeness(premises), CLOSURE_COMPLETENESS)
+
+
+# ---------------------------------------------------------------------------
+# The accepting case
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_accepts_a_record_settling_every_element_by_its_recorded_shape() -> None:
+    """The baseline for every test below, and the evidence that no other check is disturbed."""
+    assert run_checks(_settlement()) == []
+
+
+def test_settlement_reads_no_part_recorded_open() -> None:
+    """A part nobody has signed names no record, and there is nothing to read one against."""
+    part = _gate_part(SETTLED_PART, _elements(), state="open")
+    register = _settling_register(replace(part, closure_record=None))
+
+    assert check_closure_completeness(_premises(register)) == []
+
+
+def test_settlement_names_a_part_recorded_submitted_that_names_no_record() -> None:
+    part = _gate_part(SETTLED_PART, _elements(), state="submitted")
+    register = _settling_register(replace(part, closure_record=None))
+
+    (message,) = _settlement_messages(_premises(register))
+    assert f"{UNUSED_GATE}:{SETTLED_PART}: the part is recorded submitted" in message
+    assert "names no Closure_Record" in message
+
+
+# ---------------------------------------------------------------------------
+# The omitted element of Requirement 3 criterion 3
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_names_the_element_the_record_omits() -> None:
+    settled = [item for item in _settled_elements() if item.element != FIXTURE_ELEMENT]
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"{UNUSED_GATE}:{SETTLED_PART}: the record settles no entry for the element " in message
+    assert FIXTURE_ELEMENT in message
+    assert "the Gate stays OPEN" in message
+
+
+def test_settlement_names_an_element_the_record_settles_and_the_dossier_does_not() -> None:
+    settled = [
+        *_settled_elements(),
+        _settled_element(UNRECORDED_ELEMENT, SINGLE_SHAPE, _settled_entry(value=FIXTURE_VALUE)),
+    ]
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the record settles the element {UNRECORDED_ELEMENT!r}" in message
+    assert "records no Decision_Content element of that name for the part" in message
+
+
+def test_settlement_names_an_element_the_record_settles_twice() -> None:
+    settled = [*_settled_elements(), _settled_elements()[0]]
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the record settles the element {FIXTURE_ELEMENT!r} more than once" in message
+    assert "more than one set of entries to read" in message
+
+
+def test_settlement_names_a_shape_the_dossier_and_the_record_disagree_on() -> None:
+    settled = [
+        replace(item, shape=KEYED_SHAPE, entries=[_settled_entry(key=FIXTURE_KEYS[0])])
+        if item.element == FIXTURE_ELEMENT
+        else item
+        for item in _settled_elements()
+    ]
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"records the element {FIXTURE_ELEMENT!r} as {SINGLE_SHAPE}-shaped" in message
+    assert f"settles it as {KEYED_SHAPE}-shaped" in message
+    assert "until the two agree" in message
+
+
+# ---------------------------------------------------------------------------
+# single
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_single_names_an_element_settled_by_no_entry() -> None:
+    (message,) = _settlement_messages(_settlement(_resettled(FIXTURE_ELEMENT)))
+    assert f"the element {FIXTURE_ELEMENT!r} is recorded {SINGLE_SHAPE}-shaped" in message
+    assert "settles it with no entry" in message
+
+
+def test_settlement_single_names_an_element_settled_by_two_entries() -> None:
+    settled = _resettled(
+        FIXTURE_ELEMENT,
+        _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES)),
+        _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES)),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert "settles it with 2 entries" in message
+    assert "2 answers for one element" in message
+
+
+def test_settlement_single_names_the_one_attribute_the_entry_omits() -> None:
+    carried, omitted = FIXTURE_ATTRIBUTES
+    settled = _resettled(FIXTURE_ELEMENT, _settled_entry(value=_carrying(carried)))
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"records the required attribute {omitted!r}" in message
+    assert f"value names {carried}" in message
+
+
+def test_settlement_single_names_each_of_two_omitted_attributes_separately() -> None:
+    settled = _resettled(FIXTURE_ELEMENT, _settled_entry(value={}))
+
+    messages = _settlement_messages(_settlement(settled))
+    assert len(messages) == len(FIXTURE_ATTRIBUTES)
+    for attribute in FIXTURE_ATTRIBUTES:
+        assert any(f"required attribute {attribute!r}" in message for message in messages)
+        assert any("names no attribute" in message for message in messages)
+
+
+def test_settlement_single_reads_an_attribute_settled_as_null_as_omitted() -> None:
+    """Null and a placeholder are indistinguishable, and Requirement 4 criterion 10 leaves an
+    unsettled value absent rather than carrying either in its place."""
+    carried, omitted = FIXTURE_ATTRIBUTES
+    value = {**_carrying(carried), omitted: None}
+    settled = _resettled(FIXTURE_ELEMENT, _settled_entry(value=value))
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"records the required attribute {omitted!r}" in message
+
+
+def test_settlement_single_names_the_type_of_a_value_that_is_not_an_object() -> None:
+    settled = _resettled(FIXTURE_ELEMENT, _settled_entry(value=FIXTURE_VALUE))
+
+    messages = _settlement_messages(_settlement(settled))
+    assert len(messages) == len(FIXTURE_ATTRIBUTES)
+    assert all("value is a string rather than an object" in message for message in messages)
+
+
+# ---------------------------------------------------------------------------
+# keyed
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_keyed_names_a_key_the_record_settles_with_no_entry() -> None:
+    kept, missing = FIXTURE_KEYS
+    settled = _resettled(
+        FIXTURE_KEYED_ELEMENT,
+        _settled_entry(key=kept, value=_carrying(*FIXTURE_ATTRIBUTES)),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the key {missing!r} of the element {FIXTURE_KEYED_ELEMENT!r}" in message
+    assert "is settled by no entry" in message
+    assert f"the keySource {FIXTURE_KEY_SOURCE_ELEMENT!r} carries that key" in message
+
+
+def test_settlement_keyed_names_a_key_the_record_settles_twice() -> None:
+    duplicated = FIXTURE_KEYS[0]
+    settled = _resettled(
+        FIXTURE_KEYED_ELEMENT,
+        *(
+            _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES))
+            for key in (*FIXTURE_KEYS, duplicated)
+        ),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the key {duplicated!r} of the element {FIXTURE_KEYED_ELEMENT!r}" in message
+    assert "is settled by 2 entries" in message
+    assert "exactly one entry or one explicit exception settles a key" in message
+
+
+def test_settlement_keyed_accepts_a_key_settled_by_an_explicit_exception() -> None:
+    """Requirement 12 criterion 5's "or records an explicit exception" is a pass, not a gap."""
+    valued, excepted = FIXTURE_KEYS
+    settled = _resettled(
+        FIXTURE_KEYED_ELEMENT,
+        _settled_entry(key=valued, value=_carrying(*FIXTURE_ATTRIBUTES)),
+        _settled_entry(key=excepted, exception=True),
+    )
+
+    assert check_closure_completeness(_settlement(settled)) == []
+
+
+def test_settlement_keyed_names_the_key_of_an_entry_omitting_an_attribute() -> None:
+    carried, omitted = FIXTURE_ATTRIBUTES
+    first, second = FIXTURE_KEYS
+    settled = _resettled(
+        FIXTURE_KEYED_ELEMENT,
+        _settled_entry(key=first, value=_carrying(*FIXTURE_ATTRIBUTES)),
+        _settled_entry(key=second, value=_carrying(carried)),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the key {second!r} of the element {FIXTURE_KEYED_ELEMENT!r}" in message
+    assert f"records the required attribute {omitted!r}" in message
+
+
+def test_settlement_keyed_names_a_key_the_key_set_does_not_name() -> None:
+    unnamed = "a-fixture-key-no-source-names"
+    settled = _resettled(
+        FIXTURE_KEYED_ELEMENT,
+        *(
+            _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES))
+            for key in (*FIXTURE_KEYS, unnamed)
+        ),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the record settles the key {unnamed!r}" in message
+    assert f"the keySource {FIXTURE_KEY_SOURCE_ELEMENT!r} does not carry that key" in message
+
+
+def test_settlement_keyed_names_a_key_source_the_check_cannot_resolve() -> None:
+    """An unresolved premise is a failure, never a pass: a key set the check cannot establish would
+    leave every per-key rule over it passing over nothing."""
+    elements = _recontented(
+        FIXTURE_KEYED_ELEMENT,
+        _content(
+            FIXTURE_KEYED_ELEMENT,
+            KEYED_SHAPE,
+            required=FIXTURE_ATTRIBUTES,
+            key_source=UNRESOLVABLE_KEY_SOURCE,
+        ),
+    )
+
+    (message,) = _settlement_messages(_settlement(elements=elements))
+    assert f"names the keySource {UNRESOLVABLE_KEY_SOURCE!r}" in message
+    assert "records no Decision_Content element with that name" in message
+    assert "the key set could not be established" in message
+
+
+def test_settlement_keyed_rejects_an_element_naming_itself_as_its_key_source() -> None:
+    """A self-reference reads the keys the record already carries, which every entry satisfies."""
+    elements = _recontented(
+        FIXTURE_KEYED_ELEMENT,
+        _content(
+            FIXTURE_KEYED_ELEMENT,
+            KEYED_SHAPE,
+            required=FIXTURE_ATTRIBUTES,
+            key_source=FIXTURE_KEYED_ELEMENT,
+        ),
+    )
+
+    (message,) = _settlement_messages(_settlement(elements=elements))
+    assert f"names the keySource {FIXTURE_KEYED_ELEMENT!r}" in message
+    assert "that is the element's own name" in message
+    assert "would pass over nothing" in message
+
+
+def test_settlement_keyed_names_a_key_source_whose_part_names_no_record() -> None:
+    """The key-source element moves to a part nobody has signed, so its keys are unknown."""
+    elements = _elements()
+    source = next(item for item in elements if item.name == FIXTURE_KEY_SOURCE_ELEMENT)
+    settling = _gate_part(
+        SETTLED_PART, [item for item in elements if item.name != FIXTURE_KEY_SOURCE_ELEMENT]
+    )
+    unsigned = replace(_gate_part(SECOND_PART, [source], state="open"), closure_record=None)
+    settled = [item for item in _settled_elements() if item.element != FIXTURE_KEY_SOURCE_ELEMENT]
+    record = _closure_record(settled)
+    premises = _premises(_settling_register(settling, unsigned), closures=_closures(record))
+
+    messages = _settlement_messages(premises)
+    assert len(messages) == 2
+    assert all(
+        f"names the keySource {FIXTURE_KEY_SOURCE_ELEMENT!r}" in message for message in messages
+    )
+    assert all(
+        f"{UNUSED_GATE}:{SECOND_PART}, which settles that element, names no Closure_Record"
+        in message
+        for message in messages
+    )
+
+
+def test_settlement_keyed_names_an_element_enumerating_no_key_and_naming_no_source() -> None:
+    """The key-source element enumerates its own keys, so settling none empties both key sets."""
+    settled = _resettled(FIXTURE_KEY_SOURCE_ELEMENT)
+
+    messages = _settlement_messages(_settlement(settled))
+    assert any(
+        f"the element {FIXTURE_KEY_SOURCE_ELEMENT!r} records no keySource and the record "
+        f"enumerates no key" in message
+        for message in messages
+    )
+    assert all("would pass over nothing" in message for message in messages)
+
+
+# ---------------------------------------------------------------------------
+# mapping
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_mapping_names_a_member_of_the_first_set_relating_to_nothing() -> None:
+    """Total in the second direction only: every key of the second set is covered, and one member of
+    the first set relates to nothing."""
+    unmapped, mapped = FIXTURE_MEMBERS
+    settled = _resettled(
+        FIXTURE_MAPPED_ELEMENT,
+        _settled_entry(key=unmapped, value=[]),
+        _settled_entry(key=mapped, value=list(FIXTURE_KEYS)),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the member {unmapped!r} of the keys the record settles relates to no member" in message
+    assert f"the key set of the keySource {FIXTURE_KEY_SOURCE_ELEMENT!r}" in message
+    assert FIXTURE_MAPPED_ELEMENT in message
+
+
+def test_settlement_mapping_names_a_member_of_the_second_set_nothing_relates_to() -> None:
+    """Total in the first direction only: every member of the first set relates to something, and
+    one member of the second set is related to by nothing."""
+    related, unrelated = FIXTURE_KEYS
+    settled = _resettled(
+        FIXTURE_MAPPED_ELEMENT,
+        *(_settled_entry(key=member, value=related) for member in FIXTURE_MEMBERS),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the member {unrelated!r} of the key set of the keySource " in message
+    assert FIXTURE_KEY_SOURCE_ELEMENT in message
+    assert "is related to by no member of the keys the record settles" in message
+    assert FIXTURE_MAPPED_ELEMENT in message
+
+
+def test_settlement_mapping_names_a_related_member_the_second_set_does_not_name() -> None:
+    unnamed = "a-fixture-member-no-source-names"
+    settled = _resettled(
+        FIXTURE_MAPPED_ELEMENT,
+        _settled_entry(key=FIXTURE_MEMBERS[0], value=[*FIXTURE_KEYS, unnamed]),
+        _settled_entry(key=FIXTURE_MEMBERS[1], value=FIXTURE_KEYS[0]),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"relates a key of the element {FIXTURE_MAPPED_ELEMENT!r} to {unnamed!r}" in message
+    assert "does not carry that member" in message
+
+
+def test_settlement_mapping_names_an_element_recording_no_second_set() -> None:
+    elements = _recontented(FIXTURE_MAPPED_ELEMENT, _content(FIXTURE_MAPPED_ELEMENT, MAPPING_SHAPE))
+
+    (message,) = _settlement_messages(_settlement(elements=elements))
+    assert f"the element {FIXTURE_MAPPED_ELEMENT!r} is recorded {MAPPING_SHAPE}-shaped" in message
+    assert "records no keySource" in message
+    assert "the direction over it would pass over nothing" in message
+
+
+def test_settlement_mapping_names_the_type_of_a_value_naming_no_member() -> None:
+    settled = _resettled(
+        FIXTURE_MAPPED_ELEMENT,
+        _settled_entry(key=FIXTURE_MEMBERS[0], value=list(FIXTURE_KEYS)),
+        _settled_entry(key=FIXTURE_MEMBERS[1], value={"aFixtureKey": FIXTURE_VALUE}),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled))
+    assert f"the key {FIXTURE_MEMBERS[1]!r} of the element {FIXTURE_MAPPED_ELEMENT!r}" in message
+    assert "whose value is an object" in message
+    assert f"a {MAPPING_SHAPE} entry relates its key to one member" in message
+
+
+# ---------------------------------------------------------------------------
+# The excluded source
+# ---------------------------------------------------------------------------
+
+
+def test_settlement_rejects_an_entry_declaring_the_excluded_source() -> None:
+    elements = _recontented(
+        FIXTURE_ELEMENT,
+        _content(
+            FIXTURE_ELEMENT,
+            SINGLE_SHAPE,
+            required=FIXTURE_ATTRIBUTES,
+            excluded_source=EXCLUDED_SOURCE,
+        ),
+    )
+    settled = _resettled(
+        FIXTURE_ELEMENT,
+        _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES), source=EXCLUDED_SOURCE),
+    )
+
+    (message,) = _settlement_messages(_settlement(settled, elements))
+    assert f"the element {FIXTURE_ELEMENT!r} is settled by an entry traced to " in message
+    assert EXCLUDED_SOURCE in message
+    assert "may not be derived from" in message
+
+
+def test_settlement_accepts_an_entry_declaring_any_other_source() -> None:
+    elements = _recontented(
+        FIXTURE_ELEMENT,
+        _content(
+            FIXTURE_ELEMENT,
+            SINGLE_SHAPE,
+            required=FIXTURE_ATTRIBUTES,
+            excluded_source=EXCLUDED_SOURCE,
+        ),
+    )
+
+    assert check_closure_completeness(_settlement(elements=elements)) == []
+
+
+# ---------------------------------------------------------------------------
+# The records the premises load
+# ---------------------------------------------------------------------------
+
+
+def _settling_repository(
+    root: Path,
+    *parts: GatePart,
+    closures: Mapping[str, object | str] | None = None,
+) -> Path:
+    """A repository root whose UNUSED_GATE records *parts*, carrying the records *closures* has."""
+    register = _settling_register(*parts)
+    return _repository(
+        root,
+        register=dump_gate_register(register),
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+        closures=closures,
+    )
+
+
+def test_settlement_premises_load_the_record_each_part_names(tmp_path: Path) -> None:
+    """The whole path, from the register naming a record to every check running over it."""
+    part = _gate_part(SETTLED_PART, _elements())
+    record = _closure_record(_settled_elements())
+    root = _settling_repository(
+        tmp_path,
+        part,
+        closures={_record_path(UNUSED_GATE, SETTLED_PART): dump_closure_record(record)},
+    )
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    assert set(premises.closures) == {f"{UNUSED_GATE}:{SETTLED_PART}"}
+    assert run_checks(premises) == []
+
+
+def test_settlement_premises_fail_naming_a_record_the_tree_lacks(tmp_path: Path) -> None:
+    root = _settling_repository(tmp_path, _gate_part(SETTLED_PART, _elements()))
+
+    (finding,) = _findings(load_premises(root))
+
+    assert finding.check == PREMISES
+    assert finding.message == f"{_record_path(UNUSED_GATE, SETTLED_PART)} does not exist"
+
+
+def test_settlement_premises_fail_naming_the_line_of_a_record_that_is_not_json(
+    tmp_path: Path,
+) -> None:
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    root = _settling_repository(
+        tmp_path, _gate_part(SETTLED_PART, _elements()), closures={path: '{\n  "gate": ,\n}\n'}
+    )
+
+    (finding,) = _findings(load_premises(root))
+
+    assert finding.check == PREMISES
+    assert finding.message.startswith(f"{path}:2:11:")
+
+
+def test_settlement_premises_fail_with_a_json_pointer_per_record_schema_error(
+    tmp_path: Path,
+) -> None:
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    root = _settling_repository(
+        tmp_path, _gate_part(SETTLED_PART, _elements()), closures={path: {"gate": UNUSED_GATE}}
+    )
+
+    findings = _findings(load_premises(root))
+
+    assert {finding.check for finding in findings} == {SCHEMA}
+    assert all(finding.message.startswith(f"{path}: ") for finding in findings)
+    assert any("'settled' is a required property" in finding.message for finding in findings)
+
+
+def test_settlement_premises_fail_naming_a_record_that_settles_another_part(
+    tmp_path: Path,
+) -> None:
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = _closure_record(_settled_elements(), part=SECOND_PART)
+    root = _settling_repository(
+        tmp_path,
+        _gate_part(SETTLED_PART, _elements()),
+        closures={path: dump_closure_record(record)},
+    )
+
+    (finding,) = _findings(load_premises(root))
+
+    assert finding.check == PREMISES
+    assert f"{path} records that it settles {UNUSED_GATE}:{SECOND_PART}" in finding.message
+    assert f"{UNUSED_GATE}:{SETTLED_PART} names it" in finding.message
+
+
+def test_settlement_premises_fail_naming_two_parts_that_name_one_record(tmp_path: Path) -> None:
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = _closure_record(_settled_elements())
+    root = _settling_repository(
+        tmp_path,
+        _gate_part(SETTLED_PART, _elements()),
+        replace(_gate_part(SECOND_PART), closure_record=path),
+        closures={path: dump_closure_record(record)},
+    )
+
+    (finding,) = _findings(load_premises(root))
+
+    assert finding.check == PREMISES
+    assert f"{UNUSED_GATE}:{SECOND_PART} names {path}" in finding.message
+    assert f"so does {UNUSED_GATE}:{SETTLED_PART}" in finding.message
+    assert "one record settles one part" in finding.message
+
+
+# ---------------------------------------------------------------------------
 # verified-observation
 # ---------------------------------------------------------------------------
 
@@ -1403,6 +2183,7 @@ def test_verified_observation_resolves_every_real_verified_row_against_the_real_
         register=register,
         inventory=inventory,
         derived=derive(register, inventory),
+        closures={},
     )
 
     assert check_verified_observation(premises) == []
@@ -1419,24 +2200,32 @@ def _repository(
     register: object | str | None,
     inventory: str | None,
     schema: bool = True,
+    closures: Mapping[str, object | str] | None = None,
 ) -> Path:
-    """Lay out a repository root carrying the real schema and the given register and inventory.
+    """Lay out a repository root carrying the real schemas and the given documents.
 
     The test tree comes with it, because `run_checks` resolves the baseline's observation against
     the root it is given and a root with no `aerora/test/**` would report every observation unfound.
+
+    *closures* is a Closure_Record per repository-relative path, which is the path the part naming
+    it records. A path it omits is a record the tree lacks.
     """
     _test_tree(root)
     (root / REGISTER_PATH).parent.mkdir(parents=True, exist_ok=True)
     if schema:
-        (root / REGISTER_SCHEMA_PATH).write_text(
-            (REPO_ROOT / REGISTER_SCHEMA_PATH).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        for path in (REGISTER_SCHEMA_PATH, CLOSURE_RECORD_SCHEMA_PATH):
+            (root / path).write_text(
+                (REPO_ROOT / path).read_text(encoding="utf-8"), encoding="utf-8"
+            )
     if register is not None:
         text = register if isinstance(register, str) else json.dumps(register, indent=2)
         (root / REGISTER_PATH).write_text(text, encoding="utf-8")
     if inventory is not None:
         (root / INVENTORY_PATH).parent.mkdir(parents=True, exist_ok=True)
         (root / INVENTORY_PATH).write_text(inventory, encoding="utf-8")
+    for path, document in (closures or {}).items():
+        text = document if isinstance(document, str) else json.dumps(document, indent=2)
+        _write(root / path, text)
     return root
 
 
