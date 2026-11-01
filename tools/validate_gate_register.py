@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, Final
 from common.gate_register import (
     ABSENT,
     ACCEPTANCE_CRITERION_CLASSIFICATION,
+    ACCEPTED_PART_STATE,
     DELIVERED_STATUSES,
     GATE_CLASSIFICATION,
     GATE_IDS,
@@ -48,6 +49,7 @@ from common.gate_register import (
     two_gate_screens,
     undelivered,
 )
+from common.git import resolve_add_commit
 from common.markdown import parse_md_tables
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
@@ -98,6 +100,7 @@ INVENTORY_COVERAGE: Final = "inventory-coverage"
 ENTRY_CLASSIFICATION: Final = "entry-classification"
 RECLASSIFICATIONS: Final = "reclassifications"
 CLOSURE_COMPLETENESS: Final = "closure-completeness"
+CLOSURE_SIGNATURES: Final = "closure-signatures"
 VERIFIED_OBSERVATION: Final = "verified-observation"
 INVENTORY_TOTALS: Final = "inventory-totals"
 
@@ -105,6 +108,30 @@ INVENTORY_TOTALS: Final = "inventory-totals"
 # RECORD_STATES: a part is `submitted` or `accepted` exactly when a record settles it, and the
 # third part state -- `open` -- is a part nobody has signed.
 SETTLING_PART_STATES: Final = RECORD_STATES
+
+# The member of RECORD_STATES at which a record asserts it is in the repository. Aliased from the
+# part state for the reason SETTLING_PART_STATES is aliased: the two vocabularies coincide on this
+# literal, and a second spelling of it would be a second thing to keep in step.
+ACCEPTED_RECORD_STATE: Final = ACCEPTED_PART_STATE
+
+# The commit trailer a signature is recorded as. Resolving the commit that added a file and reading
+# its trailers belongs to `common.git`; which trailer names a signing party is the Closure_Record's
+# own convention, so the key stays here.
+SIGNED_BY_KEY: Final = "Gate-Signed-By"
+
+# What `closure-signatures` establishes, and what it does not. Every trailer finding carries the
+# short form and the run prints the long form whenever a record was read, because a check that
+# compared commit trailers without saying what they establish would read as a stronger claim than
+# it is. `AeroraSecurityStatus` is the precedent: the station reports *not enforced* rather than
+# claiming a boundary it does not evaluate. Making this stronger needs branch protection on the
+# register path, which is a repository setting outside this repository and is named rather than
+# assumed.
+RECORDED_IDENTITY: Final = "recorded identity, not cryptographic authorship"
+SIGNATURE_NOTICE: Final = (
+    f"{CLOSURE_SIGNATURES} compares {RECORDED_IDENTITY}: a signature is an owner label the "
+    f"Gate_Dossier records, and a {SIGNED_BY_KEY} trailer on the commit that added the record, "
+    f"and neither establishes that the named party agreed"
+)
 
 # The three members of SETTLEMENT_SHAPES by name. The settlement rules branch on these and on
 # nothing else: the shape, the required attributes, the key source and the excluded source are what
@@ -548,6 +575,16 @@ def _gates(gates: Iterable[str]) -> str:
 def _screens(screens: Iterable[str]) -> str:
     """Render a screen set in identifier order, for the same reason :func:`_gates` orders Gates."""
     return ", ".join(sorted(screens))
+
+
+def _owners(owners: Iterable[str]) -> str:
+    """Render an owner set in label order, and say so where it is empty.
+
+    Ordered for the reason :func:`_gates` orders Gates. An empty set is rendered rather than
+    omitted, because a message that trailed off into nothing where an owner set should be would
+    read as a rendering defect instead of as the finding that the set is empty.
+    """
+    return ", ".join(sorted(owners)) or "no owner"
 
 
 def _recorded_release_sets(register: GateRegister) -> dict[str, frozenset[str]]:
@@ -1499,6 +1536,183 @@ def check_closure_completeness(premises: Premises) -> list[Finding]:
     return findings
 
 
+def _recorded_signatures(reference: str, part: GatePart, record: ClosureRecord) -> list[Finding]:
+    """Set equality between the owner set the dossier records and the signatures the record carries.
+
+    Both directions, one finding per party, because the two halves are repaired differently: a
+    missing owner is a signature to collect, and an unrecognised signatory is a signature to remove
+    or an owner set to widen. Requirement 3 criterion 4 names each owner whose signature is
+    required, which a message reporting that the two sets differ would leave a reviewer to work out
+    from the register.
+
+    The sign-off date Requirement 3 criterion 1 records alongside the signatures is checked here as
+    well. The date on each signature row is the schema's -- it requires one per row, in a bounded
+    shape -- so what is left to establish is that the record carries the one the review signs off
+    on.
+    """
+    recorded = frozenset(part.signing_owners)
+    signed = frozenset(signature.owner for signature in record.signatures)
+    findings = [
+        Finding(
+            CLOSURE_SIGNATURES,
+            f"{reference}: the Gate_Dossier records {owner} as an owner of the Decision_Content "
+            f"the record settles, and the record carries no signature from {owner}, whose "
+            f"signature is required before the part is accepted",
+        )
+        for owner in sorted(recorded - signed)
+    ]
+    findings.extend(
+        Finding(
+            CLOSURE_SIGNATURES,
+            f"{reference}: the record carries a signature from {owner}, whom the Gate_Dossier does "
+            f"not record as an owner of the Decision_Content the record settles. It records "
+            f"{_owners(recorded)}",
+        )
+        for owner in sorted(signed - recorded)
+    )
+    if not record.sign_off_date.strip():
+        findings.append(
+            Finding(
+                CLOSURE_SIGNATURES,
+                f"{reference}: the record carries no sign-off date, which Requirement 3 criterion "
+                f"1 records as part of the Closure_Record alongside the signature of each owner",
+            )
+        )
+    return findings
+
+
+def _trailer_parties(trailers: Iterable[str]) -> frozenset[str]:
+    """The parties the ``Gate-Signed-By:`` trailers of one commit name.
+
+    A trailer is a key, a colon and a value. Every other trailer a commit carries belongs to
+    somebody else's convention and names no signing party.
+    """
+    parties: set[str] = set()
+    for trailer in trailers:
+        key, separator, party = trailer.partition(":")
+        if separator and key.strip() == SIGNED_BY_KEY and party.strip():
+            parties.add(party.strip())
+    return frozenset(parties)
+
+
+def _signature_trailers(
+    premises: Premises, reference: str, part: GatePart, closure: NamedClosureRecord
+) -> list[Finding]:
+    """The ``Gate-Signed-By:`` trailers of the commit that added the record, against the owner set.
+
+    The rule runs over an `accepted` record and no other, which is Requirement 3 criterion 1 read
+    with the schema. The record carries the commit at which it enters the repository, and that
+    commit is `null` while the record is `submitted` -- so a submitted record is one the register
+    itself says is not in yet. It is also the record the Gate_Review reads *before* anything
+    accepts it, and the hook gates the very commit that would add it, so demanding a trailer on a
+    commit the record records as absent would reject every record at the one moment the review
+    exists to read it. Once the record is `accepted` the schema requires a 40-character hash, the
+    record asserts it is in the repository, and git history has to be able to answer.
+
+    A history that cannot answer is reported, never skipped: the record names the file and the
+    finding names the reason, following the discipline `aerora-manifest-check.ps1` states for its
+    own `ASSUMED` rows.
+
+    The per-signature ``trailer`` the record may record is not read. The commit is the authority for
+    its own trailers, and comparing the record against its own copy of them would compare a
+    document with itself.
+    """
+    if closure.record.state != ACCEPTED_RECORD_STATE:
+        return []
+
+    commit = resolve_add_commit(closure.path, repo_root=premises.root)
+    if commit.sha is None:
+        return [
+            Finding(
+                CLOSURE_SIGNATURES,
+                f"{reference}: the record at {closure.path} is recorded "
+                f"{ACCEPTED_RECORD_STATE} and {commit.reason}, so the {SIGNED_BY_KEY} trailer set "
+                f"could not be read. An unresolved premise is a failure rather than a pass, and "
+                f"pre-commit.yml checks out full history, so a history that cannot answer is a "
+                f"real problem rather than an environment quirk",
+            )
+        ]
+
+    recorded = frozenset(part.signing_owners)
+    named = _trailer_parties(commit.trailers)
+    findings: list[Finding] = []
+    missing = recorded - named
+    if missing:
+        findings.append(
+            Finding(
+                CLOSURE_SIGNATURES,
+                f"{reference}: the commit {commit.sha} adds the record, its {SIGNED_BY_KEY} "
+                f"trailers name {_owners(named)}, and no trailer there names {_owners(missing)}, "
+                f"whom the Gate_Dossier records as authorised to sign the part. The comparison is "
+                f"{RECORDED_IDENTITY}",
+            )
+        )
+    unrecorded = named - recorded
+    if unrecorded:
+        findings.append(
+            Finding(
+                CLOSURE_SIGNATURES,
+                f"{reference}: the commit {commit.sha} adds the record, and its {SIGNED_BY_KEY} "
+                f"trailers name {_owners(unrecorded)}, whom the Gate_Dossier does not record as "
+                f"authorised to sign the part. It records {_owners(recorded)}. The comparison is "
+                f"{RECORDED_IDENTITY}",
+            )
+        )
+    return findings
+
+
+def check_closure_signatures(premises: Premises) -> list[Finding]:
+    """Every owner the Gate_Dossier records for a part has signed it, and nobody else has.
+
+    Requirement 3 criterion 4 is the governing rule, and it fails the same way in both directions:
+    a record that omits the signature of an owner the dossier records, **or** carries a signature
+    from a party the dossier does not record as an owner of that Decision_Content, holds the Gate
+    at `OPEN`. Each direction is reported per party, because each names a different repair.
+
+    A part recording an empty owner set is a named failure rather than a vacuous pass. Set equality
+    against no owners is satisfied by a record carrying no signature, so the rule that should be
+    protecting the part would pass over nothing. ``signingOwners`` admits an empty array on purpose
+    -- Requirement 15 criterion 18 cannot name a part as carrying no recorded owner if the register
+    cannot express one -- and the message says that an empty owner set authorises nobody rather than
+    anybody. It runs over every part the dossier records rather than only the signed ones, because
+    the criterion's trigger is the dossier recording no owner and not a record arriving.
+
+    The trailer half compares the parties the adding commit's trailers name against the same
+    recorded owner set, and says in its own output that what it establishes is recorded identity
+    and no more.
+
+    Amendment signatures are not read here. Requirement 3 criterion 4 covers an amendment too, and
+    an amendment settles one key carrying its own signatures and its own date, so the owner set
+    those rows answer to is the key's rather than the part's. That scoping belongs with the
+    amendment rule; reading an amendment's rows against the part's whole owner set here would be
+    the conflation that rule exists to prevent.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            reference = _part_reference(dossier.id, part.id)
+            if not part.signing_owners:
+                findings.append(
+                    Finding(
+                        CLOSURE_SIGNATURES,
+                        f"{reference}: the Gate_Dossier records no owner authorised to sign the "
+                        f"part, so nobody is authorised to sign it rather than anybody being. Set "
+                        f"equality against an empty owner set is satisfied by a record carrying no "
+                        f"signature, and Requirement 15 criterion 18 names the part as carrying no "
+                        f"recorded owner instead of passing it",
+                    )
+                )
+            closure = premises.closures.get(reference)
+            if part.state not in SETTLING_PART_STATES or closure is None:
+                # A part recorded `submitted` or `accepted` that names no record is
+                # `closure-completeness`'s finding, reported once there. A part naming a record
+                # that did not load is the premise failure load_premises reported against the path.
+                continue
+            findings.extend(_recorded_signatures(reference, part, closure.record))
+            findings.extend(_signature_trailers(premises, reference, part, closure))
+    return findings
+
+
 @dataclass(frozen=True)
 class _TestTree:
     """What ``aerora/test/**`` and the overlay's CMake files say about a suite, read once per run.
@@ -1948,6 +2162,7 @@ _CHECKS: Final = (
     check_entry_classification,
     check_reclassifications,
     check_closure_completeness,
+    check_closure_signatures,
     check_verified_observation,
     check_inventory_totals,
 )
@@ -1971,6 +2186,10 @@ def main() -> int:
         return report(premises)
 
     findings = run_checks(premises)
+    if premises.closures:
+        # Whether the run passes or fails, because the passing case is where a reader is most
+        # likely to take a signature for more than it is.
+        print(SIGNATURE_NOTICE)
     if findings:
         return report(findings)
 

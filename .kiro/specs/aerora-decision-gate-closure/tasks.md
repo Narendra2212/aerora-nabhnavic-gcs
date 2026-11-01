@@ -320,7 +320,7 @@ Constraints every task inherits:
     - _Requirements: 3.3, 3.11, 6.11, 6.13, 7.12, 8.3, 8.10, 8.11, 9.4, 9.5, 9.11, 10.12, 11.11, 11.12, 12.5, 12.12, 12.13, 12.14, 13.4, 13.9, 13.10, 15.10_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k settlement`
 
-  - [~] 5.2 Implement `closure-signatures`
+  - [x] 5.2 Implement `closure-signatures`
     - Set equality in both directions: every owner the Gate_Dossier records for the part has signed,
       and no signature comes from a party the dossier does not record as an owner of that part, with
       missing owners and unrecognised signatories reported separately

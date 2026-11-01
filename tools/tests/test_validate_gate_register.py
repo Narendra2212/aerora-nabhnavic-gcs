@@ -68,10 +68,13 @@ from common.gate_register import (
     is_entry_id,
     parse_screen_inventory,
 )
+from common.git import run_git
 from common.markdown import md_table
 from validate_gate_register import (
+    ACCEPTED_RECORD_STATE,
     CLOSURE_COMPLETENESS,
     CLOSURE_RECORD_SCHEMA_PATH,
+    CLOSURE_SIGNATURES,
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
     INVENTORY_COVERAGE,
@@ -85,6 +88,7 @@ from validate_gate_register import (
     PREMISES,
     RECLASSIFICATIONS,
     RECLASSIFIED_ENTRIES,
+    RECORDED_IDENTITY,
     REGISTER_PATH,
     REGISTER_SCHEMA_PATH,
     RELEASE_SET_DERIVATION,
@@ -92,6 +96,8 @@ from validate_gate_register import (
     RELEASED_WITH_NO_GATE,
     RETAINED_GATES,
     SCHEMA,
+    SIGNATURE_NOTICE,
+    SIGNED_BY_KEY,
     SINGLE_SHAPE,
     SUPERSEDED_STATUS,
     TEST_TREE,
@@ -105,6 +111,7 @@ from validate_gate_register import (
     Premises,
     _pointer,
     check_closure_completeness,
+    check_closure_signatures,
     check_delivered_outside,
     check_entry_classification,
     check_inventory_coverage,
@@ -117,6 +124,7 @@ from validate_gate_register import (
     check_verified_observation,
     derive,
     load_premises,
+    main,
     run_checks,
 )
 
@@ -1391,13 +1399,21 @@ def _settlement(
     settled: Sequence[SettledElement] | None = None,
     elements: Sequence[DecisionContentElement] | None = None,
 ) -> Premises:
-    """Premises over the baseline plus one accepted part of UNUSED_GATE and the record settling it.
+    """Premises over the baseline plus one submitted part of UNUSED_GATE and the record settling it.
 
     Both axes default to the accepting case, so a test rewrites one element of the dossier or one
     element's entries in the record and nothing else moves.
+
+    `submitted` rather than `accepted`, which is Requirement 3 criterion 3's own state and the one
+    that keeps this fixture honest: an accepted record asserts it is in the repository, and the
+    record these premises name is in none -- they are built in code against the repository root, so
+    no commit adds the path they record. The checks that read git history therefore belong to the
+    tests that build a repository, and the accepted case is asserted there.
     """
-    part = _gate_part(SETTLED_PART, _elements() if elements is None else elements)
-    record = _closure_record(_settled_elements() if settled is None else settled)
+    part = _gate_part(
+        SETTLED_PART, _elements() if elements is None else elements, state="submitted"
+    )
+    record = _closure_record(_settled_elements() if settled is None else settled, state="submitted")
     return _premises(_settling_register(part), closures=_closures(record))
 
 
@@ -1822,9 +1838,14 @@ def _settling_repository(
 
 
 def test_settlement_premises_load_the_record_each_part_names(tmp_path: Path) -> None:
-    """The whole path, from the register naming a record to every check running over it."""
-    part = _gate_part(SETTLED_PART, _elements())
-    record = _closure_record(_settled_elements())
+    """The whole path, from the register naming a record to every check running over it.
+
+    The record is `submitted`, for the reason :func:`_settlement` builds a submitted one: the tree
+    here carries no repository, so an accepted record -- which asserts it is in one -- is the
+    signature section's case to assert against a repository it builds.
+    """
+    part = _gate_part(SETTLED_PART, _elements(), state="submitted")
+    record = _closure_record(_settled_elements(), state="submitted")
     root = _settling_repository(
         tmp_path,
         part,
@@ -1910,6 +1931,270 @@ def test_settlement_premises_fail_naming_two_parts_that_name_one_record(tmp_path
     assert f"{UNUSED_GATE}:{SECOND_PART} names {path}" in finding.message
     assert f"so does {UNUSED_GATE}:{SETTLED_PART}" in finding.message
     assert "one record settles one part" in finding.message
+
+
+# ---------------------------------------------------------------------------
+# closure-signatures
+#
+# Named with the `signature` prefix for the reason the settlement tests carry `settlement`: it is
+# what this task's command selects.
+#
+# The row half is pure, so it runs over premises built in code. The trailer half resolves the
+# commit that added the record, and nothing short of a commit answers that, so it runs over a
+# repository built under `tmp_path`: one `git init` and one commit per example, and two examples.
+# Those two are the only tests here that pay for a repository.
+# ---------------------------------------------------------------------------
+
+# The owner the settlement fixtures record, and two further labels. Each is verbatim from
+# requirements.md by way of `OWNER_LABELS`: an owner label is not a Contract_Value, and no fixture
+# here invents one. APPROVING_OWNER is Tab 1 because Requirement 14 criterion 11 names Tab 1 as the
+# approver a class-X fork requires, so the omitted-owner finding below names the party that
+# criterion does.
+SIGNING_OWNER = "Product"
+APPROVING_OWNER = "Tab 1"
+SECOND_OWNER = "Firmware"
+
+# A label the Gate_Dossier records as no owner of the part, which is the second direction of
+# Requirement 3 criterion 4.
+UNRECORDED_OWNER = "Tab 7"
+
+
+def _signature(owner: str) -> Signature:
+    """One signing owner's row. The row records no trailer: the commit carries its own."""
+    return Signature(owner=owner, date=FIXTURE_DATE, trailer=None, signature_verified=None)
+
+
+def _signing(
+    owners: Sequence[str] = (SIGNING_OWNER,),
+    signers: Sequence[str] = (SIGNING_OWNER,),
+    *,
+    sign_off_date: str = FIXTURE_DATE,
+) -> Premises:
+    """Premises over the baseline plus one submitted part recording *owners*, signed by *signers*.
+
+    The settlement is the accepting one, so a test rewrites the owner set, the signature rows or
+    the sign-off date and nothing else moves. Submitted for the reason :func:`_settlement` is
+    submitted: the record these premises name is in no repository, and the trailer half reads one.
+    """
+    part = replace(
+        _gate_part(SETTLED_PART, _elements(), state="submitted"), signing_owners=list(owners)
+    )
+    record = replace(
+        _closure_record(_settled_elements(), state="submitted"),
+        signatures=[_signature(owner) for owner in signers],
+        sign_off_date=sign_off_date,
+    )
+    return _premises(_settling_register(part), closures=_closures(record))
+
+
+def _signature_messages(premises: Premises) -> list[str]:
+    return _messages(check_closure_signatures(premises), CLOSURE_SIGNATURES)
+
+
+def _git(root: Path, *args: str) -> str:
+    """Run git in *root* alone, which is where every setting these tests write stays."""
+    return run_git(*args, cwd=root, check=True).stdout.strip()
+
+
+def _signed_repository(root: Path, *parties: str) -> tuple[Path, str]:
+    """A repository whose accepted Closure_Record was added by a commit naming *parties*.
+
+    One `git init` and one commit, with `user.name`, `user.email` and `commit.gpgsign` written in
+    this repository alone and never in the one under test, following the precedent
+    `tools/tests/test_translation_placeholders.py` sets.
+
+    The record's ``entryCommit`` is written back after the commit that adds it, because a file
+    cannot carry the hash of the commit that adds it. That is the order an owner records it in, and
+    it leaves the record agreeing with the history the checks read.
+    """
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = _closure_record(_settled_elements())
+    _settling_repository(
+        root,
+        _gate_part(SETTLED_PART, _elements()),
+        closures={path: dump_closure_record(record)},
+    )
+    _git(root, "init", "-q")
+    for setting, value in (
+        ("user.name", "Test"),
+        ("user.email", "test@example.invalid"),
+        ("commit.gpgsign", "false"),
+    ):
+        _git(root, "config", setting, value)
+    _git(root, "add", "--all")
+    trailers = "\n".join(f"{SIGNED_BY_KEY}: {party}" for party in parties)
+    _git(
+        root,
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "-q",
+        "-m",
+        f"Add a fixture Closure_Record\n\n{trailers}",
+    )
+    sha = _git(root, "rev-parse", "HEAD")
+    _write(
+        root / path, json.dumps(dump_closure_record(replace(record, entry_commit=sha)), indent=2)
+    )
+    return root, sha
+
+
+def test_signatures_accept_a_record_signed_by_every_owner_the_dossier_records() -> None:
+    """Set equality holds in both directions, and no other check moves.
+
+    The signature rows are in the opposite order to the recorded owners, because set equality is
+    what Requirement 3 criterion 4 asks for and a check comparing sequences would pass this by
+    accident.
+    """
+    premises = _signing((SIGNING_OWNER, APPROVING_OWNER), (APPROVING_OWNER, SIGNING_OWNER))
+
+    assert run_checks(premises) == []
+
+
+def test_signatures_name_the_owner_whose_signature_the_record_omits() -> None:
+    """Requirement 14 criterion 11's shape: the finding names Tab 1 as the approver it requires."""
+    premises = _signing((SIGNING_OWNER, APPROVING_OWNER), (SIGNING_OWNER,))
+
+    (message,) = _signature_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"the Gate_Dossier records {APPROVING_OWNER} as an owner" in message
+    assert f"carries no signature from {APPROVING_OWNER}" in message
+
+
+def test_signatures_name_each_of_two_omitted_owners_separately() -> None:
+    """Two owners to collect are two findings: a reviewer collects them one at a time."""
+    premises = _signing((SIGNING_OWNER, APPROVING_OWNER, SECOND_OWNER), (SIGNING_OWNER,))
+
+    messages = _signature_messages(premises)
+    assert len(messages) == 2
+    for owner in (APPROVING_OWNER, SECOND_OWNER):
+        assert any(f"carries no signature from {owner}" in message for message in messages)
+
+
+def test_signatures_name_a_signatory_the_dossier_does_not_record() -> None:
+    premises = _signing((SIGNING_OWNER,), (SIGNING_OWNER, UNRECORDED_OWNER))
+
+    (message,) = _signature_messages(premises)
+    assert f"carries a signature from {UNRECORDED_OWNER}" in message
+    assert "does not record as an owner of the Decision_Content the record settles" in message
+    assert f"It records {SIGNING_OWNER}" in message
+
+
+def test_signatures_report_an_omitted_owner_and_an_unrecognised_signatory_separately() -> None:
+    """Two different repairs: a signature to collect, and a signature to remove or an owner set to
+    widen. One finding reporting that the two sets differ would name neither."""
+    premises = _signing((SIGNING_OWNER,), (UNRECORDED_OWNER,))
+
+    messages = _signature_messages(premises)
+    assert len(messages) == 2
+    assert any(f"carries no signature from {SIGNING_OWNER}" in message for message in messages)
+    assert any(f"carries a signature from {UNRECORDED_OWNER}" in message for message in messages)
+
+
+def test_signatures_name_a_part_recording_no_owner_rather_than_passing_it() -> None:
+    """The vacuous pass: no recorded owner and no signature satisfies set equality and protects
+    nothing, which is what Requirement 15 criterion 18 rejects."""
+    premises = _signing(owners=(), signers=())
+
+    (message,) = _signature_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert "records no owner authorised to sign the part" in message
+    assert "nobody is authorised to sign it rather than anybody being" in message
+
+
+def test_signatures_name_a_part_recording_no_owner_that_carries_a_signature() -> None:
+    """An empty owner set authorises nobody, so the signature it carries is unrecognised too."""
+    premises = _signing(owners=(), signers=(SIGNING_OWNER,))
+
+    messages = _signature_messages(premises)
+    assert len(messages) == 2
+    assert any("records no owner authorised to sign the part" in message for message in messages)
+    assert any(f"carries a signature from {SIGNING_OWNER}" in message for message in messages)
+    assert any("It records no owner" in message for message in messages)
+
+
+def test_signatures_name_a_part_recording_no_owner_before_any_record_arrives() -> None:
+    """Requirement 15 criterion 18's trigger is the Gate_Dossier recording no owner, not a record
+    arriving, so a part nobody is authorised to sign is named while it is still open."""
+    part = replace(_gate_part(SETTLED_PART, state="open"), signing_owners=[], closure_record=None)
+
+    (message,) = _signature_messages(_premises(_settling_register(part)))
+    assert "records no owner authorised to sign the part" in message
+
+
+def test_signatures_name_a_record_carrying_no_sign_off_date() -> None:
+    (message,) = _signature_messages(_signing(sign_off_date=""))
+    assert "carries no sign-off date" in message
+    assert "Requirement 3 criterion 1" in message
+
+
+def test_signatures_accept_a_committed_record_whose_trailers_name_the_recorded_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The accepted record end to end, over a repository: one `git init` and one commit.
+
+    It is also where the run's own output is read, because the passing case is where a reader is
+    most likely to take a signature for more than it is.
+    """
+    root, sha = _signed_repository(tmp_path, SIGNING_OWNER)
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    assert premises.closures[f"{UNUSED_GATE}:{SETTLED_PART}"].record.entry_commit == sha
+    assert run_checks(premises) == []
+
+    monkeypatch.setattr("validate_gate_register.ROOT", root)
+    assert main() == 0
+    assert SIGNATURE_NOTICE in capsys.readouterr().out
+
+
+def test_signatures_name_both_directions_of_a_trailer_set_that_does_not_match(
+    tmp_path: Path,
+) -> None:
+    """A commit naming a party the Gate_Dossier does not record: one `git init` and one commit.
+
+    The recorded rows agree with the recorded owner set here, so the two findings are the trailer
+    set's alone, and each says what the comparison establishes.
+    """
+    root, sha = _signed_repository(tmp_path, UNRECORDED_OWNER)
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    messages = _signature_messages(premises)
+    assert len(messages) == 2
+    assert all(sha in message and RECORDED_IDENTITY in message for message in messages)
+    assert any(f"no trailer there names {SIGNING_OWNER}" in message for message in messages)
+    assert any(
+        f"trailers name {UNRECORDED_OWNER}, whom the Gate_Dossier does not record" in message
+        for message in messages
+    )
+
+
+def test_signatures_fail_naming_an_accepted_record_whose_history_cannot_answer(
+    tmp_path: Path,
+) -> None:
+    """A tree with no repository in it, which costs no commit at all.
+
+    An unanswerable history is a finding naming the record and the reason, never a skip: an
+    unresolved premise is a failure, and `pre-commit.yml` checks out full history so CI can answer.
+    """
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = _closure_record(_settled_elements())
+    root = _settling_repository(
+        tmp_path,
+        _gate_part(SETTLED_PART, _elements()),
+        closures={path: dump_closure_record(record)},
+    )
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    (message,) = _signature_messages(premises)
+    assert f"the record at {path} is recorded {ACCEPTED_RECORD_STATE}" in message
+    assert "the tree is not a git repository" in message
+    assert "a failure rather than a pass" in message
 
 
 # ---------------------------------------------------------------------------
