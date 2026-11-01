@@ -305,7 +305,7 @@ Constraints every task inherits:
       two" a property of the format rather than of the reviewer
     - _Requirements: 1.1, 2.1, 5.1, 5.11_
 
-- [ ] 5. `tools/validate_gate_register.py` — the Closure_Record half
+- [x] 5. `tools/validate_gate_register.py` — the Closure_Record half
 
   - [x] 5.1 Implement the three settlement shapes and `closure-completeness`
     - `single`: exactly one settled entry carrying every name in `requiredAttributes`, with each
@@ -339,7 +339,7 @@ Constraints every task inherits:
     - _Requirements: 3.1_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k entry_commit`
 
-  - [~] 5.4 Implement `gate-status-derivation`, `signoff-verdicts` and amendments
+  - [x] 5.4 Implement `gate-status-derivation`, `signoff-verdicts` and amendments
     - A Gate is `CLOSED` exactly when every part is accepted, with every unaccepted part named
     - Every Sign_Off_Condition the dossier records for an accepted part carries a verdict and a named
       reviewer. The check establishes totality; it never evaluates the verdict, because the verdict is

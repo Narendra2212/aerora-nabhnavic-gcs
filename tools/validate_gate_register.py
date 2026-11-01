@@ -40,6 +40,7 @@ from common.gate_register import (
     GateRegisterError,
     ScreenInventoryError,
     blocking_gates,
+    gate_open,
     is_entry_id,
     load_closure_record,
     load_gate_register,
@@ -58,8 +59,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from common.gate_register import (
+        Amendment,
         ClosureRecord,
         DecisionContentElement,
+        GateOpenness,
         GatePart,
         GateRegister,
         Observation,
@@ -103,6 +106,15 @@ RECLASSIFICATIONS: Final = "reclassifications"
 CLOSURE_COMPLETENESS: Final = "closure-completeness"
 CLOSURE_SIGNATURES: Final = "closure-signatures"
 ENTRY_COMMIT: Final = "closure-entry-commit"
+GATE_STATUS_DERIVATION: Final = "gate-status-derivation"
+SIGNOFF_VERDICTS: Final = "signoff-verdicts"
+# The amendment rule carries its own check name rather than joining one of its neighbours. A
+# finding names the rule that rejected the record, and an amendment is repaired on its own: the
+# repair is to one amendment's key, signatures or date and never to the record's own rows.
+# `closure-signatures` makes the same point from the other side -- it deliberately does not read an
+# amendment's signatures, because the owner set those rows answer to is scoped to the amendment's
+# key -- so folding them back in would undo the scoping Requirement 3 criterion 11 turns on.
+CLOSURE_AMENDMENTS: Final = "closure-amendments"
 VERIFIED_OBSERVATION: Final = "verified-observation"
 INVENTORY_TOTALS: Final = "inventory-totals"
 
@@ -192,6 +204,12 @@ INVENTORY_OWNER: Final = "Tab 7"
 # adds to it.
 VERIFIED_STATUS: Final = "VERIFIED"
 SUPERSEDED_STATUS: Final = "SUPERSEDED"
+
+# The two members of GATE_STATUSES by name. `gate-status-derivation` is the one check that reads a
+# Gate's recorded status, and it reads both members: a Gate recorded `CLOSED` over an unaccepted
+# part and a Gate left `OPEN` once every part is accepted are both findings.
+OPEN_STATUS: Final = "OPEN"
+CLOSED_STATUS: Final = "CLOSED"
 
 # The Inventory totals table's columns, which is how the check finds that table rather than
 # counting tables or anchoring on the heading above it, and the Status-cell text identifying each
@@ -289,9 +307,14 @@ class Derived:
     sub-expression over the Gate-classified blocking entries. An entry classified as a Gate that
     names no Gate is an unresolved premise, and deriving it once per check would report that single
     defect four times and bury it among the consequences.
+
+    ``gate_open`` is carried for the same reason, even though the release derivation evaluates it
+    too: ``gate-status-derivation`` compares a Gate's recorded status against it, and a check that
+    derived its own answer would be a second evaluation of the equation every other check reads.
     """
 
     blocking_gates: dict[str, tuple[str, ...]]
+    gate_open: dict[str, GateOpenness]
     release_sets: dict[str, frozenset[str]]
     releases: dict[str, ScreenRelease]
     two_gate_screens: dict[str, tuple[str, ...]]
@@ -513,6 +536,7 @@ def derive(register: GateRegister, inventory: ScreenInventory) -> Derived:
     """
     return Derived(
         blocking_gates=blocking_gates(register),
+        gate_open=gate_open(register),
         release_sets=release_sets(register),
         releases=released(register),
         two_gate_screens=two_gate_screens(register),
@@ -1849,6 +1873,328 @@ def check_closure_entry_commit(premises: Premises) -> list[Finding]:
     return findings
 
 
+def _parts(gate: str, parts: Iterable[str]) -> str:
+    """Render a set of one Gate's parts in the ``<GATE>:<part>`` notation the register uses.
+
+    In the order the Gate_Dossier records the parts, which is the order the derivation reports
+    them, so a finding reads down the dossier rather than alphabetically across it.
+    """
+    return ", ".join(_part_reference(gate, part) for part in parts)
+
+
+def check_gate_status_derivation(premises: Premises) -> list[Finding]:
+    """Each Gate's recorded ``status`` equals the derived one: `CLOSED` exactly when every part of
+    it is accepted.
+
+    The derivation is ``gate_open``'s, read from the premises rather than re-derived here, so this
+    check and the release derivation cannot disagree about which Gates are open. Requirement 3
+    criterion 7 is the governing rule in one direction and Requirement 3 criterion 6 supplies the
+    quantifier: the part is the unit of acceptance, so a Gate is settled exactly when no part of it
+    is unaccepted. There is no special case at one part.
+
+    Both directions are findings, and each names the parts the verdict rests on.
+
+    A Gate recorded `CLOSED` over an unaccepted part is the first, and the finding names **every**
+    unaccepted part: Requirement 9 criterion 14, Requirement 10 criterion 15, Requirement 11
+    criterion 15, Requirement 12 criterion 17 and Requirement 15 criterion 13 each require the part
+    that is not accepted to be named, and a Gate recorded closed with two parts outstanding needs
+    both.
+
+    A Gate recorded `OPEN` with every part accepted is the second, and it is not cosmetic.
+    Requirement 3 criterion 7 says the register *shall* record the Gate `CLOSED` once every element
+    is settled, so a Gate left `OPEN` after its last part was accepted holds its Release_Set shut
+    for no recorded reason. The screens stay unreleased either way -- ``released-derivation`` reads
+    part acceptance and not this status -- which is exactly why the disagreement has to be reported
+    here: nothing else would notice it.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        openness = premises.derived.gate_open[dossier.id]
+        derived = OPEN_STATUS if openness.is_open else CLOSED_STATUS
+        if dossier.status == derived:
+            continue
+        if openness.is_open:
+            findings.append(
+                Finding(
+                    GATE_STATUS_DERIVATION,
+                    f"{dossier.id} is recorded {CLOSED_STATUS}, and the Gate_Dossier records "
+                    f"{_parts(dossier.id, openness.unaccepted_parts)} as not accepted. A Gate is "
+                    f"{CLOSED_STATUS} exactly when every part of it is accepted, and Requirement 3 "
+                    f"criterion 7 records the Gate {CLOSED_STATUS} once an accepted "
+                    f"Closure_Record settles every element of its Decision_Content",
+                )
+            )
+            continue
+        accepted = _parts(dossier.id, (part.id for part in dossier.parts))
+        findings.append(
+            Finding(
+                GATE_STATUS_DERIVATION,
+                f"{dossier.id} is recorded {OPEN_STATUS}, and the Gate_Dossier records every part "
+                f"of it accepted: {accepted}. Requirement 3 criterion 7 records the Gate "
+                f"{CLOSED_STATUS} once every element is settled, and a Gate left {OPEN_STATUS} "
+                f"after its last part was accepted holds its Release_Set shut for no recorded "
+                f"reason",
+            )
+        )
+    return findings
+
+
+def _verdicts(reference: str, part: GatePart, record: ClosureRecord) -> list[Finding]:
+    """The Sign_Off_Conditions the dossier records for one part, against the verdicts the record
+    carries for them.
+
+    Set equality, reported per condition, plus the facts a verdict row has to carry. Each is a
+    different repair: an unanswered condition is a verdict to reach, a verdict naming no reviewer
+    is an attribution to record, and a verdict for a condition the dossier does not record answers
+    a condition nobody was recorded as requiring.
+    """
+    recorded = {condition.id for condition in part.sign_off_conditions}
+    answered = {verdict.id for verdict in record.sign_off_condition_verdicts}
+
+    findings = [
+        Finding(
+            SIGNOFF_VERDICTS,
+            f"{reference}: the Gate_Dossier records the Sign_Off_Condition {condition!r} for the "
+            f"part, the part is accepted, and the record carries no verdict on it. A condition is "
+            f"not satisfied by going unmentioned",
+        )
+        for condition in sorted(recorded - answered)
+    ]
+    findings.extend(
+        Finding(
+            SIGNOFF_VERDICTS,
+            f"{reference}: the record carries a verdict on {condition!r}, and the Gate_Dossier "
+            f"records no Sign_Off_Condition of that identifier for the part. It records "
+            f"{', '.join(repr(item) for item in sorted(recorded)) or 'no Sign_Off_Condition'}",
+        )
+        for condition in sorted(answered - recorded)
+    )
+    for verdict in record.sign_off_condition_verdicts:
+        if not verdict.reviewer.strip():
+            findings.append(
+                Finding(
+                    SIGNOFF_VERDICTS,
+                    f"{reference}: the verdict on the Sign_Off_Condition {verdict.id!r} names no "
+                    f"reviewer. The verdict is a reviewer's judgement, so a verdict nobody is "
+                    f"recorded as having reached attributes it to the record instead",
+                )
+            )
+        if not verdict.satisfied:
+            findings.append(
+                Finding(
+                    SIGNOFF_VERDICTS,
+                    f"{reference}: the part is accepted, and the verdict {verdict.reviewer} "
+                    f"recorded on the Sign_Off_Condition {verdict.id!r} records it unsatisfied. "
+                    f"This check does not evaluate the condition -- the verdict is the reviewer's "
+                    f"and is read as recorded -- and Requirement 3 criterion 5 records a "
+                    f"Closure_Record as accepted when it satisfies every Sign_Off_Condition "
+                    f"recorded for the Decision_Content it settles, so the two records disagree",
+                )
+            )
+    return findings
+
+
+def check_signoff_verdicts(premises: Premises) -> list[Finding]:
+    """Every Sign_Off_Condition the dossier records for an accepted part carries a verdict, and
+    every verdict names a reviewer.
+
+    **The check establishes totality. It never evaluates a verdict.** Requirement 3 criterion 2
+    makes the Gate_Review record, for each Sign_Off_Condition, whether the record satisfies it, and
+    criterion 5 makes acceptance conditional on satisfying every one of them -- but *who judges* is
+    the reviewer. ``satisfied`` is a boolean a reviewer set. A checker that read a false one as "not
+    accepted" would be making the reviewer's call, and one that read a true one as evidence would
+    be reading its own input as its own output. What no reviewer can be protected from is a
+    condition that was never put to them, which is what this check is for: the set of conditions
+    carrying a verdict equals the set the dossier records, or the missing one is named.
+
+    The one place the recorded verdict is read is the inconsistency between two records, and it is
+    reported as that rather than as an evaluation. A part the register records accepted whose record
+    carries an unsatisfied verdict records both that the condition was not satisfied and that the
+    part was accepted anyway, and criterion 5 does not admit both. The finding takes the verdict at
+    face value, names the reviewer who reached it, and says in its own text that the condition was
+    not evaluated here. The alternative -- staying silent -- would leave the register able to record
+    an acceptance its own reviewer contradicted, with every other check passing.
+
+    The rule runs over the parts the register records `accepted`, which is the state ``gate_open``
+    reads and the state that closes a Gate and releases screens. A part recorded `submitted` is the
+    review in progress: an unanswered condition is what a record in front of a reviewer looks like,
+    and an unsatisfied verdict on one is a review doing its job. A part recorded `accepted` that
+    names no Closure_Record is ``closure-completeness``'s finding, reported once there.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            if part.state != ACCEPTED_PART_STATE:
+                continue
+            reference = _part_reference(dossier.id, part.id)
+            closure = premises.closures.get(reference)
+            if closure is None:
+                continue
+            findings.extend(_verdicts(reference, part, closure.record))
+    return findings
+
+
+def _amendment_key(reference: str, record: ClosureRecord, amendment: Amendment) -> list[Finding]:
+    """The key an amendment settles is a key the record settles, exactly once.
+
+    A key nothing settles is an amendment that amends nothing: Requirement 3 criterion 11 returns
+    the Gate to `OPEN` over an element the record *does* record and leaves settled, so an amendment
+    is always against something the record already carries.
+
+    A key the record settles more than once -- in two elements, or twice in one -- is the other
+    failure, and it is the one that would break the scoping: the amendment's signatures and date
+    would attach to more than one settled entry, and nothing says which.
+    """
+    settling = [
+        element.element
+        for element in record.settled
+        for entry in element.entries
+        if entry.key == amendment.key
+    ]
+    if not settling:
+        return [
+            Finding(
+                CLOSURE_AMENDMENTS,
+                f"{reference}: the amendment settles the key {amendment.key!r}, and the record "
+                f"settles no entry under that key, so the amendment amends nothing the record "
+                f"records",
+            )
+        ]
+    if len(settling) > 1:
+        named = ", ".join(repr(element) for element in sorted(set(settling)))
+        return [
+            Finding(
+                CLOSURE_AMENDMENTS,
+                f"{reference}: the amendment settles the key {amendment.key!r}, and the record "
+                f"settles that key {len(settling)} times, under {named}, so the amendment's "
+                f"signatures and sign-off date would attach to more than one settled entry",
+            )
+        ]
+    return []
+
+
+def _amendment_signoff(reference: str, part: GatePart, amendment: Amendment) -> list[Finding]:
+    """An amendment's signature set against the part's recorded owner set, and its own date.
+
+    The signature halves are the set equality ``closure-signatures`` asserts over the record's own
+    rows, in both directions and one finding per party, because Requirement 3 criterion 4 names an
+    amendment alongside a submitted record and the owners authorised to sign the part are the owners
+    authorised to amend it.
+
+    A part recording no owner at all is ``closure-signatures``'s finding, reported once there. An
+    amendment carrying a signature under that empty owner set is still reported here, because an
+    empty owner set authorises nobody rather than anybody.
+
+    The date is the amendment's own. Requirement 8 criterion 14 records an amendment's signatures
+    *and* sign-off date against its key alone, so the record's date is the part's and says nothing
+    about when this key was signed.
+    """
+    recorded = frozenset(part.signing_owners)
+    signed = frozenset(signature.owner for signature in amendment.signatures)
+    findings = [
+        Finding(
+            CLOSURE_AMENDMENTS,
+            f"{reference}: the amendment to the key {amendment.key!r} carries no signature from "
+            f"{owner}, whom the Gate_Dossier records as an owner of the Decision_Content the "
+            f"record settles. An amendment is signed the way the record is, and the signatures it "
+            f"carries attach to that key alone",
+        )
+        for owner in sorted(recorded - signed)
+    ]
+    findings.extend(
+        Finding(
+            CLOSURE_AMENDMENTS,
+            f"{reference}: the amendment to the key {amendment.key!r} carries a signature from "
+            f"{owner}, whom the Gate_Dossier does not record as an owner of the Decision_Content "
+            f"the record settles. It records {_owners(recorded)}",
+        )
+        for owner in sorted(signed - recorded)
+    )
+    if not amendment.sign_off_date.strip():
+        findings.append(
+            Finding(
+                CLOSURE_AMENDMENTS,
+                f"{reference}: the amendment to the key {amendment.key!r} carries no sign-off "
+                f"date, and Requirement 8 criterion 14 records an amendment's signatures and "
+                f"sign-off date against that key alone, so the date the record carries is not it",
+            )
+        )
+    return findings
+
+
+def _amendments(reference: str, part: GatePart, record: ClosureRecord) -> list[Finding]:
+    """Each amendment the record carries, read against its own key and nothing wider.
+
+    Grouped by key first, so two amendments to one key are one finding naming the key rather than
+    two readings of the same ambiguity. The per-amendment rules do not run over such a pair: the
+    repair is to choose one of the two, and reporting its key three times would bury that.
+    """
+    grouped: dict[str, list[Amendment]] = {}
+    for amendment in record.amendments or ():
+        grouped.setdefault(amendment.key, []).append(amendment)
+
+    findings: list[Finding] = []
+    for key, group in grouped.items():
+        if len(group) > 1:
+            findings.append(
+                Finding(
+                    CLOSURE_AMENDMENTS,
+                    f"{reference}: the record carries {len(group)} amendments to the key {key!r}, "
+                    f"and an amendment settles one key: two of them carry two sets of signatures "
+                    f"and two sign-off dates against that key, with nothing to choose between "
+                    f"them",
+                )
+            )
+            continue
+        (amendment,) = group
+        findings.extend(_amendment_key(reference, record, amendment))
+        findings.extend(_amendment_signoff(reference, part, amendment))
+    return findings
+
+
+def check_closure_amendments(premises: Premises) -> list[Finding]:
+    """An amendment settles one key the record settles, carrying its own signatures and sign-off
+    date against that key alone.
+
+    Requirement 3 criterion 11 is the governing rule, and its third clause is the load-bearing one:
+    an accepted Closure_Record found to carry no settled entry for a recorded element returns the
+    Gate to `OPEN`, names the omitted element and the amendment required, **and retains the accepted
+    status of the elements the record settles.** Requirement 8 criteria 5 and 14 are the worked
+    case: a freshness class `DG-TLM` names that an accepted `DG-FRS` record has not settled is
+    amended in, and the amendment's signatures and sign-off date are recorded against that class
+    alone while every class signed earlier keeps its recorded acceptance.
+
+    So the whole of this check is scope. Every rule reads one amendment's own key: that the record
+    settles it, that it settles it once, that the amendment's signature set equals the owner set the
+    dossier records for the part, and that the amendment carries a sign-off date of its own. No rule
+    reads another key, the record's own signature rows or the record's own date -- which is what
+    makes applying an amendment unable to disturb an acceptance already recorded.
+
+    An amendment's ``entryCommit`` is not compared against git history, and the reason is worth
+    recording rather than leaving as an omission. The resolution the premises carry is an
+    *add*-commit: ``git log --diff-filter=A`` reports the commit that added the record's path. An
+    amendment is a change to a file already added, so it enters at a modify-commit that resolution
+    by construction never reports, and comparing an amendment's commit against the record's
+    add-commit would compare it against a commit that cannot be its own. What the schema does
+    establish is the shape -- null, or forty hex characters -- and what would be needed beyond it is
+    a modify-commit resolution per amendment, which ``common.git`` does not offer and this check
+    does not invent. "Not resolved" is said here rather than read as "agrees".
+
+    The rule runs over every Closure_Record the premises loaded, whatever its state. An amendment
+    to a key the record does not settle is wrong wherever it is recorded, in the way a recorded
+    observation that resolves against nothing is wrong whatever its row's status.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            reference = _part_reference(dossier.id, part.id)
+            closure = premises.closures.get(reference)
+            if closure is None:
+                continue
+            findings.extend(_amendments(reference, part, closure.record))
+    return findings
+
+
 @dataclass(frozen=True)
 class _TestTree:
     """What ``aerora/test/**`` and the overlay's CMake files say about a suite, read once per run.
@@ -2300,6 +2646,9 @@ _CHECKS: Final = (
     check_closure_completeness,
     check_closure_signatures,
     check_closure_entry_commit,
+    check_gate_status_derivation,
+    check_signoff_verdicts,
+    check_closure_amendments,
     check_verified_observation,
     check_inventory_totals,
 )

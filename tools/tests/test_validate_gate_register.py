@@ -45,7 +45,9 @@ from typing import TYPE_CHECKING
 import pytest
 from common.gate_register import (
     ABSENT,
+    ACCEPTED_PART_STATE,
     INVENTORY_COLUMNS,
+    Amendment,
     BlockingEntry,
     ClosureRecord,
     DecisionContentElement,
@@ -63,6 +65,8 @@ from common.gate_register import (
     SettledElement,
     SettledEntry,
     Signature,
+    SignOffCondition,
+    SignOffConditionVerdict,
     dump_closure_record,
     dump_gate_register,
     is_entry_id,
@@ -72,18 +76,22 @@ from common.git import AddCommit, run_git
 from common.markdown import md_table
 from validate_gate_register import (
     ACCEPTED_RECORD_STATE,
+    CLOSED_STATUS,
+    CLOSURE_AMENDMENTS,
     CLOSURE_COMPLETENESS,
     CLOSURE_RECORD_SCHEMA_PATH,
     CLOSURE_SIGNATURES,
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
     ENTRY_COMMIT,
+    GATE_STATUS_DERIVATION,
     INVENTORY_COVERAGE,
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
     KEYED_SHAPE,
     MAPPING_SHAPE,
     NOT_DELIVERED_LABEL,
+    OPEN_STATUS,
     OVERLAY_TREE,
     PARTITION,
     PREMISES,
@@ -99,6 +107,7 @@ from validate_gate_register import (
     SCHEMA,
     SIGNATURE_NOTICE,
     SIGNED_BY_KEY,
+    SIGNOFF_VERDICTS,
     SINGLE_SHAPE,
     SUPERSEDED_STATUS,
     TEST_TREE,
@@ -111,17 +120,20 @@ from validate_gate_register import (
     NamedClosureRecord,
     Premises,
     _pointer,
+    check_closure_amendments,
     check_closure_completeness,
     check_closure_entry_commit,
     check_closure_signatures,
     check_delivered_outside,
     check_entry_classification,
+    check_gate_status_derivation,
     check_inventory_coverage,
     check_inventory_totals,
     check_partition,
     check_reclassifications,
     check_release_set_derivation,
     check_released_derivation,
+    check_signoff_verdicts,
     check_two_gate,
     check_verified_observation,
     derive,
@@ -2365,6 +2377,458 @@ def test_entry_commit_fails_naming_a_history_that_does_not_reach_the_record(
     assert f"the record at {path} is recorded {ACCEPTED_RECORD_STATE}" in message
     assert "no commit in this repository's history adds it" in message
     assert "pre-commit.yml checks out full history" in message
+
+
+# ---------------------------------------------------------------------------
+# gate-status-derivation
+#
+# Named with the `status` prefix for the reason the signature tests carry `signature`: it is what
+# this task's command selects.
+#
+# Two documents and nothing else: the status a Gate_Dossier records, and the states its parts
+# record. The derivation is `gate_open`'s, evaluated once in the premises, so no test here builds a
+# second reading of it -- and the baseline's ten Gates are each OPEN with one unaccepted part, so
+# the agreeing case comes for free.
+# ---------------------------------------------------------------------------
+
+
+def _status_part(part: str, state: str) -> GatePart:
+    """One part in *state*, naming a Closure_Record exactly where the schema requires one.
+
+    An accepted part must name a record and a part in any other state need not. These premises load
+    none either way, which is what keeps the status rule the only one these tests exercise: a part
+    naming a record the premises did not load is the premise failure `load_premises` reports
+    against the path, and `closure-completeness` reports it nowhere.
+    """
+    recorded = _gate_part(part, state=state)
+    return recorded if state == ACCEPTED_PART_STATE else replace(recorded, closure_record=None)
+
+
+def _status(status: str, *states: str) -> Premises:
+    """Premises over the baseline with UNUSED_GATE recording *status* and one part per state.
+
+    The recorded status is passed rather than derived, because the disagreement between the two is
+    the whole subject: `_settling_register` records the status its parts imply, and every test here
+    overrides it.
+    """
+    parts = [
+        _status_part(f"{SETTLED_PART}-{index}", state) for index, state in enumerate(states, 1)
+    ]
+    register = _settling_register(*parts)
+    dossier = replace(
+        next(item for item in register.gates if item.id == UNUSED_GATE), status=status
+    )
+    return _premises(
+        replace(
+            register,
+            gates=[dossier if item.id == UNUSED_GATE else item for item in register.gates],
+        )
+    )
+
+
+def _status_messages(premises: Premises) -> list[str]:
+    return _messages(check_gate_status_derivation(premises), GATE_STATUS_DERIVATION)
+
+
+def test_status_derivation_accepts_the_baseline_ten_open_gates() -> None:
+    """The baseline records ten Gates OPEN with one unaccepted part each, so the derivation agrees.
+
+    The whole register is asserted, not one Gate, because the rule runs over all ten and a check
+    that read the wrong direction would reject every one of them.
+    """
+    assert check_gate_status_derivation(_premises()) == []
+
+
+def test_status_derivation_accepts_a_gate_recorded_closed_with_every_part_accepted() -> None:
+    """The other agreeing case, and the evidence that closing a Gate disturbs no other check."""
+    assert run_checks(_status(CLOSED_STATUS, ACCEPTED_PART_STATE, ACCEPTED_PART_STATE)) == []
+
+
+def test_status_derivation_names_the_unaccepted_part_of_a_gate_recorded_closed() -> None:
+    premises = _status(CLOSED_STATUS, ACCEPTED_PART_STATE, ACCEPTED_PART_STATE, "submitted")
+
+    (message,) = _status_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE} is recorded {CLOSED_STATUS}, ")
+    assert f"records {UNUSED_GATE}:{SETTLED_PART}-3 as not accepted" in message
+    # The two accepted parts are not named: what holds the Gate open is the part that is not.
+    assert f"{SETTLED_PART}-1" not in message
+    assert f"{SETTLED_PART}-2" not in message
+
+
+def test_status_derivation_names_every_unaccepted_part_of_a_gate_recorded_closed() -> None:
+    """Two parts outstanding are two names in one finding.
+
+    Requirement 9 criterion 14 and Requirement 10 criterion 15 each require the part that is not
+    accepted to be named, and a Gate recorded closed over two of them needs both: a finding naming
+    one would send a reviewer to accept it and leave the Gate recorded closed over the other.
+    """
+    premises = _status(CLOSED_STATUS, ACCEPTED_PART_STATE, "submitted", "open")
+
+    (message,) = _status_messages(premises)
+    assert f"{UNUSED_GATE}:{SETTLED_PART}-2, {UNUSED_GATE}:{SETTLED_PART}-3" in message
+
+
+def test_status_derivation_names_a_gate_recorded_open_with_every_part_accepted() -> None:
+    """The second direction, which is not cosmetic: Requirement 3 criterion 7 records the Gate
+    CLOSED once every element is settled, and nothing else would report this.
+
+    `released-derivation` reads part acceptance rather than this status, so the screens stay
+    unreleased either way -- which is exactly the reason the disagreement has to be reported here.
+    """
+    premises = _status(OPEN_STATUS, ACCEPTED_PART_STATE, ACCEPTED_PART_STATE)
+
+    (message,) = _status_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE} is recorded {OPEN_STATUS}, ")
+    assert (
+        f"every part of it accepted: {UNUSED_GATE}:{SETTLED_PART}-1, "
+        f"{UNUSED_GATE}:{SETTLED_PART}-2" in message
+    )
+    assert "holds its Release_Set shut for no recorded reason" in message
+
+
+@pytest.mark.parametrize(
+    ("status", "state", "expected"),
+    [
+        (CLOSED_STATUS, "submitted", "as not accepted"),
+        (OPEN_STATUS, ACCEPTED_PART_STATE, "every part of it accepted"),
+    ],
+    ids=["closed-over-an-unaccepted-part", "open-over-an-accepted-part"],
+)
+def test_status_derivation_reads_a_one_part_gate_as_it_reads_a_many_part_one(
+    status: str, state: str, expected: str
+) -> None:
+    """There is no special case at one part: the quantifier is the one a three-part Gate answers."""
+    (message,) = _status_messages(_status(status, state))
+    assert expected in message
+    assert f"{UNUSED_GATE}:{SETTLED_PART}-1" in message
+
+
+# ---------------------------------------------------------------------------
+# signoff-verdicts
+#
+# Named with the `verdict` prefix for the reason above: it is what this task's command selects.
+#
+# Every test here is about totality. None of them asserts that a verdict's value decided anything,
+# because the check never evaluates one -- and the one test that records `satisfied: false` asserts
+# that the finding says so in its own text.
+# ---------------------------------------------------------------------------
+
+# Two Sign_Off_Conditions, recorded the way the register records one: an identifier the dossier
+# assigns and the requirement criterion it comes from. The identifiers are fixtures; the criteria
+# are the two this check discharges.
+FIXTURE_CONDITIONS = ("a-fixture-condition", "another-fixture-condition")
+FIXTURE_CRITERIA = ("3.2", "3.5")
+UNRECORDED_CONDITION = "a-fixture-condition-no-dossier-records"
+
+# The reviewer a verdict names. A reviewer is not an owner label: Requirement 3 criterion 2 records
+# who reached the verdict, and the schema takes any non-empty string for it.
+FIXTURE_REVIEWER = "a fixture reviewer"
+
+
+def _condition(condition: str, requirement: str) -> SignOffCondition:
+    """One Sign_Off_Condition, which is a condition a reviewer checks by inspection."""
+    return SignOffCondition(
+        id=condition,
+        requirement=requirement,
+        text="a fixture condition a reviewer checks against the record",
+        verification=None,
+    )
+
+
+def _verdict(
+    condition: str, *, satisfied: bool = True, reviewer: str = FIXTURE_REVIEWER
+) -> SignOffConditionVerdict:
+    """One reviewer's verdict on one condition. Nothing reads ``satisfied`` as evidence."""
+    return SignOffConditionVerdict(
+        id=condition, satisfied=satisfied, reviewer=reviewer, date=FIXTURE_DATE, note=None
+    )
+
+
+def _resolved() -> AddCommit:
+    """The resolution the premises carry for an accepted record, agreeing with what it records.
+
+    An accepted record asserts it is in the repository, so `closure-entry-commit` compares its
+    recorded commit against the resolved one and the trailer half of `closure-signatures` reads the
+    same commit's trailers. Supplying the agreeing resolution is what lets an accepted part be
+    built in code without those two reporting the history a fixture tree does not have.
+    """
+    return AddCommit(
+        sha=FIXTURE_COMMIT, trailers=(f"{SIGNED_BY_KEY}: {SIGNING_OWNER}",), reason=None
+    )
+
+
+def _reviewed(
+    conditions: Sequence[SignOffCondition] | None = None,
+    verdicts: Sequence[SignOffConditionVerdict] | None = None,
+    *,
+    state: str = ACCEPTED_PART_STATE,
+) -> Premises:
+    """Premises over the baseline plus one part of UNUSED_GATE recording *conditions*, settled by a
+    record carrying *verdicts*.
+
+    Both default to the accepting case -- the two fixture conditions, each answered by a verdict
+    naming a reviewer -- so a test rewrites one side and nothing else moves. The settlement is the
+    accepting one, because this check reads the conditions and the verdicts alone.
+    """
+    recorded = (
+        [
+            _condition(name, criterion)
+            for name, criterion in zip(FIXTURE_CONDITIONS, FIXTURE_CRITERIA, strict=True)
+        ]
+        if conditions is None
+        else list(conditions)
+    )
+    answered = [_verdict(item.id) for item in recorded] if verdicts is None else list(verdicts)
+    part = replace(_gate_part(SETTLED_PART, _elements(), state=state), sign_off_conditions=recorded)
+    record = replace(
+        _closure_record(_settled_elements(), state=state), sign_off_condition_verdicts=answered
+    )
+    accepted = state == ACCEPTED_PART_STATE
+    return _premises(
+        _settling_register(part),
+        closures=_closures(record, add_commit=_resolved() if accepted else None),
+    )
+
+
+def _verdict_messages(premises: Premises) -> list[str]:
+    return _messages(check_signoff_verdicts(premises), SIGNOFF_VERDICTS)
+
+
+def test_verdicts_accept_an_accepted_part_whose_conditions_all_carry_verdicts() -> None:
+    """The accepting case, and the evidence that accepting a part disturbs no other check."""
+    assert run_checks(_reviewed()) == []
+
+
+def test_verdicts_name_a_condition_the_record_leaves_unanswered() -> None:
+    first, second = FIXTURE_CONDITIONS
+
+    (message,) = _verdict_messages(_reviewed(verdicts=[_verdict(first)]))
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"records the Sign_Off_Condition {second!r} for the part" in message
+    assert "not satisfied by going unmentioned" in message
+
+
+def test_verdicts_name_each_of_two_unanswered_conditions_separately() -> None:
+    """Two verdicts to reach are two findings: a reviewer reaches them one at a time."""
+    messages = _verdict_messages(_reviewed(verdicts=[]))
+
+    assert len(messages) == 2
+    for condition in FIXTURE_CONDITIONS:
+        assert any(repr(condition) in message for message in messages)
+
+
+def test_verdicts_name_a_verdict_naming_no_reviewer() -> None:
+    """The schema requires a non-empty reviewer, so whitespace is the shape that reaches here."""
+    first, second = FIXTURE_CONDITIONS
+
+    (message,) = _verdict_messages(
+        _reviewed(verdicts=[_verdict(first), _verdict(second, reviewer=" ")])
+    )
+    assert f"the verdict on the Sign_Off_Condition {second!r} names no reviewer" in message
+    assert "The verdict is a reviewer's judgement" in message
+
+
+def test_verdicts_name_a_verdict_for_a_condition_the_dossier_does_not_record() -> None:
+    verdicts = [_verdict(condition) for condition in (*FIXTURE_CONDITIONS, UNRECORDED_CONDITION)]
+
+    (message,) = _verdict_messages(_reviewed(verdicts=verdicts))
+    assert f"carries a verdict on {UNRECORDED_CONDITION!r}" in message
+    assert "records no Sign_Off_Condition of that identifier for the part" in message
+    assert all(repr(condition) in message for condition in FIXTURE_CONDITIONS)
+
+
+def test_verdicts_name_an_unsatisfied_verdict_as_a_disagreement_between_two_records() -> None:
+    """The one place the recorded verdict is read, and it is read exactly as recorded.
+
+    The condition is not evaluated here -- that judgement is the reviewer's, and it has been made.
+    What the finding reports is that the register records the part accepted while the record
+    records its reviewer finding a condition unsatisfied, which Requirement 3 criterion 5 does not
+    admit. Staying silent would leave the register able to record an acceptance its own reviewer
+    contradicted, with every other check passing.
+    """
+    first, second = FIXTURE_CONDITIONS
+
+    (message,) = _verdict_messages(
+        _reviewed(verdicts=[_verdict(first), _verdict(second, satisfied=False)])
+    )
+    assert (
+        f"the verdict {FIXTURE_REVIEWER} recorded on the Sign_Off_Condition {second!r}" in message
+    )
+    assert "records it unsatisfied" in message
+    assert "does not evaluate the condition" in message
+    assert "Requirement 3 criterion 5" in message
+
+
+def test_verdicts_read_no_part_recorded_submitted() -> None:
+    """A record in front of a reviewer is what an unanswered condition looks like, and a verdict of
+    unsatisfied on one is a review doing its job rather than a finding."""
+    verdicts = [_verdict(FIXTURE_CONDITIONS[0], satisfied=False)]
+
+    assert check_signoff_verdicts(_reviewed(verdicts=verdicts, state="submitted")) == []
+
+
+# ---------------------------------------------------------------------------
+# closure-amendments
+#
+# Named with the `amendment` prefix for the reason above: it is what this task's command selects.
+#
+# The load-bearing test is the non-regression one. Requirement 3 criterion 11 retains the accepted
+# status of the elements the record settles, so an amendment that disturbed another key would break
+# the one clause the rule exists for -- and the way to demonstrate that it does not is to assert
+# that the other keys produce no finding and that the record's own rows still satisfy the two
+# checks that read them.
+# ---------------------------------------------------------------------------
+
+# A key the accepting settlement settles exactly once, under the mapped element, and the other
+# member of that element. FIXTURE_KEYS are the keys of both the key-source element and the keyed
+# element, so each of them is settled twice, which is the ambiguity the more-than-once rule names.
+AMENDED_KEY = FIXTURE_MEMBERS[0]
+UNAMENDED_KEY = FIXTURE_MEMBERS[1]
+TWICE_SETTLED_KEY = FIXTURE_KEYS[0]
+UNSETTLED_KEY = "a-fixture-key-the-record-does-not-settle"
+
+# A second sign-off date, because an amendment carries its own: the record's date is the one its
+# part was signed off on, and the amendment's is the one its key was.
+AMENDMENT_DATE = "2004-05-06"
+
+
+def _amendment(
+    key: str,
+    *,
+    signers: Sequence[str] = (SIGNING_OWNER,),
+    sign_off_date: str = AMENDMENT_DATE,
+    entry_commit: str | None = None,
+) -> Amendment:
+    """One amendment, settling *key* alone and carrying its own signatures and date."""
+    return Amendment(
+        key=key,
+        sign_off_date=sign_off_date,
+        signatures=[_signature(owner) for owner in signers],
+        entry_commit=entry_commit,
+    )
+
+
+def _amended(*amendments: Amendment, owners: Sequence[str] = (SIGNING_OWNER,)) -> Premises:
+    """Premises over the baseline plus one submitted part of UNUSED_GATE carrying *amendments*.
+
+    The record's own signature rows name every owner in *owners*, so `closure-signatures` is
+    satisfied by the record itself and every finding a test asserts is an amendment's.
+    """
+    part = replace(
+        _gate_part(SETTLED_PART, _elements(), state="submitted"), signing_owners=list(owners)
+    )
+    record = replace(
+        _closure_record(_settled_elements(), state="submitted"),
+        signatures=[_signature(owner) for owner in owners],
+        amendments=list(amendments),
+    )
+    return _premises(_settling_register(part), closures=_closures(record))
+
+
+def _amendment_messages(premises: Premises) -> list[str]:
+    return _messages(check_closure_amendments(premises), CLOSURE_AMENDMENTS)
+
+
+def test_amendment_accepts_one_settling_a_key_the_record_settles_once() -> None:
+    """The accepting case, and the evidence that an amendment disturbs no other check."""
+    assert run_checks(_amended(_amendment(AMENDED_KEY))) == []
+
+
+def test_amendment_leaves_every_other_key_the_acceptance_already_recorded() -> None:
+    """Requirement 3 criterion 11's third clause, which is what this check is for.
+
+    The amendment omits an owner the dossier records, so there is a finding to scope -- and it names
+    the amended key and nothing else. The record's own rows still satisfy `closure-signatures` and
+    every element it settles still satisfies `closure-completeness`, which is what retaining the
+    accepted status of the elements the record settles means here.
+    """
+    premises = _amended(
+        _amendment(AMENDED_KEY, signers=(SIGNING_OWNER,)), owners=(SIGNING_OWNER, APPROVING_OWNER)
+    )
+
+    (message,) = _amendment_messages(premises)
+    assert f"the amendment to the key {AMENDED_KEY!r} carries no signature" in message
+    assert APPROVING_OWNER in message
+    for untouched in (UNAMENDED_KEY, *FIXTURE_KEYS):
+        assert untouched not in message
+    assert check_closure_signatures(premises) == []
+    assert check_closure_completeness(premises) == []
+
+
+def test_amendment_names_a_key_the_record_does_not_settle() -> None:
+    """An amendment to a key nothing settles amends nothing: Requirement 3 criterion 11 amends an
+    element the record records and leaves settled."""
+    (message,) = _amendment_messages(_amended(_amendment(UNSETTLED_KEY)))
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"the amendment settles the key {UNSETTLED_KEY!r}" in message
+    assert "settles no entry under that key" in message
+    assert "amends nothing the record records" in message
+
+
+def test_amendment_names_a_key_the_record_settles_more_than_once() -> None:
+    """The ambiguity the scoping cannot survive: the amendment's signatures and date would attach
+    to two settled entries, and nothing says which."""
+    settled = _settled_elements()
+    assert (
+        sum(1 for element in settled for entry in element.entries if entry.key == TWICE_SETTLED_KEY)
+        == 2
+    ), "the fixture settlement settles this key under two elements"
+
+    (message,) = _amendment_messages(_amended(_amendment(TWICE_SETTLED_KEY)))
+    assert f"the amendment settles the key {TWICE_SETTLED_KEY!r}" in message
+    assert "settles that key 2 times" in message
+    assert FIXTURE_KEY_SOURCE_ELEMENT in message
+    assert FIXTURE_KEYED_ELEMENT in message
+
+
+def test_amendment_names_an_owner_whose_signature_it_omits() -> None:
+    """The owner set is the part's, which is the set equality `closure-signatures` asserts over the
+    record's own rows: Requirement 3 criterion 4 names an amendment alongside a submitted record."""
+    (message,) = _amendment_messages(_amended(_amendment(AMENDED_KEY, signers=())))
+    assert f"carries no signature from {SIGNING_OWNER}" in message
+    assert "signatures it carries attach to that key alone" in message
+
+
+def test_amendment_names_a_signatory_the_dossier_does_not_record() -> None:
+    premises = _amended(_amendment(AMENDED_KEY, signers=(SIGNING_OWNER, UNRECORDED_OWNER)))
+
+    (message,) = _amendment_messages(premises)
+    assert f"carries a signature from {UNRECORDED_OWNER}" in message
+    assert f"It records {SIGNING_OWNER}" in message
+
+
+def test_amendment_names_one_carrying_no_sign_off_date() -> None:
+    (message,) = _amendment_messages(_amended(_amendment(AMENDED_KEY, sign_off_date="")))
+    assert f"the amendment to the key {AMENDED_KEY!r} carries no sign-off date" in message
+    assert "Requirement 8 criterion 14" in message
+
+
+def test_amendment_names_a_key_carrying_two_amendments() -> None:
+    """Two amendments to one key carry two sets of signatures and two dates against it.
+
+    One finding, and the per-amendment rules do not run over the pair: the repair is to choose one
+    of the two, and the second amendment here breaks both of the other rules without adding a
+    finding of its own.
+    """
+    premises = _amended(
+        _amendment(AMENDED_KEY), _amendment(AMENDED_KEY, signers=(), sign_off_date="")
+    )
+
+    (message,) = _amendment_messages(premises)
+    assert f"carries 2 amendments to the key {AMENDED_KEY!r}" in message
+    assert "nothing to choose between them" in message
+
+
+@pytest.mark.parametrize("commit", [None, FIXTURE_COMMIT], ids=["none", "recorded"])
+def test_amendment_reads_no_entry_commit_against_history(commit: str | None) -> None:
+    """An amendment's commit is not compared against git history, either way it is recorded.
+
+    The resolution the premises carry is an *add*-commit, and an amendment is a change to a file
+    already added, so it enters at a modify-commit that resolution never reports. The schema bounds
+    the shape -- null, or forty hex characters -- and the check establishes nothing further rather
+    than comparing the amendment against a commit that cannot be its own.
+    """
+    assert check_closure_amendments(_amended(_amendment(AMENDED_KEY, entry_commit=commit))) == []
 
 
 # ---------------------------------------------------------------------------

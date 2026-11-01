@@ -383,6 +383,7 @@ The `lint` dependency group already carries `jsonschema>=4.23`, so no new runtim
 | `closure-entry-commit` | `entryCommit` equals the git add-commit of the record file | 3.1 |
 | `gate-status-derivation` | A Gate is `CLOSED` exactly when every part is accepted | 3.7, 7.15, 9.14, 11.15, 12.17, 15.13 |
 | `signoff-verdicts` | Every Sign_Off_Condition the dossier records for an accepted part carries a verdict and a reviewer | 3.2, 3.5 |
+| `closure-amendments` | An amendment settles one key the record settles, carrying its own signatures and sign-off date against that key alone | 3.11, 8.5, 8.14 |
 | `verified-observation` | Every inventory `VERIFIED` row has a register observation naming a suite and slot that exist in `aerora/test/**` and are registered with `add_qgc_test` | 3.9 |
 | `guard-registry` | The guard registry covers at least the nine guards Requirement 4 criterion 5 names, every Gate records its guards or records that it has none, and every accepted part carries a permit verdict for each guard mapped to it | 4.5, 4.6, 4.8, 6.17, 7.18, 8.15, 9.17, 11.19, 12.20, 13.16, 14.16, 15.16 |
 | `forbidden-until` | `P7-FLY-004` is recorded `FORBIDDEN-UNTIL` `DG-ROL`, and the two pre-approved seams are recorded as waiting on it | 5.8, 9.16 |
