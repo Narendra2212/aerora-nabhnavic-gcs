@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ABSENT",
+    "ACCEPTANCE_CRITERION_CLASSIFICATION",
     "ACCEPTED_PART_STATE",
     "CLASSIFICATIONS",
     "DELIVERED_STATUSES",
@@ -102,6 +103,7 @@ __all__ = [
     "dump_closure_record",
     "dump_gate_register",
     "gate_open",
+    "is_entry_id",
     "load_closure_record",
     "load_gate_register",
     "parse_screen_inventory",
@@ -1332,9 +1334,16 @@ class InventoryArea:
 
 @dataclass(frozen=True)
 class ScreenInventory:
-    """The screen rows of the inventory's area tables, by area."""
+    """The screen rows of the inventory's area tables, by area, and the text they were read from.
+
+    ``text`` is retained for the reason :attr:`InventoryRow.blocked_by` keeps its cell as written.
+    The ``inventory-totals`` check reads declarations no area table carries -- a lead line, a
+    totals table, a paragraph -- and re-reading the document inside that check would make it a
+    second place that knows where the document lives.
+    """
 
     areas: list[InventoryArea]
+    text: str
 
     @property
     def rows(self) -> list[InventoryRow]:
@@ -1342,9 +1351,21 @@ class ScreenInventory:
         return [row for area in self.areas for row in area.rows]
 
 
+def is_entry_id(token: str) -> bool:
+    """Report whether *token* has the shape of an inventory blocking-entry identifier.
+
+    Public because the ``entry-classification`` check has to tell an identifier the inventory's
+    "Blocked by" cell carries from a key the register assigned to an entry that carries none, and it
+    must read the same shape :func:`_entry_ids` picked the cell's tokens out with. A second copy of
+    the shape in the check is the drift that would let the two documents stop being comparable while
+    both looked well formed.
+    """
+    return _ENTRY_ID.fullmatch(token) is not None
+
+
 def _entry_ids(cell: str) -> list[str]:
     """Return the identifier-shaped code spans of *cell*, in the order they appear."""
-    return [span for span in _CODE_SPAN.findall(cell) if _ENTRY_ID.fullmatch(span)]
+    return [span for span in _CODE_SPAN.findall(cell) if is_entry_id(span)]
 
 
 def _read_inventory_row(row: MarkdownRow, path: str) -> InventoryRow:
@@ -1419,7 +1440,7 @@ def parse_screen_inventory(text: str, *, path: str = "screen-inventory") -> Scre
             )
         )
 
-    inventory = ScreenInventory(areas=areas)
+    inventory = ScreenInventory(areas=areas, text=text)
     if not inventory.rows:
         raise ScreenInventoryError(f"{path}: the {len(areas)} area tables carry no screen row")
     return inventory
@@ -1434,9 +1455,12 @@ def parse_screen_inventory(text: str, *, path: str = "screen-inventory") -> Scre
 # hold the Gate open.
 ACCEPTED_PART_STATE: Final = "accepted"
 
-# The member of CLASSIFICATIONS the three set equations read. The other member is read for nothing,
-# which is what makes an Acceptance_Criterion unable to hold a screen back.
+# The member of CLASSIFICATIONS the three set equations read. The derivations read the other member
+# for nothing, which is what makes an Acceptance_Criterion unable to hold a screen back. The
+# `reclassifications` check in tools/validate_gate_register.py does read it, because Requirement 2
+# criterion 7's five misreads are recorded reclassified to it.
 GATE_CLASSIFICATION: Final = "Gate"
+ACCEPTANCE_CRITERION_CLASSIFICATION: Final = "Acceptance_Criterion"
 
 # The two members of the screen inventory's status vocabulary that make a row a Delivered_Screen.
 # Equation five removes exactly these rows; the vocabulary is the inventory's and nothing here adds

@@ -231,7 +231,7 @@ Constraints every task inherits:
     and the lint and type-check commands on the new Python
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. `tools/validate_gate_register.py` — the cross-document half
+- [x] 4. `tools/validate_gate_register.py` — the cross-document half
 
   - [x] 4.1 Entry point, loading, schema validation and the error contract
     - Entry point at `tools/` root following `tools/validate_configs.py`, `pass_filenames: false`,
@@ -258,7 +258,7 @@ Constraints every task inherits:
     - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.10, 1.11, 1.12, 2.5, 2.8, 3.8, 3.10, 5.7, 6.6, 7.8, 8.6, 9.7, 10.8, 10.9, 11.7, 11.8, 12.7, 12.8, 13.6, 13.14, 14.7, 15.7_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py`
 
-  - [~] 4.3 Implement the classification and totals checks
+  - [x] 4.3 Implement the classification and totals checks
     - `entry-classification`: the ID tokens in each inventory "Blocked by" cell equal the register's
       classified-entry set for that screen, with the symmetric difference named. Entries carrying no
       ID match by their register key plus an `inventoryText` substring that must appear in the cell
@@ -270,7 +270,7 @@ Constraints every task inherits:
     - _Requirements: 2.1, 2.7, 2.10, 2.11_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k classification`
 
-  - [~] 4.4 Implement `verified-observation`
+  - [x] 4.4 Implement `verified-observation`
     - Every inventory `VERIFIED` row has a register observation naming a suite and a slot that exist
       under `aerora/test/**` and are registered through `add_qgc_test`, and every recorded delivery
       status is a member of the inventory's status vocabulary
