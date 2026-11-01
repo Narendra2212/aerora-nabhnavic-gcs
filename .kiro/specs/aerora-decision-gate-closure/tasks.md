@@ -331,7 +331,7 @@ Constraints every task inherits:
     - _Requirements: 3.1, 3.4, 14.11, 15.17, 15.18_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k signature`
 
-  - [~] 5.3 Implement `closure-entry-commit` against git history
+  - [x] 5.3 Implement `closure-entry-commit` against git history
     - Resolve the add-commit with `git log --diff-filter=A --format=%H -- <record>` through
       `tools/common/git.py`, and compare with the recorded `entryCommit`
     - A record whose state is `submitted` must carry no commit. If git history cannot answer — no

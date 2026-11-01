@@ -68,7 +68,7 @@ from common.gate_register import (
     is_entry_id,
     parse_screen_inventory,
 )
-from common.git import run_git
+from common.git import AddCommit, run_git
 from common.markdown import md_table
 from validate_gate_register import (
     ACCEPTED_RECORD_STATE,
@@ -77,6 +77,7 @@ from validate_gate_register import (
     CLOSURE_SIGNATURES,
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
+    ENTRY_COMMIT,
     INVENTORY_COVERAGE,
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
@@ -111,6 +112,7 @@ from validate_gate_register import (
     Premises,
     _pointer,
     check_closure_completeness,
+    check_closure_entry_commit,
     check_closure_signatures,
     check_delivered_outside,
     check_entry_classification,
@@ -1382,14 +1384,24 @@ def _settling_register(*parts: GatePart) -> GateRegister:
     )
 
 
-def _closures(*records: ClosureRecord) -> dict[str, NamedClosureRecord]:
-    """Each record attached to the part that names it, the way load_premises attaches them."""
+def _closures(
+    *records: ClosureRecord, add_commit: AddCommit | None = None
+) -> dict[str, NamedClosureRecord]:
+    """Each record attached to the part that names it, the way load_premises attaches them.
+
+    *add_commit* is the resolution the premises carry for each record. It defaults to none, which
+    is what `load_premises` carries for a record that is not `accepted`: no commit is resolved for
+    a record the register says is not in the repository yet. A test over an accepted record passes
+    the resolution it wants read, which is what lets the recorded-against-resolved rule be checked
+    without a repository.
+    """
     return {
         f"{record.gate}:{record.part}": NamedClosureRecord(
             gate=record.gate,
             part=record.part,
             path=_record_path(record.gate, record.part),
             record=record,
+            add_commit=add_commit,
         )
         for record in records
     }
@@ -1996,12 +2008,32 @@ def _git(root: Path, *args: str) -> str:
     return run_git(*args, cwd=root, check=True).stdout.strip()
 
 
+def _git_init(root: Path) -> None:
+    """Initialise a repository in *root*, writing every setting it needs in *root* alone.
+
+    `user.name`, `user.email` and `commit.gpgsign` are written in this repository and never in the
+    one under test, following the precedent `tools/tests/test_translation_placeholders.py` sets.
+    """
+    _git(root, "init", "-q")
+    for setting, value in (
+        ("user.name", "Test"),
+        ("user.email", "test@example.invalid"),
+        ("commit.gpgsign", "false"),
+    ):
+        _git(root, "config", setting, value)
+
+
+def _git_commit(root: Path, message: str, *parties: str) -> str:
+    """Commit what is staged in *root*, with one `Gate-Signed-By:` trailer per party."""
+    trailers = "".join(f"\n\n{SIGNED_BY_KEY}: {party}" for party in parties)
+    _git(root, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", f"{message}{trailers}")
+    return _git(root, "rev-parse", "HEAD")
+
+
 def _signed_repository(root: Path, *parties: str) -> tuple[Path, str]:
     """A repository whose accepted Closure_Record was added by a commit naming *parties*.
 
-    One `git init` and one commit, with `user.name`, `user.email` and `commit.gpgsign` written in
-    this repository alone and never in the one under test, following the precedent
-    `tools/tests/test_translation_placeholders.py` sets.
+    One `git init` and one commit.
 
     The record's ``entryCommit`` is written back after the commit that adds it, because a file
     cannot carry the hash of the commit that adds it. That is the order an owner records it in, and
@@ -2014,25 +2046,9 @@ def _signed_repository(root: Path, *parties: str) -> tuple[Path, str]:
         _gate_part(SETTLED_PART, _elements()),
         closures={path: dump_closure_record(record)},
     )
-    _git(root, "init", "-q")
-    for setting, value in (
-        ("user.name", "Test"),
-        ("user.email", "test@example.invalid"),
-        ("commit.gpgsign", "false"),
-    ):
-        _git(root, "config", setting, value)
+    _git_init(root)
     _git(root, "add", "--all")
-    trailers = "\n".join(f"{SIGNED_BY_KEY}: {party}" for party in parties)
-    _git(
-        root,
-        "-c",
-        "core.hooksPath=/dev/null",
-        "commit",
-        "-q",
-        "-m",
-        f"Add a fixture Closure_Record\n\n{trailers}",
-    )
-    sha = _git(root, "rev-parse", "HEAD")
+    sha = _git_commit(root, "Add a fixture Closure_Record", *parties)
     _write(
         root / path, json.dumps(dump_closure_record(replace(record, entry_commit=sha)), indent=2)
     )
@@ -2172,13 +2188,138 @@ def test_signatures_name_both_directions_of_a_trailer_set_that_does_not_match(
     )
 
 
-def test_signatures_fail_naming_an_accepted_record_whose_history_cannot_answer(
+# ---------------------------------------------------------------------------
+# closure-entry-commit
+#
+# Named with the `entry_commit` prefix for the reason the signature tests carry `signature`: it is
+# what this task's command selects.
+#
+# The add-commit is resolved once per record and travels with the record, so a rule about the
+# recorded value against the resolved one is checked over premises built in code and costs no
+# history at all. Two tests here pay for a repository -- one `git init` and one commit each -- and
+# they are the two whose subject *is* the history: the record whose recorded commit is the commit
+# that added it, and the repository whose history does not reach that commit. The third history
+# case, a tree with no repository in it, costs neither.
+# ---------------------------------------------------------------------------
+
+# A second valid hash, which is what a record recording the wrong commit records: the finding has to
+# name both, so the two values a test compares have to differ and both have to be readable as one.
+ANOTHER_COMMIT = "1" * 40
+
+
+def _entry_commit_messages(premises: Premises) -> list[str]:
+    return _messages(check_closure_entry_commit(premises), ENTRY_COMMIT)
+
+
+def _entry_commit_premises(
+    *, state: str = ACCEPTED_RECORD_STATE, commit: str | None, resolved: AddCommit | None
+) -> Premises:
+    """Premises over one part of UNUSED_GATE whose record records *commit*, with *resolved* read.
+
+    The settlement is the accepting one, so a test rewrites the record's state, its recorded commit
+    or the resolution the premises carry and nothing else moves. The part is recorded `submitted`
+    whatever the record says, because the parts recorded `accepted` close the Gate and this check
+    reads the record's state rather than the part's.
+    """
+    part = _gate_part(SETTLED_PART, _elements(), state="submitted")
+    record = replace(_closure_record(_settled_elements(), state=state), entry_commit=commit)
+    return _premises(_settling_register(part), closures=_closures(record, add_commit=resolved))
+
+
+def test_entry_commit_accepts_a_record_recording_the_commit_that_adds_it(tmp_path: Path) -> None:
+    """The accepted record end to end, over a repository: one `git init` and one commit.
+
+    It is also the evidence that the two checks read one resolution: the commit the premises
+    carry for the record is the one git reports, and both checks are satisfied by it.
+    """
+    root, sha = _signed_repository(tmp_path, SIGNING_OWNER)
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    closure = premises.closures[f"{UNUSED_GATE}:{SETTLED_PART}"]
+    assert closure.add_commit is not None
+    assert closure.add_commit.sha == sha
+    assert check_closure_entry_commit(premises) == []
+    assert run_checks(premises) == []
+
+
+def test_entry_commit_names_the_recorded_commit_and_the_resolved_one() -> None:
+    """A record recording a commit that is not the one that added it, and no history at all.
+
+    Both values are named, because one of the two is wrong and a finding carrying either alone
+    leaves a reviewer to work the other out for themselves.
+
+    This is what sharing the resolution buys: the comparison reads what the premises carry, so the
+    rule and its finding cost no `git init`. The test above is what establishes that a real
+    resolution reaches the comparison.
+    """
+    premises = _entry_commit_premises(
+        commit=FIXTURE_COMMIT, resolved=AddCommit(sha=ANOTHER_COMMIT, trailers=(), reason=None)
+    )
+
+    (message,) = _entry_commit_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"the record at {_record_path(UNUSED_GATE, SETTLED_PART)} is recorded " in message
+    assert f"records the entry commit {FIXTURE_COMMIT}" in message
+    assert f"the commit that adds that path is {ANOTHER_COMMIT}" in message
+
+
+def test_entry_commit_accepts_a_submitted_record_carrying_no_commit() -> None:
+    """The accepting case for the second rule, and the state every record starts in."""
+    assert check_closure_entry_commit(_settlement()) == []
+
+
+def test_entry_commit_names_a_submitted_record_carrying_a_commit() -> None:
+    """A file cannot contain the commit that adds it, so a record not yet in carries none.
+
+    Checked without history, because the rule needs none: the record's own state and its own
+    recorded commit are the whole of it.
+    """
+    premises = _entry_commit_premises(state="submitted", commit=FIXTURE_COMMIT, resolved=None)
+
+    (message,) = _entry_commit_messages(premises)
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"is recorded submitted and records the entry commit {FIXTURE_COMMIT}" in message
+    assert "a file cannot contain the commit that adds it" in message
+    assert CLOSURE_RECORD_SCHEMA_PATH in message
+
+
+def test_entry_commit_is_the_second_line_against_a_submitted_record_carrying_a_commit(
     tmp_path: Path,
 ) -> None:
+    """The schema rejects it first, and the check's own guard is what records the rule.
+
+    `closure-record.schema.json` requires `entryCommit` to be null for every state other than
+    `accepted`, so a record like this never reaches the check through `load_premises`. The guard
+    above is therefore the second line, and this test is what says so: the premises fail against
+    the schema, naming the member that carries the commit.
+    """
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = replace(
+        _closure_record(_settled_elements(), state="submitted"), entry_commit=FIXTURE_COMMIT
+    )
+    root = _settling_repository(
+        tmp_path,
+        _gate_part(SETTLED_PART, _elements(), state="submitted"),
+        closures={path: dump_closure_record(record)},
+    )
+
+    (finding,) = _findings(load_premises(root))
+
+    assert finding.check == SCHEMA
+    assert finding.message.startswith(f"{path}: /entryCommit: ")
+
+
+def test_entry_commit_fails_naming_a_tree_that_is_not_a_git_repository(tmp_path: Path) -> None:
     """A tree with no repository in it, which costs no commit at all.
 
     An unanswerable history is a finding naming the record and the reason, never a skip: an
     unresolved premise is a failure, and `pre-commit.yml` checks out full history so CI can answer.
+
+    It is also where the one-report rule is asserted. `closure-signatures` rests on the same
+    resolution and reads the trailers of the same commit, and one unanswerable history is one
+    defect: this check names it, and that check reports nothing.
     """
     path = _record_path(UNUSED_GATE, SETTLED_PART)
     record = _closure_record(_settled_elements())
@@ -2191,10 +2332,39 @@ def test_signatures_fail_naming_an_accepted_record_whose_history_cannot_answer(
     premises = load_premises(root)
 
     assert not isinstance(premises, list), premises
-    (message,) = _signature_messages(premises)
+    (message,) = _entry_commit_messages(premises)
     assert f"the record at {path} is recorded {ACCEPTED_RECORD_STATE}" in message
     assert "the tree is not a git repository" in message
     assert "a failure rather than a pass" in message
+    assert check_closure_signatures(premises) == []
+
+
+def test_entry_commit_fails_naming_a_history_that_does_not_reach_the_record(
+    tmp_path: Path,
+) -> None:
+    """A repository whose history carries the register and not the record: one `git init`, one commit.
+
+    The commit is what makes this the reason it is. A repository with no commit at all answers that
+    its history could not be read, which is a different reason read off a different branch.
+    """
+    path = _record_path(UNUSED_GATE, SETTLED_PART)
+    record = _closure_record(_settled_elements())
+    root = _settling_repository(
+        tmp_path,
+        _gate_part(SETTLED_PART, _elements()),
+        closures={path: dump_closure_record(record)},
+    )
+    _git_init(root)
+    _git(root, "add", "--", REGISTER_PATH)
+    _git_commit(root, "Add a fixture Gate_Register")
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    (message,) = _entry_commit_messages(premises)
+    assert f"the record at {path} is recorded {ACCEPTED_RECORD_STATE}" in message
+    assert "no commit in this repository's history adds it" in message
+    assert "pre-commit.yml checks out full history" in message
 
 
 # ---------------------------------------------------------------------------

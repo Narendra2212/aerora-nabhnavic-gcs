@@ -68,6 +68,7 @@ if TYPE_CHECKING:
         SettledElement,
         SettledEntry,
     )
+    from common.git import AddCommit
     from common.markdown import MarkdownTable
 
 ROOT: Final = Path(__file__).resolve().parents[1]
@@ -101,6 +102,7 @@ ENTRY_CLASSIFICATION: Final = "entry-classification"
 RECLASSIFICATIONS: Final = "reclassifications"
 CLOSURE_COMPLETENESS: Final = "closure-completeness"
 CLOSURE_SIGNATURES: Final = "closure-signatures"
+ENTRY_COMMIT: Final = "closure-entry-commit"
 VERIFIED_OBSERVATION: Final = "verified-observation"
 INVENTORY_TOTALS: Final = "inventory-totals"
 
@@ -302,12 +304,21 @@ class NamedClosureRecord:
 
     The path travels with the record because the record is the only document here that a part names
     rather than this module knowing: a finding about it has to say which file to repair.
+
+    ``add_commit`` is what git history says about the commit that added ``path``, resolved once for
+    the reason :class:`Derived` evaluates the derivations once: ``closure-signatures`` reads the
+    trailers of that commit and ``closure-entry-commit`` compares its hash against the recorded
+    ``entryCommit``, and two resolutions would be two ``git log`` invocations per record and two
+    chances to disagree about which commit added it. It is ``None`` for a record that is not
+    recorded `accepted`: such a record is one the register itself says is not in the repository
+    yet, so neither check reads a commit for it and none is resolved.
     """
 
     gate: str
     part: str
     path: str
     record: ClosureRecord
+    add_commit: AddCommit | None
 
 
 @dataclass(frozen=True)
@@ -411,6 +422,10 @@ def _load_closures(
 
     The schema is read only once a part names a record. Reading it unconditionally would fail a
     tree that carries no record against a premise that nothing in it rests on.
+
+    An unanswerable git history is not reported here. It is a premise of two checks rather than of
+    the run -- every set check over the register and the inventory holds whatever git can say -- so
+    the resolution travels with the record and ``closure-entry-commit`` reports the reason.
     """
     named: list[tuple[str, GatePart, str]] = [
         (dossier.id, part, record)
@@ -472,7 +487,21 @@ def _load_closures(
                 )
             )
             continue
-        closures[reference] = NamedClosureRecord(gate=gate, part=part.id, path=path, record=record)
+        closures[reference] = NamedClosureRecord(
+            gate=gate,
+            part=part.id,
+            path=path,
+            record=record,
+            # Once per record, for the two checks that read it. Resolved for an `accepted` record
+            # alone: a record in any other state says it is not in the repository yet, and neither
+            # check reads a commit for one, so resolving it would be a `git log` per unsigned part
+            # that nothing goes on to read.
+            add_commit=(
+                resolve_add_commit(path, repo_root=root)
+                if record.state == ACCEPTED_RECORD_STATE
+                else None
+            ),
+        )
     return closures, findings
 
 
@@ -1596,7 +1625,7 @@ def _trailer_parties(trailers: Iterable[str]) -> frozenset[str]:
 
 
 def _signature_trailers(
-    premises: Premises, reference: str, part: GatePart, closure: NamedClosureRecord
+    reference: str, part: GatePart, closure: NamedClosureRecord
 ) -> list[Finding]:
     """The ``Gate-Signed-By:`` trailers of the commit that added the record, against the owner set.
 
@@ -1609,29 +1638,20 @@ def _signature_trailers(
     exists to read it. Once the record is `accepted` the schema requires a 40-character hash, the
     record asserts it is in the repository, and git history has to be able to answer.
 
-    A history that cannot answer is reported, never skipped: the record names the file and the
-    finding names the reason, following the discipline `aerora-manifest-check.ps1` states for its
-    own `ASSUMED` rows.
+    The commit is the one the premises resolved, so this check and ``closure-entry-commit`` read
+    one resolution per record and cannot disagree about which commit added it.
+
+    A history that cannot answer is reported, never skipped -- by ``closure-entry-commit``, whose
+    subject is that commit, and by this check not at all. One unanswerable history is one defect,
+    and reporting it under both check names would read as two.
 
     The per-signature ``trailer`` the record may record is not read. The commit is the authority for
     its own trailers, and comparing the record against its own copy of them would compare a
     document with itself.
     """
-    if closure.record.state != ACCEPTED_RECORD_STATE:
+    commit = closure.add_commit
+    if closure.record.state != ACCEPTED_RECORD_STATE or commit is None or commit.sha is None:
         return []
-
-    commit = resolve_add_commit(closure.path, repo_root=premises.root)
-    if commit.sha is None:
-        return [
-            Finding(
-                CLOSURE_SIGNATURES,
-                f"{reference}: the record at {closure.path} is recorded "
-                f"{ACCEPTED_RECORD_STATE} and {commit.reason}, so the {SIGNED_BY_KEY} trailer set "
-                f"could not be read. An unresolved premise is a failure rather than a pass, and "
-                f"pre-commit.yml checks out full history, so a history that cannot answer is a "
-                f"real problem rather than an environment quirk",
-            )
-        ]
 
     recorded = frozenset(part.signing_owners)
     named = _trailer_parties(commit.trailers)
@@ -1679,7 +1699,8 @@ def check_closure_signatures(premises: Premises) -> list[Finding]:
 
     The trailer half compares the parties the adding commit's trailers name against the same
     recorded owner set, and says in its own output that what it establishes is recorded identity
-    and no more.
+    and no more. It reads the commit the premises resolved, and stays silent where that history
+    could not answer: that reason is one defect, reported once, by ``closure-entry-commit``.
 
     Amendment signatures are not read here. Requirement 3 criterion 4 covers an amendment too, and
     an amendment settles one key carrying its own signatures and its own date, so the owner set
@@ -1709,7 +1730,122 @@ def check_closure_signatures(premises: Premises) -> list[Finding]:
                 # that did not load is the premise failure load_premises reported against the path.
                 continue
             findings.extend(_recorded_signatures(reference, part, closure.record))
-            findings.extend(_signature_trailers(premises, reference, part, closure))
+            findings.extend(_signature_trailers(reference, part, closure))
+    return findings
+
+
+def _unsettled_commit(reference: str, closure: NamedClosureRecord) -> list[Finding]:
+    """A record not recorded `accepted` carries no commit.
+
+    A file cannot contain the hash of the commit that adds it, so ``entryCommit`` is `null` until
+    the record is in and the review has accepted it. ``closure-record.schema.json`` already makes
+    the other reading unrepresentable -- its ``else`` branch requires ``entryCommit`` to be null
+    for every state other than `accepted`, so a record carrying one is rejected before this check
+    sees it, and a commit recorded against a `submitted` part reaches here only from premises built
+    without the schema. This guard is therefore the second line and not the first, and it is here
+    because this is where the rule is read.
+    """
+    record = closure.record
+    if record.state == ACCEPTED_RECORD_STATE or record.entry_commit is None:
+        return []
+    return [
+        Finding(
+            ENTRY_COMMIT,
+            f"{reference}: the record at {closure.path} is recorded {record.state} and records "
+            f"the entry commit {record.entry_commit}, and a record the register says is not in "
+            f"the repository yet carries none: a file cannot contain the commit that adds it. "
+            f"{CLOSURE_RECORD_SCHEMA_PATH} rejects it as well, so this is a record that reached "
+            f"the check without being validated against the schema",
+        )
+    ]
+
+
+def _recorded_commit(reference: str, closure: NamedClosureRecord) -> list[Finding]:
+    """An `accepted` record's recorded ``entryCommit`` against the add-commit git history reports.
+
+    The finding names the record, the recorded value and the resolved value. A reviewer has to see
+    both to know which of the two is wrong: the record may carry the hash of some other commit, or
+    the path may have entered the repository at a commit nobody recorded, and one value alone does
+    not tell those apart.
+
+    A history that cannot answer is reported here rather than skipped, naming the record and the
+    reason git gave, which is the Error Handling row the design records for it: `pre-commit.yml`
+    checks out with full history, so an unanswerable history is a real problem rather than an
+    environment quirk. The four reasons are ``common.git``'s, not re-derived here -- git not
+    runnable, a tree that is not a repository, unreadable history, and no commit adding the path,
+    which probes shallowness.
+    """
+    record = closure.record
+    if record.state != ACCEPTED_RECORD_STATE:
+        return []
+
+    commit = closure.add_commit
+    if commit is None or commit.sha is None:
+        # `None` and a reasonless resolution are the same defect: the premises carry no answer for
+        # a record that says it is in the repository. Neither reaches here through load_premises,
+        # which resolves one for every accepted record and takes its reason from `common.git`.
+        reason = (
+            "the premises resolved no add-commit for it"
+            if commit is None or commit.reason is None
+            else commit.reason
+        )
+        return [
+            Finding(
+                ENTRY_COMMIT,
+                f"{reference}: the record at {closure.path} is recorded "
+                f"{ACCEPTED_RECORD_STATE} and {reason}, so the commit it records could not be "
+                f"compared against the commit that adds it. An unresolved premise is a failure "
+                f"rather than a pass, and pre-commit.yml checks out full history, so a history "
+                f"that cannot answer is a real problem rather than an environment quirk",
+            )
+        ]
+
+    if record.entry_commit == commit.sha:
+        return []
+    carried = (
+        "records no entry commit"
+        if record.entry_commit is None
+        else f"records the entry commit {record.entry_commit}"
+    )
+    return [
+        Finding(
+            ENTRY_COMMIT,
+            f"{reference}: the record at {closure.path} is recorded {ACCEPTED_RECORD_STATE} and "
+            f"{carried}, and the commit that adds that path is {commit.sha}",
+        )
+    ]
+
+
+def check_closure_entry_commit(premises: Premises) -> list[Finding]:
+    """Each Closure_Record's recorded ``entryCommit`` is the commit git history says added it.
+
+    Requirement 3 criterion 1 records the commit at which the record enters the repository as part
+    of the Closure_Record, which is the one field of it a file cannot know about itself. So
+    ``entryCommit`` is a recorded field with a derived counterpart, like everything else in this
+    register: git resolves the commit that added the path, and the two have to agree.
+
+    Two rules and the reason the second can fail. An `accepted` record's recorded commit equals the
+    resolved add-commit, and a record in any other state carries no commit at all. A history that
+    cannot answer either question fails naming the record and the reason.
+
+    The resolution is the premises', shared with ``closure-signatures``, which reads the trailers
+    of the same commit. The reporting stays here, so the finding names the decision this check
+    protects -- that the record entered the repository where it says it did.
+
+    The rule runs over the records the premises loaded, in register order, as the other closure
+    checks do. A part naming no record is ``closure-completeness``'s finding and a part naming one
+    that did not load is the premise failure reported against its path, so neither is reported
+    again here.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            reference = _part_reference(dossier.id, part.id)
+            closure = premises.closures.get(reference)
+            if closure is None:
+                continue
+            findings.extend(_unsettled_commit(reference, closure))
+            findings.extend(_recorded_commit(reference, closure))
     return findings
 
 
@@ -2163,6 +2299,7 @@ _CHECKS: Final = (
     check_reclassifications,
     check_closure_completeness,
     check_closure_signatures,
+    check_closure_entry_commit,
     check_verified_observation,
     check_inventory_totals,
 )
