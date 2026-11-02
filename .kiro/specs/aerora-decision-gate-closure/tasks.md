@@ -432,7 +432,7 @@ Constraints every task inherits:
     - _Requirements: 4.2, 4.7_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/`
 
-  - [ ] 7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement
+  - [x] 7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement
     - Each recorded guard's declaration in its recorded `declaredIn` file carries its recorded
       literal. A declaration not found fails naming the symbol and the file — "not found" is not
       "unchanged"
