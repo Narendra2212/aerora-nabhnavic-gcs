@@ -396,7 +396,7 @@ Constraints every task inherits:
     - **Property 22: A Decision_Content element and an excluded Acceptance_Criterion are never the same item**
     - **Validates: Requirements 1.9, 2.6, 6.16, 13.15**
 
-- [ ] 6. The guard registry and the read-only records in the data half
+- [x] 6. The guard registry and the read-only records in the data half
 
   - [x] 6.1 Implement `guard-registry`
     - The registry covers at least the nine guards Requirement 4 criterion 5 names; every Gate records
@@ -409,7 +409,7 @@ Constraints every task inherits:
     - _Requirements: 4.5, 4.6, 4.8, 6.17, 7.18, 8.15, 9.17, 10.17, 10.18, 11.19, 12.20, 13.16, 14.16, 15.16_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k guard`
 
-  - [~] 6.2 Implement `forbidden-until`
+  - [x] 6.2 Implement `forbidden-until`
     - `P7-FLY-004` is recorded `FORBIDDEN-UNTIL` `DG-ROL`, and both pre-approved undeclared seams are
       recorded as waiting on `DG-ROL`
     - _Requirements: 5.8, 9.16_

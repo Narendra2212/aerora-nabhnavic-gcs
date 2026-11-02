@@ -121,6 +121,7 @@ SIGNOFF_VERDICTS: Final = "signoff-verdicts"
 CLOSURE_AMENDMENTS: Final = "closure-amendments"
 VERIFIED_OBSERVATION: Final = "verified-observation"
 GUARD_REGISTRY: Final = "guard-registry"
+FORBIDDEN_UNTIL: Final = "forbidden-until"
 INVENTORY_TOTALS: Final = "inventory-totals"
 
 # The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
@@ -228,6 +229,32 @@ MECHANICAL_GUARDS: Final[Mapping[str, str | None]] = {
     "kGcsPayloadStateReplayImplemented": "false",
     MAVLINK_IDENTIFIER_GUARD: None,
 }
+
+# The Gate the read-only posture of Requirement 5 reads, and the Gate every `FORBIDDEN-UNTIL` row
+# in requirements.md waits on: criterion 8's one item, and the mission paths Requirement 6 criteria
+# 7 and 8 add to the posture once `DG-MIS` is accepted. Recorded here rather than read out of
+# `readOnly.gate`, for the reason TWO_GATE_SCREENS is recorded here: the posture is the document
+# under check. The schema pins that key to this Gate as a `const`, so the two cannot disagree.
+READ_ONLY_GATE: Final = "DG-ROL"
+
+# Requirement 5 criterion 8: the item the register records held `FORBIDDEN-UNTIL` a Gate is
+# recorded `CLOSED`, with the Gate it waits on. The criterion names this one item and no criterion
+# bounds the set, so the register may record more rows -- Requirement 6 criteria 7 and 8 put every
+# mission upload, start and resume path and every call to `AeroraMissionObserver::verify()` at
+# `FORBIDDEN-UNTIL` the same Gate -- and a missing row is the finding, the way MECHANICAL_GUARDS
+# reads Requirement 4 criterion 5's "at least".
+FORBIDDEN_UNTIL_ITEMS: Final[Mapping[str, str]] = {"P7-FLY-004": READ_ONLY_GATE}
+
+# Requirement 5 criterion 4: the two seams the Gate_Review retains as pre-approved and undeclared
+# while the read-only Gate is `OPEN`, by the file name the criterion names each of them by. The
+# posture records a seam as the override allow-list would carry it, which is a resource path, so
+# the check matches on the file name and either form satisfies it. A QML file name is not a
+# Contract_Value: requirements.md names both seams already, and what each one would introduce is
+# the Decision_Content the Gate withholds.
+PRE_APPROVED_SEAMS: Final = (
+    "CustomGuidedActionsController.qml",
+    "FlyViewAdditionalCustomActionsList.qml",
+)
 
 # The screen inventory is Tab 7's document, so a disagreement between the totals it declares and
 # the rows it carries is Tab 7's to settle. `inventory-totals` names the owner and takes no side:
@@ -2833,6 +2860,70 @@ def check_guard_registry(premises: Premises) -> list[Finding]:
     ]
 
 
+def check_forbidden_until(premises: Premises) -> list[Finding]:
+    """The items the read-only posture holds until its Gate closes, and the two retained seams.
+
+    Three rules. Every item Requirement 5 criterion 8 names carries a row. Every row the posture
+    carries waits on the read-only Gate. And both seams of Requirement 5 criterion 4 are recorded,
+    which is what records the operator actions each seam would introduce as waiting on that Gate.
+
+    The first two are the criterion read as a conjunction, and they are separate findings because
+    they are separate repairs: a missing row is an item nobody recorded as held, and a row naming
+    another Gate is an item recorded as held on the wrong decision. Reading them as one would
+    report an item waiting on the wrong Gate as an item nobody wrote down.
+
+    **The row set is open and the seam list is a floor.** Requirement 6 criteria 7 and 8 put every
+    mission upload, start and resume path and every call to `AeroraMissionObserver::verify()` at
+    `FORBIDDEN-UNTIL` the same Gate once `DG-MIS` is accepted, so a row this check does not
+    recognise is a row a criterion requires rather than one nobody can trace -- and what makes such
+    a row reviewable is the decision it waits on, which is why the second rule runs over every row
+    rather than only over the recorded one. Criterion 4 says *both* seams are retained, and a third
+    recorded seam holds one more thing back rather than letting one through: the list that could
+    weaken the posture is ``exceptions``, which the schema pins to exactly one, and this one cannot.
+
+    The Gate each rule compares against is the criteria's rather than ``readOnly.gate``, which the
+    schema pins to it as a `const`. A check that read the posture's own Gate would agree with the
+    document on the one axis the document cannot get wrong.
+    """
+    posture = premises.register.read_only
+    held = {row.id for row in posture.forbidden_until}
+    findings = [
+        Finding(
+            FORBIDDEN_UNTIL,
+            f"{item}: Requirement 5 criterion 8 records it held FORBIDDEN-UNTIL {gate} is recorded "
+            f"CLOSED, and the read-only posture records no item of that identifier. An item no row "
+            f"names is one nobody recorded as held",
+        )
+        for item, gate in sorted(FORBIDDEN_UNTIL_ITEMS.items())
+        if item not in held
+    ]
+
+    findings.extend(
+        Finding(
+            FORBIDDEN_UNTIL,
+            f"{row.id}: the read-only posture records it held FORBIDDEN-UNTIL {row.gate} is "
+            f"recorded CLOSED, and every FORBIDDEN-UNTIL item requirements.md records waits on "
+            f"{READ_ONLY_GATE}. The posture reads {READ_ONLY_GATE} and nothing else, so an item "
+            f"held on another decision is held on the wrong one",
+        )
+        for row in posture.forbidden_until
+        if row.gate != READ_ONLY_GATE
+    )
+
+    recorded = {PurePosixPath(seam).name for seam in posture.pre_approved_undeclared_seams}
+    findings.extend(
+        Finding(
+            FORBIDDEN_UNTIL,
+            f"{seam}: Requirement 5 criterion 4 retains the seam as pre-approved and undeclared, "
+            f"and the read-only posture records no seam of that file name. Nothing then records the "
+            f"operator actions it introduces as waiting on {READ_ONLY_GATE}",
+        )
+        for seam in PRE_APPROVED_SEAMS
+        if seam not in recorded
+    )
+    return findings
+
+
 def _declared_count(
     path: str, site: str, declared: int, derived: int, counted: str
 ) -> list[Finding]:
@@ -2983,6 +3074,7 @@ _CHECKS: Final = (
     check_closure_amendments,
     check_verified_observation,
     check_guard_registry,
+    check_forbidden_until,
     check_inventory_totals,
 )
 

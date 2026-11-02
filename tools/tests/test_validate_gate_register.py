@@ -33,6 +33,13 @@ permitted to change it has recorded a permitting verdict for it. The guard tests
 here that reads a Closure_Record's content against the register rather than against itself, because
 criterion 6 puts the verdict in the record and the mapping in the register.
 
+Requirements 5.8 and 9.16: the read-only posture carries a row for every item Requirement 5
+criterion 8 holds `FORBIDDEN-UNTIL` a Gate, every row it carries waits on the read-only Gate, and
+both pre-approved undeclared seams of criterion 4 are recorded under it. The posture's own Gate is a
+schema `const`, so recording an item or a seam under the posture is recording it as waiting on that
+Gate, and the check compares against the Gate the criteria name rather than the one the document
+does.
+
 Requirement 3.9: every `VERIFIED` row carries an observation naming a suite and a slot that resolve
 against `aerora/test/**` and the overlay's CMake registration, and every status the inventory's rows
 carry is a member of the vocabulary the inventory declares. That check reads three files no fixture
@@ -58,6 +65,7 @@ from common.gate_register import (
     BlockingEntry,
     ClosureRecord,
     DecisionContentElement,
+    ForbiddenUntil,
     GateDossier,
     GatePart,
     GateRegister,
@@ -96,6 +104,8 @@ from validate_gate_register import (
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
     ENTRY_COMMIT,
+    FORBIDDEN_UNTIL,
+    FORBIDDEN_UNTIL_ITEMS,
     GATE_STATUS_DERIVATION,
     GUARD_REGISTRY,
     INVENTORY_COVERAGE,
@@ -109,7 +119,9 @@ from validate_gate_register import (
     OPEN_STATUS,
     OVERLAY_TREE,
     PARTITION,
+    PRE_APPROVED_SEAMS,
     PREMISES,
+    READ_ONLY_GATE,
     RECLASSIFICATIONS,
     RECLASSIFIED_ENTRIES,
     RECORDED_IDENTITY,
@@ -141,6 +153,7 @@ from validate_gate_register import (
     check_closure_signatures,
     check_delivered_outside,
     check_entry_classification,
+    check_forbidden_until,
     check_gate_status_derivation,
     check_guard_registry,
     check_inventory_coverage,
@@ -463,6 +476,17 @@ def _dossier(gate: str, release_set: Iterable[str], guards: Iterable[str] = ()) 
     )
 
 
+# The directory the override allow-list carries each pre-approved seam under. Requirement 5
+# criterion 4 names a seam by its file name and the posture records it as the allow-list would, so
+# the baseline records the path form and `forbidden-until` matches on the name.
+SEAM_DIRECTORY = "/qml/QGroundControl/FlyView"
+
+
+def _seams() -> list[str]:
+    """Both seams of Requirement 5 criterion 4, as the baseline posture records them."""
+    return [f"{SEAM_DIRECTORY}/{seam}" for seam in PRE_APPROVED_SEAMS]
+
+
 def _register(
     screens: Sequence[ScreenRecord] | None = None,
     release_sets: Mapping[str, Iterable[str]] | None = None,
@@ -485,7 +509,7 @@ def _register(
         screens=records,
         guards=registry,
         read_only=ReadOnlyPosture(
-            gate="DG-ROL",
+            gate=READ_ONLY_GATE,
             exceptions=[
                 ReadOnlyException(
                     screen=EXCEPTION_SCREEN,
@@ -495,8 +519,11 @@ def _register(
                     requirement=None,
                 )
             ],
-            forbidden_until=[],
-            pre_approved_undeclared_seams=[],
+            forbidden_until=[
+                ForbiddenUntil(id=item, gate=gate, requirement=None)
+                for item, gate in FORBIDDEN_UNTIL_ITEMS.items()
+            ],
+            pre_approved_undeclared_seams=_seams(),
         ),
         contract_surface=[],
     )
@@ -662,6 +689,11 @@ def _with_guard(register: GateRegister, symbol: str, **changes: object) -> GateR
             for guard in register.guards
         ],
     )
+
+
+def _with_posture(register: GateRegister, **changes: object) -> GateRegister:
+    """Replace one field of the read-only posture, leaving every other axis as it was."""
+    return replace(register, read_only=replace(register.read_only, **changes))
 
 
 def _messages(findings: Sequence[Finding], check: str) -> list[str]:
@@ -3703,6 +3735,199 @@ def test_guard_freedom_pins_a_guard_whose_accepted_part_names_no_record() -> Non
     assert not verdict.is_free
     assert verdict.unrecorded_parts == (part_reference(SINGLE_GATE, BASELINE_PART),)
     assert check_guard_registry(premises) == []
+
+
+# ---------------------------------------------------------------------------
+# forbidden-until
+#
+# Every name here carries `forbidden`, for the reason the guard tests carry `guard`: it is what
+# this task's command selects.
+#
+# The read-only posture is the DG-ROL side of the register: the schema pins its Gate as a `const`,
+# so an item or a seam recorded under it is recorded as waiting on that Gate and on nothing else.
+# Three rules, and the two shapes the check deliberately accepts -- the row set is open, because
+# Requirement 6 criteria 7 and 8 add rows to it, and the seam list is a floor.
+# ---------------------------------------------------------------------------
+
+# An item no criterion names, standing in for the mission paths Requirement 6 criteria 7 and 8 put
+# at FORBIDDEN-UNTIL the same Gate once DG-MIS is accepted. A fixture identifier, because this
+# check reads no row's identifier beyond the one Requirement 5 criterion 8 names.
+FURTHER_ITEM = "a-fixture-held-item"
+
+# A seam outside the two criterion 4 names, under the same directory so the two forms differ in the
+# file name alone.
+FIXTURE_SEAM = f"{SEAM_DIRECTORY}/AFixtureSeam.qml"
+
+# A token shaped like a Gate identifier and outside the ten there are.
+NOT_A_GATE = "DG-ZZZ"
+
+
+def _held(item: str, gate: str = READ_ONLY_GATE) -> ForbiddenUntil:
+    """One row of the posture, holding *item* until *gate* is recorded CLOSED."""
+    return ForbiddenUntil(id=item, gate=gate, requirement=None)
+
+
+def _baseline_held() -> list[ForbiddenUntil]:
+    """The rows the baseline posture carries, which is one per item criterion 8 names."""
+    return list(_register().read_only.forbidden_until)
+
+
+def _forbidden_messages(register: GateRegister) -> list[str]:
+    return _messages(check_forbidden_until(_premises(register)), FORBIDDEN_UNTIL)
+
+
+def test_the_baseline_posture_carries_the_forbidden_until_facts_the_check_reads() -> None:
+    posture = _register().read_only
+
+    # The premises of every test below rather than assertions about the posture the spec will
+    # write: criterion 8's row against the Gate it names, and both seams of criterion 4 recorded
+    # the way the override allow-list carries them, which is by path and not by file name.
+    assert {row.id: row.gate for row in posture.forbidden_until} == dict(FORBIDDEN_UNTIL_ITEMS)
+    assert set(FORBIDDEN_UNTIL_ITEMS.values()) == {READ_ONLY_GATE}
+    assert posture.pre_approved_undeclared_seams == _seams()
+    assert [PurePosixPath(seam).name for seam in _seams()] == list(PRE_APPROVED_SEAMS)
+
+
+def test_forbidden_until_accepts_the_agreeing_posture() -> None:
+    assert check_forbidden_until(_premises()) == []
+
+
+@pytest.mark.parametrize("item", sorted(FORBIDDEN_UNTIL_ITEMS))
+def test_forbidden_until_names_an_item_no_row_holds(item: str) -> None:
+    rows = [row for row in _baseline_held() if row.id != item]
+    register = _with_posture(_register(), forbidden_until=rows)
+
+    (message,) = _forbidden_messages(register)
+    assert message.startswith(f"{item}: Requirement 5 criterion 8 records it held FORBIDDEN-UNTIL ")
+    assert f"{READ_ONLY_GATE} is recorded CLOSED" in message
+    assert "records no item of that identifier" in message
+
+
+@pytest.mark.parametrize("item", sorted(FORBIDDEN_UNTIL_ITEMS))
+def test_forbidden_until_names_an_item_a_row_holds_on_another_gate(item: str) -> None:
+    """The second of two findings, because a wrong Gate and a missing row are two repairs.
+
+    An item no row names is one nobody recorded as held; an item a row holds until another Gate
+    closes is recorded as held on the wrong decision, and reporting that as the first would send
+    the reader looking for a row the posture already carries.
+    """
+    rows = [_held(row.id, UNUSED_GATE) if row.id == item else row for row in _baseline_held()]
+    register = _with_posture(_register(), forbidden_until=rows)
+
+    (message,) = _forbidden_messages(register)
+    assert message.startswith(f"{item}: the read-only posture records it held FORBIDDEN-UNTIL ")
+    assert f"{UNUSED_GATE} is recorded CLOSED" in message
+    assert f"waits on {READ_ONLY_GATE}" in message
+    assert "records no item of that identifier" not in message
+
+
+def test_forbidden_until_names_a_further_item_held_on_another_gate() -> None:
+    """A row this check does not recognise is still read for the decision it waits on."""
+    rows = [*_baseline_held(), _held(FURTHER_ITEM, UNUSED_GATE)]
+    register = _with_posture(_register(), forbidden_until=rows)
+
+    (message,) = _forbidden_messages(register)
+    assert message.startswith(f"{FURTHER_ITEM}: the read-only posture records it held ")
+    assert f"FORBIDDEN-UNTIL {UNUSED_GATE} is recorded CLOSED" in message
+    assert f"The posture reads {READ_ONLY_GATE} and nothing else" in message
+
+
+def test_forbidden_until_accepts_a_further_item_held_on_the_read_only_gate() -> None:
+    """The row set is open, because Requirement 6 criteria 7 and 8 add to it.
+
+    Every mission upload, start and resume path and every call to `AeroraMissionObserver::verify()`
+    joins the posture once `DG-MIS` is accepted, so a row this check does not recognise is one a
+    criterion requires rather than one nobody can trace. What makes such a row reviewable is the
+    decision it waits on, which the rule above reads for every row.
+    """
+    rows = [*_baseline_held(), _held(FURTHER_ITEM)]
+
+    assert check_forbidden_until(_premises(_with_posture(_register(), forbidden_until=rows))) == []
+
+
+@pytest.mark.parametrize("seam", PRE_APPROVED_SEAMS)
+def test_forbidden_until_names_a_seam_the_posture_does_not_record(seam: str) -> None:
+    kept = [recorded for recorded in _seams() if PurePosixPath(recorded).name != seam]
+    register = _with_posture(_register(), pre_approved_undeclared_seams=kept)
+
+    (message,) = _forbidden_messages(register)
+    assert message.startswith(f"{seam}: Requirement 5 criterion 4 retains the seam ")
+    assert "records no seam of that file name" in message
+    assert f"waiting on {READ_ONLY_GATE}" in message
+
+
+def test_forbidden_until_names_each_seam_of_a_posture_recording_neither() -> None:
+    register = _with_posture(_register(), pre_approved_undeclared_seams=[])
+
+    messages = _forbidden_messages(register)
+    assert [message.split(":")[0] for message in messages] == list(PRE_APPROVED_SEAMS)
+
+
+def test_forbidden_until_accepts_a_seam_recorded_by_its_file_name() -> None:
+    """Criterion 4 names each seam by file name, and the posture may record either form."""
+    register = _with_posture(_register(), pre_approved_undeclared_seams=list(PRE_APPROVED_SEAMS))
+
+    assert check_forbidden_until(_premises(register)) == []
+
+
+def test_forbidden_until_accepts_a_seam_outside_the_two_criterion_4_names() -> None:
+    """The seam list is a floor: criterion 4 retains *both* seams and bounds the list nowhere.
+
+    A third recorded seam holds one more thing back rather than letting one through. The list that
+    could weaken the posture is `exceptions`, which the schema pins to exactly one entry on one
+    screen, and this one cannot be read that way.
+    """
+    register = _with_posture(_register(), pre_approved_undeclared_seams=[*_seams(), FIXTURE_SEAM])
+
+    assert check_forbidden_until(_premises(register)) == []
+
+
+def test_forbidden_until_is_the_second_line_against_a_row_waiting_on_no_gate(
+    tmp_path: Path,
+) -> None:
+    """The schema pins each row's Gate to the ten, so the check's own rule is the second line.
+
+    `forbiddenUntil[].gate` is the ten-identifier enum, which leaves the nine Gates other than the
+    read-only one as the whole of what the check has to reject: a row waiting on a token that is no
+    Gate at all never reaches it through `load_premises`.
+    """
+    rows = [*_baseline_held(), _held(FURTHER_ITEM, NOT_A_GATE)]
+    register = _with_posture(_register(), forbidden_until=rows)
+    root = _repository(
+        tmp_path,
+        register=dump_gate_register(register),
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+    )
+
+    findings = _findings(load_premises(root))
+
+    assert {finding.check for finding in findings} == {SCHEMA}
+    assert any(
+        finding.message.startswith(f"{REGISTER_PATH}: /readOnly/forbiddenUntil/")
+        and "/gate: " in finding.message
+        and NOT_A_GATE in finding.message
+        for finding in findings
+    )
+
+
+@pytest.mark.parametrize("key", ["forbiddenUntil", "preApprovedUndeclaredSeams"])
+def test_the_schema_requires_a_posture_to_carry_its_forbidden_until_rows_and_seams(
+    key: str, tmp_path: Path
+) -> None:
+    """Neither list can be left out, so an absent one is a schema error rather than an empty one."""
+    register = _register()
+    document = dump_gate_register(register)
+    del document["readOnly"][key]
+    root = _repository(
+        tmp_path,
+        register=document,
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+    )
+
+    findings = _findings(load_premises(root))
+
+    assert {finding.check for finding in findings} == {SCHEMA}
+    assert any(f"'{key}' is a required property" in finding.message for finding in findings)
 
 
 # ---------------------------------------------------------------------------
