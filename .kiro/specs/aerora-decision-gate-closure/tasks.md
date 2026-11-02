@@ -444,7 +444,7 @@ Constraints every task inherits:
     - _Requirements: 4.6, 4.7, 4.9_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k guard`
 
-  - [ ] 7.3 Implement `adr-016-pair`
+  - [x] 7.3 Implement `adr-016-pair`
     - The friend declaration in `src/Vehicle/Vehicle.h` and the
       `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` definition in `aerora/CMakeLists.txt` must match the
       register's recorded authorisation state. Read-only: the check reads `src/Vehicle/Vehicle.h` and

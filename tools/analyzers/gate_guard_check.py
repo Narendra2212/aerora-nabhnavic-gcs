@@ -34,6 +34,15 @@ permitted to change a guard has permitted it, and both before and after that the
 source against the recorded value. The recorded-value side of criterion 6 is ``guard-registry``'s,
 in the data half.
 
+**``adr-016-pair`` is the one rule that reads core, and it reads the permission rather than the
+value.** Requirement 7 criterion 17 is about two edits -- a friend declaration in
+``src/Vehicle/Vehicle.h`` and a compile definition in ``aerora/CMakeLists.txt`` -- which no guard's
+declaration carries and ``guard-value`` never opens, so the two rules divide by subject: the value
+the guard holds is ``guard-value``'s and the two edits are this rule's. It reads the change
+permission on the same registry entry, through the freedom derivation, because Requirement 7
+criterion 18 records exactly that as the condition under which the core edit's authorisation lets
+the guard move. Both files are read as characters and neither is written.
+
 **Reported is not passed.** A guard carrying a ``disagreement`` the source actually holds is the one
 concession the design makes to being gating: the finding is printed on every run and the run still
 exits zero, because a hook that blocks every commit until an unrelated authorisation lands gets
@@ -68,8 +77,10 @@ ensure_tools_dir(__file__)
 
 from common.analyzer import AnalysisResult, AnalyzerBase
 from common.file_traversal import find_cpp_files
-from common.gate_register import GATE_IDS
+from common.gate_register import GATE_IDS, GateRegisterError, guard_freedom, part_reference
 from validate_gate_register import (
+    FACT_GROUP_REGISTRAR_GUARD,
+    GUARD_REGISTRY,
     MAVLINK_IDENTIFIER_GUARD,
     OPEN_STATUS,
     REGISTER_PATH,
@@ -80,7 +91,7 @@ from validate_gate_register import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from common.gate_register import Disagreement, Guard
+    from common.gate_register import Disagreement, GateRegister, Guard, GuardFreedom
     from validate_gate_register import Finding as PremiseFinding
     from validate_gate_register import Premises
 
@@ -92,9 +103,10 @@ ROOT: Final = Path(__file__).resolve().parents[2]
 # The name a finding and the dispatcher's status line carry, which is the hook id as well.
 NAME: Final = "gate-guards"
 
-# The two rules this module carries, named as the design's table names them.
+# The three rules this module carries, named as the design's table names them.
 GUARD_VALUE: Final = "guard-value"
 GUARD_ASSERTION: Final = "guard-assertion"
+ADR_016_PAIR: Final = "adr-016-pair"
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -485,6 +497,309 @@ def check_guard_assertion(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# adr-016-pair
+# ---------------------------------------------------------------------------
+
+# The two halves of the `ADR-016` core edit, each as the file that carries it and the text that is
+# it. Requirement 7 criteria 2 and 17 name the declaration, the define and `src/Vehicle/Vehicle.h`
+# verbatim, and the design's Finding 1 names `CUSTOM_DEFINITIONS` in `aerora/CMakeLists.txt` as
+# where the define is written -- which is also where the second of the two recorded remedies would
+# withdraw it. Neither a path nor a macro name is a Contract_Value: requirements.md carries both.
+CORE_HEADER: Final = "src/Vehicle/Vehicle.h"
+FRIEND_DECLARATION: Final = "friend class AeroraVehicleFactGroupRegistrar"
+OVERLAY_MANIFEST: Final = "aerora/CMakeLists.txt"
+FRIENDSHIP_DEFINITION: Final = "AERORA_VEHICLE_FACTGROUP_FRIENDSHIP"
+CUSTOM_DEFINITIONS: Final = "CUSTOM_DEFINITIONS"
+
+# The Gate Requirement 7 criterion 17 protects, read only where the registry records no entry for
+# the guard and so records no mapping to read. Every other finding here names the entry's
+# `holdsOpen`, because the registry is the authority for that mapping and comparing it against the
+# criteria is `guard-registry`'s.
+CORE_EDIT_GATE: Final = "DG-TLM"
+
+_FRIEND: Final = re.compile(rf"\b{re.escape(FRIEND_DECLARATION)}\b\s*;")
+_CMAKE_COMMENT: Final = re.compile(r"#[^\n]*")
+_DEFINITIONS_LIST: Final = re.compile(
+    rf"\bset\s*\(\s*{re.escape(CUSTOM_DEFINITIONS)}\b(?P<body>[^)]*)\)"
+)
+
+
+@dataclass(frozen=True)
+class _Half:
+    """One half of the pair: where it is written, whether it is applied, and why that is unknown.
+
+    ``applied`` is ``None`` for a file this check could not read, or could not find the definition
+    list in. That is a third state rather than "not applied": a renamed file and a withdrawn define
+    are different repairs, and reading the first as the second is how the pair stops being watched.
+    """
+
+    file: str
+    text: str
+    applied: bool | None
+    reason: str
+
+
+def _friend_half(root: Path) -> _Half:
+    """Whether ``src/Vehicle/Vehicle.h`` declares the registrar a friend of ``Vehicle``.
+
+    Comments are removed first, because the Aerora-added block beside the declaration names the
+    class in prose and reading one of those mentions as the declaration would report the half
+    applied in a tree that had withdrawn it.
+
+    **This reads the file and never writes it.** That is the one promise this rule makes about
+    core: the edit is already applied, and the only thing a write here could do is launder it.
+    """
+    text, unreadable = _read(root, CORE_HEADER)
+    if text is None:
+        return _Half(CORE_HEADER, FRIEND_DECLARATION, None, unreadable)
+    return _Half(CORE_HEADER, FRIEND_DECLARATION, _FRIEND.search(_code(text)) is not None, "")
+
+
+def _definition_half(root: Path) -> _Half:
+    """Whether ``aerora/CMakeLists.txt`` defines the macro in its ``CUSTOM_DEFINITIONS`` list.
+
+    Scoped to that list, because that is where the define is written and where the recorded remedy
+    would withdraw it: the comment above the list names the macro and the manifest could name it
+    again in prose, so a whole-file search would read the explanation as the definition. CMake
+    comments are removed for that reason, with the textual bound :func:`_code` carries.
+    """
+    text, unreadable = _read(root, OVERLAY_MANIFEST)
+    if text is None:
+        return _Half(OVERLAY_MANIFEST, FRIENDSHIP_DEFINITION, None, unreadable)
+
+    listed = _DEFINITIONS_LIST.search(_CMAKE_COMMENT.sub("", text))
+    if listed is None:
+        return _Half(
+            OVERLAY_MANIFEST, FRIENDSHIP_DEFINITION, None, f"sets no {CUSTOM_DEFINITIONS} list"
+        )
+
+    defined = re.search(rf"\b{re.escape(FRIENDSHIP_DEFINITION)}\b", listed["body"]) is not None
+    return _Half(OVERLAY_MANIFEST, FRIENDSHIP_DEFINITION, defined, "")
+
+
+def _authorising_guard(premises: Premises) -> Guard | None:
+    """The registry entry whose change permission is the core edit's recorded authorisation.
+
+    Requirement 7 criterion 18 records this guard as the one holding `DG-TLM` visible and records
+    the acceptance of both parts as the condition under which Requirement 4 permits it to change
+    value. So the entry's ``permittedToChangeBy`` *is* the authorisation state this rule reads, and
+    the rule asks the freedom derivation rather than reading a part state of its own.
+    """
+    return next(
+        (guard for guard in premises.register.guards if guard.symbol == FACT_GROUP_REGISTRAR_GUARD),
+        None,
+    )
+
+
+def _pinning(freedom: GuardFreedom) -> tuple[str, ...]:
+    """The parts that resolve and leave the guard pinned, which are the parts with owners to name.
+
+    ``unresolved_parts`` is left out: a permission naming a part the register does not record
+    resolves to no owner, and that it resolves to nothing at all is ``guard-registry``'s finding.
+    """
+    return (
+        *freedom.unaccepted_parts,
+        *freedom.unrecorded_parts,
+        *freedom.unanswered_parts,
+        *freedom.withholding_parts,
+    )
+
+
+def _owners(register: GateRegister, guard: Guard, freedom: GuardFreedom) -> tuple[str, ...]:
+    """The owner labels the register records as owing the signature the core edit requires.
+
+    Requirement 7 criterion 17 names Tab 1, and this reads that label out of the register rather
+    than carrying it: a check whose expectation was a constant would stop naming the right owner
+    the day an owner label changed, and the label is the Gate_Dossier's to record. Two sources, in
+    this order -- the ``disagreement``'s own ``owner``, which is the register's answer to who
+    resolves this gap, and the ``signingOwners`` of each part whose acceptance would free the
+    guard, which resolves whether or not a disagreement is recorded.
+
+    A part recording no owner at all is ``closure-signatures``'s named failure in the data half.
+    Here it leaves the set empty, and the finding says that the register named no owner rather than
+    naming one.
+    """
+    named: list[str] = [] if guard.disagreement is None else [guard.disagreement.owner]
+    parts = {
+        part_reference(dossier.id, part.id): part
+        for dossier in register.gates
+        for part in dossier.parts
+    }
+    for reference in _pinning(freedom):
+        part = parts.get(reference)
+        if part is not None:
+            named.extend(part.signing_owners)
+    return tuple(dict.fromkeys(named))
+
+
+def _pinned_by(freedom: GuardFreedom) -> str:
+    """Why the register records no acceptance permitting the guard, in the derivation's own terms.
+
+    Each state names the parts in it, because each is a different repair and a reviewer reading
+    "unauthorised" has to know whether a signature is missing, a record is missing, or an
+    acceptance answered nothing about this guard.
+    """
+    stated = [
+        f"{', '.join(references)}: {state}"
+        for references, state in (
+            (freedom.unaccepted_parts, "recorded unaccepted"),
+            (freedom.unrecorded_parts, "accepted and naming no Closure_Record"),
+            (freedom.unanswered_parts, "accepted with no verdict on the guard"),
+            (freedom.withholding_parts, "accepted with the verdict withheld"),
+            (freedom.unresolved_parts, "named as permitting it and recorded nowhere"),
+        )
+        if references
+    ]
+    return "; ".join(stated) or (
+        "the registry records no part whose acceptance would permit the guard to change value"
+    )
+
+
+def check_adr_016_pair(premises: Premises) -> list[Finding]:
+    """The `ADR-016` core edit's two halves against the authorisation the register records.
+
+    Requirement 7 criterion 17 rejects a change that adds
+    ``friend class AeroraVehicleFactGroupRegistrar`` to ``src/Vehicle/Vehicle.h`` or defines
+    ``AERORA_VEHICLE_FACTGROUP_FRIENDSHIP`` while the `ADR-016` core-edit part holds no accepted
+    Closure_Record, and requires the rejection to name the owner whose signature it needs.
+
+    **The recorded authorisation state is the change permission on the guard.** Requirement 7
+    criterion 18 records the acceptance of both parts of `DG-TLM` as the condition under which
+    Requirement 4 permits ``AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()`` to change
+    value, so :func:`guard_freedom` already answers whether the authorisation has been given and
+    this rule asks it. What the pair must match is therefore:
+
+    - the guard free -- every part permitted to change it accepted, and each of those acceptances
+      permitting it -- with both halves applied, or with neither. An authorisation is a permission
+      rather than an instruction, so a signed authorisation nobody acted on is not a finding here;
+      whether the guard's value then followed the edit is ``guard-value``'s.
+    - the guard pinned, with neither half applied: the state criterion 17 protects.
+    - the guard pinned with both halves applied, which is the state this tree stands in. Reported
+      with the owner named, and blocking unless the register records a ``disagreement`` for the
+      guard -- the one known state the design pins. The alternative is the cliff the design refuses:
+      a rule rejecting the applied pair on every commit until an unrelated authorisation landed
+      would be removed rather than obeyed.
+    - exactly one half applied, under either state: rejected. Criterion 2 records the core edit as
+      comprising both halves, the friend declaration alone leaves the registrar inert and the define
+      alone does not compile, so one half matches no recorded state and no record pins it.
+
+    **It divides with ``guard-value`` by subject rather than by silence.** ``guard-value`` reads the
+    guard's declaration under ``aerora/src/**`` and owns everything about the *value*: the observed
+    literal, whether the recorded disagreement still observes it, the remedies, the handed-on row,
+    and a record that has stopped matching. This rule reads neither that file nor ``recordedValue``
+    and reports none of them. It owns the two *edits*, in two files ``guard-value`` never opens. So
+    the tree in which the declaration is applied and the define is not is reported here and nowhere
+    else, which is the gap a rule that went quiet whenever ``guard-value`` spoke would leave:
+    ``isRegistrationAvailable()`` returns the recorded ``false`` in that tree and the value rule
+    passes over it.
+
+    Two premises belong to the data half and are reported here as a pair read against nothing
+    rather than passed over: that the registry covers the guard at all, and that a change permission
+    resolves to a part. Both are ``guard-registry``'s findings, and an unresolved premise is a
+    failure, never a pass.
+
+    **Read-only.** Both files are read as characters and neither is written.
+    """
+    guard = _authorising_guard(premises)
+    if guard is None:
+        return [
+            Finding(
+                ADR_016_PAIR,
+                (CORE_EDIT_GATE,),
+                f"{FACT_GROUP_REGISTRAR_GUARD}: the guard registry records no entry for the guard "
+                f"Requirement 7 criterion 18 records as holding the Gate visible, so {CORE_HEADER} "
+                f"and {OVERLAY_MANIFEST} were compared against no recorded authorisation state. "
+                f"That the registry covers the guard is {GUARD_REGISTRY}'s finding in the data "
+                f"half; what is reported here is the pair read against nothing",
+            )
+        ]
+
+    gates = tuple(guard.holds_open) or (CORE_EDIT_GATE,)
+    try:
+        freedom = guard_freedom(
+            premises.register,
+            {reference: closure.record for reference, closure in premises.closures.items()},
+        )[guard.symbol]
+    except GateRegisterError as error:
+        return [
+            Finding(
+                ADR_016_PAIR,
+                gates,
+                f"{guard.symbol}: {error}, so the authorisation the register records for the "
+                f"ADR-016 core edit has two readings and the pair was compared against neither",
+            )
+        ]
+
+    halves = (_friend_half(premises.root), _definition_half(premises.root))
+    unanswerable = [half for half in halves if half.applied is None]
+    if unanswerable:
+        return [
+            Finding(
+                ADR_016_PAIR,
+                gates,
+                f"{half.text}: {half.file} {half.reason}, so the half of the ADR-016 core edit it "
+                f"carries was compared against nothing. A file this check cannot read is a failure "
+                f'rather than a pass: "not found" is not "not applied"',
+            )
+            for half in unanswerable
+        ]
+
+    applied = [half for half in halves if half.applied]
+    absent = [half for half in halves if not half.applied]
+    owners = _owners(premises.register, guard, freedom)
+    requires = (
+        f" Requirement 7 criterion 17 names the owner whose signature the core edit requires, "
+        f"which the register records as {', '.join(owners)}"
+        if owners
+        else " Requirement 7 criterion 17 requires the rejection to name the owner whose signature "
+        "the core edit requires, and the register records none for it"
+    )
+
+    if applied and absent:
+        return [
+            Finding(
+                ADR_016_PAIR,
+                gates,
+                f"the ADR-016 core edit is one edit in two files, and this tree carries "
+                f"{applied[0].text} in {applied[0].file} and not {absent[0].text} in "
+                f"{absent[0].file}. Requirement 7 criterion 2 records the core edit as comprising "
+                f"both halves, so one half alone matches no recorded authorisation state: the "
+                f"friend declaration alone leaves the registrar inert, and the define alone does "
+                f"not compile.{requires}",
+            )
+        ]
+    if not applied or freedom.is_free:
+        return []
+
+    standing = (
+        f"this tree carries {FRIEND_DECLARATION} in {CORE_HEADER} and {FRIENDSHIP_DEFINITION} in "
+        f"{OVERLAY_MANIFEST} {CUSTOM_DEFINITIONS}, and the register records no acceptance "
+        f"permitting it -- {_pinned_by(freedom)}"
+    )
+    excusing = _excusing(guard)
+    if excusing is None:
+        return [
+            Finding(
+                ADR_016_PAIR,
+                gates,
+                f"{standing} -- and no disagreement that excuses the applied pair. Requirement 7 "
+                f"criterion 17 rejects the change and holds the Gate at {OPEN_STATUS}.{requires}",
+            )
+        ]
+    return [
+        Finding(
+            ADR_016_PAIR,
+            gates,
+            f"{standing}. The recorded disagreement for {guard.symbol} pins this state and tracks "
+            f"it at {excusing.hand_on_row}, so this prints on every run and does not block; the "
+            f"guard's own value, the remedies and whether the record still observes the source are "
+            f"{GUARD_VALUE}'s finding, reported once there.{requires}",
+            blocking=False,
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 
@@ -493,6 +808,7 @@ def check_guard_assertion(premises: Premises) -> list[Finding]:
 _CHECKS: Final = (
     check_guard_value,
     check_guard_assertion,
+    check_adr_016_pair,
 )
 
 
@@ -504,17 +820,20 @@ def run_checks(premises: Premises) -> list[Finding]:
 def _established(premises: Premises, files: int) -> str:
     """What the run established, measured here and now rather than remembered.
 
-    It states the premise and what was compared against it, and says that the selected files are not
-    what the guard rules read: both read the files the register names, so a run claiming to have
-    reviewed the selection would be claiming the wrong thing.
+    It states the premise and what was compared against it, and says that the selection is not what
+    decided any of it: the guard rules read the files the register names and `adr-016-pair` reads
+    the two files Requirement 7 criterion 17 names, so a run claiming to have reviewed the
+    selection would be claiming the wrong thing -- including the run that selects one of those two
+    files, which is read because the criterion names it and not because it was given.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
-        f"assertion sites compared against the files the register names, and none of the {files} "
-        f"selected source files has been read by a rule yet\n"
+        f"assertion sites compared against the files the register names, and the ADR-016 pair "
+        f"against {CORE_HEADER} and {OVERLAY_MANIFEST}; no rule read a file because it was among "
+        f"the {files} selected source files\n"
     )
 
 

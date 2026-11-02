@@ -209,6 +209,12 @@ RETAINED_GATES: Final[Mapping[str, tuple[str, ...]]] = {
 # site and reason, never by identifier.
 MAVLINK_IDENTIFIER_GUARD: Final = "mavlink-identifier"
 
+# Requirement 4 criterion 5's guard over the `ADR-016` pair, named here for the reason
+# MAVLINK_IDENTIFIER_GUARD is: the source half's `adr-016-pair` reads this entry's change
+# permission as the recorded authorisation state of the core edit (Requirement 7 criterion 18), and
+# a second spelling of the symbol would be a second thing to keep in step.
+FACT_GROUP_REGISTRAR_GUARD: Final = "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()"
+
 # Requirement 4 criterion 5: each mechanical guard that holds an open Gate visible, with the value
 # the criterion records it holding. Recorded here rather than read out of the register, for the
 # reason TWO_GATE_SCREENS is: a check that took its expectation from the document it checks agrees
@@ -220,7 +226,7 @@ MAVLINK_IDENTIFIER_GUARD: Final = "mavlink-identifier"
 # neither, and requirements.md names all nine already.
 MECHANICAL_GUARDS: Final[Mapping[str, str | None]] = {
     "AeroraPowerModel::kDefinedThresholdCount": "0",
-    "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()": "false",
+    FACT_GROUP_REGISTRAR_GUARD: "false",
     "AeroraCorePlugin::isAuthorizationEnforced()": "false",
     "kGroundStationActuatorPathImplemented": "false",
     "kAutonomousPayloadActionImplemented": "false",

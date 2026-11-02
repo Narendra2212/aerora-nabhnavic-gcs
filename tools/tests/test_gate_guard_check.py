@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the shell and the two guard rules in tools/analyzers/gate_guard_check.py.
+"""Tests for the shell and the three source-half rules in tools/analyzers/gate_guard_check.py.
 
 Two things are under test, and they are tested differently.
 
@@ -13,9 +13,21 @@ That is the spec's governing rule rather than an interim inconvenience -- an unr
 failure, never a pass -- so it is asserted here as the shell's answer in that state.
 
 The rules: `guard-value`, which reads each recorded guard's declaration in its recorded `declaredIn`
-file, and `guard-assertion`, which reads each recorded assertion site under `aerora/test/**`.
-Neither reads the files the run selected, so the fixture that decides what a rule sees is not the
-file list but the tree.
+file; `guard-assertion`, which reads each recorded assertion site under `aerora/test/**`; and
+`adr-016-pair`, which reads the two files Requirement 7 criterion 17 names against the change
+permission the registry records on the fact-group registrar's guard. None of them reads the files
+the run selected, so the fixture that decides what a rule sees is not the file list but the tree.
+
+`adr-016-pair` is tested over both recorded authorisation states and all four states of the pair,
+because each combination is a different answer: the applied pair under an unsigned authorisation is
+the state this repository stands in and is reported without blocking, the same pair with nothing
+pinning it blocks, one half alone blocks under either authorisation, and an authorisation nobody has
+acted on is no finding at all. Two of its cases reach the register as a model rather than as a
+document, for the reason `_in_code` does: an authorised core edit needs an accepted part whose
+Closure_Record records a permitting verdict, which `_accepting` builds in code. One case reads the
+repository's own `src/Vehicle/Vehicle.h` and `aerora/CMakeLists.txt`, which is the only evidence
+that the two patterns match the files they exist to watch rather than only the fixtures, and it
+asserts that both files come back byte for byte -- the rule reads core and never writes it.
 
 The fixture register is the data half's, imported rather than rewritten, and the fixture tree is
 derived from it: each guard's declaration carries the literal the register records, and each
@@ -44,13 +56,20 @@ from typing import TYPE_CHECKING
 
 import pytest
 from analyzers.gate_guard_check import (
+    ADR_016_PAIR,
+    CORE_HEADER,
+    CUSTOM_DEFINITIONS,
+    FRIEND_DECLARATION,
+    FRIENDSHIP_DEFINITION,
     GUARD_ASSERTION,
     GUARD_VALUE,
     NAME,
+    OVERLAY_MANIFEST,
     REPORTED,
     UNASSIGNED,
     Finding,
     GateGuardCheckAnalyzer,
+    check_adr_016_pair,
     check_guard_value,
     main,
     premise_findings,
@@ -58,28 +77,36 @@ from analyzers.gate_guard_check import (
 )
 from common.analyzer import AnalyzerBase
 from common.file_traversal import find_cpp_files
-from common.gate_register import GATE_IDS, Disagreement, dump_gate_register
+from common.gate_register import GATE_IDS, Disagreement, dump_gate_register, part_reference
 from validate_gate_register import (
+    FACT_GROUP_REGISTRAR_GUARD,
+    GUARD_REGISTRY,
     MAVLINK_IDENTIFIER_GUARD,
     MECHANICAL_GUARDS,
+    OPEN_STATUS,
     PREMISES,
     REGISTER_PATH,
     TEST_TREE,
     load_premises,
 )
 
-from ._helpers import TOOLS_DIR
+from ._helpers import REPO_ROOT, TOOLS_DIR
 from .test_validate_gate_register import (
     ACTUATOR_PATH_GUARD,
+    BASELINE_GUARD_GATES,
+    BASELINE_PART,
     MISSION_GATE,
     PAYLOAD_GATE,
     REPLAY_GUARD,
     ROLE_GATE,
     SINGLE_GATE,
     TELEMETRY_GUARD,
+    _accepting,
     _baseline_rows,
     _blocked_by,
+    _guard,
     _inventory_text,
+    _permissions,
     _premises,
     _register,
     _repository,
@@ -224,18 +251,80 @@ def _guard_sources(root: Path, register: GateRegister) -> Path:
     return root
 
 
-def _tree(root: Path, register: GateRegister | None = None) -> Path:
-    """A repository root carrying *register*, the inventory it names and the guard sources it names.
+# A compile definition the fixture manifest's list always carries, so a manifest that does not
+# define the Aerora half still sets a list to find. A list that is absent is a different finding
+# from a list that does not carry the define, and the fixture has to be able to write each.
+ANOTHER_DEFINITION = "A_FIXTURE_DEFINITION"
 
-    Every guard agrees with its record, so the baseline passes both rules and a test asserting a
-    finding writes that finding itself.
+
+def _core_header(*, friend: bool) -> str:
+    """`src/Vehicle/Vehicle.h` as the fixture tree carries it, with its half applied or not.
+
+    The comment block names the class and the define whether or not the declaration is there, which
+    is the shape the real header has: the Aerora-added block beside the declaration explains both
+    halves in prose. So the absent case is a file naming the declaration in a comment and nowhere
+    else, which is what a rule reading comments would read as applied.
+    """
+    declared = f"    {FRIEND_DECLARATION};\n" if friend else ""
+    return (
+        "#pragma once\n\n"
+        "class Vehicle\n"
+        "{\n"
+        "    friend class AFixtureUpstreamFriend;    // A friend upstream grants\n"
+        f"    // A fixture comment naming `{FRIEND_DECLARATION}` and the\n"
+        f"    // {FRIENDSHIP_DEFINITION} it is gated on, the way the overlay's block does.\n"
+        f"{declared}"
+        "};\n"
+    )
+
+
+def _overlay_manifest(*, defined: bool) -> str:
+    """`aerora/CMakeLists.txt` as the fixture tree carries it, with its half defined or not.
+
+    The comment above the list names the macro either way, for the reason `_core_header`'s does:
+    the real manifest explains the pair in a comment directly above `CUSTOM_DEFINITIONS`, so a
+    whole-file search would read the explanation as the definition.
+    """
+    define = f"    {FRIENDSHIP_DEFINITION}\n" if defined else ""
+    return (
+        f"# A fixture comment naming {FRIENDSHIP_DEFINITION} and the\n"
+        f"# `{FRIEND_DECLARATION};` it pairs with.\n"
+        f"set({CUSTOM_DEFINITIONS}\n"
+        f"    {ANOTHER_DEFINITION}\n"
+        f"{define}"
+        "    PARENT_SCOPE\n"
+        ")\n"
+    )
+
+
+def _pair_sources(root: Path, *, friend: bool, defined: bool) -> Path:
+    """Lay out the two files Requirement 7 criterion 17 names, each half applied or not."""
+    _write(root / CORE_HEADER, _core_header(friend=friend))
+    _write(root / OVERLAY_MANIFEST, _overlay_manifest(defined=defined))
+    return root
+
+
+def _tree(root: Path, register: GateRegister | None = None, *, applied: bool = False) -> Path:
+    """A repository root carrying *register*, the inventory it names and the sources it names.
+
+    Every guard agrees with its record, so the baseline passes all three rules and a test asserting
+    a finding writes that finding itself.
+
+    *applied* is whether the `ADR-016` pair is written into the tree. It defaults to neither half,
+    because every register reachable through a document here records the authorisation unsigned --
+    no fixture part is accepted -- and neither half applied is the state Requirement 7 criterion 17
+    protects. A test wanting the applied pair says so.
     """
     recorded = _register() if register is None else register
     return _guard_sources(
-        _repository(
-            root,
-            register=dump_gate_register(recorded),
-            inventory=_inventory_text(_baseline_rows(recorded), _blocked_by(recorded)),
+        _pair_sources(
+            _repository(
+                root,
+                register=dump_gate_register(recorded),
+                inventory=_inventory_text(_baseline_rows(recorded), _blocked_by(recorded)),
+            ),
+            friend=applied,
+            defined=applied,
         ),
         recorded,
     )
@@ -304,18 +393,20 @@ def _review(root: Path) -> AnalysisResult:
 def _established(register: GateRegister, *, files: int = 0) -> str:
     """The summary line a run ends with, spelled out rather than matched loosely.
 
-    What it claims is the point: both rules read the files *register* names, so the line reports the
-    guard values and the assertion sites it compared and states that the selected files have not
-    been read by a rule. Taking it off a run's output by equality is what makes every test below
-    assert that the claim still reads that way.
+    What it claims is the point: the guard rules read the files *register* names and `adr-016-pair`
+    reads the two files the criterion names, so the line reports the guard values, the assertion
+    sites and the pair it compared, and states that the selection decided none of it. Taking it off
+    a run's output by equality is what makes every test below assert that the claim still reads
+    that way.
     """
     guards = [guard for guard in register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
     sites = sum(len(guard.asserted_in) for guard in guards)
     return (
         f"{REGISTER_PATH} records {len(register.guards)} guards over {len(register.gates)} "
         f"Gate_Dossiers; {len(guards)} guard values and {sites} assertion sites compared against "
-        f"the files the register names, and none of the {files} selected source files has been "
-        f"read by a rule yet\n"
+        f"the files the register names, and the ADR-016 pair against {CORE_HEADER} and "
+        f"{OVERLAY_MANIFEST}; no rule read a file because it was among the {files} selected source "
+        f"files\n"
     )
 
 
@@ -776,3 +867,320 @@ def test_guard_value_rejects_a_disagreement_naming_no_handed_on_row(tmp_path: Pa
     assert finding.blocking
     assert finding.message.startswith(f"{TELEMETRY_GUARD}: ")
     assert "names no handed-on row" in finding.message
+
+
+# ---------------------------------------------------------------------------
+# adr-016-pair
+#
+# Named with the `adr` prefix, which is the selector these reach under: `-k adr` runs this group and
+# nothing else, and the task's own command is a direct invocation of the script rather than a test
+# selection.
+#
+# Two documents again, read against each other, and the division with `guard-value` is the thing
+# most of these assert. `guard-value` owns the value `AeroraVehicleFactGroupRegistrar::
+# isRegistrationAvailable()` holds and everything recorded about that value; this rule owns the two
+# edits, in the two files `guard-value` never opens, against the change permission recorded on the
+# same registry entry. The sharpest case is the half-applied tree: the guard holds its recorded
+# `false` there, so the value rule passes and this is the only finding -- a rule that went quiet
+# whenever `guard-value` spoke would let that tree through.
+# ---------------------------------------------------------------------------
+
+
+def _signing_owner(register: GateRegister, gate: str) -> str:
+    """The owner *register* records as authorised to sign *gate*'s one part.
+
+    Read off the register the test hands over rather than written here, because what the finding
+    has to name is the label the register records and not the label this file happens to know.
+    """
+    (dossier,) = [item for item in register.gates if item.id == gate]
+    (owner,) = dossier.parts[0].signing_owners
+    return owner
+
+
+def _authorised() -> Premises:
+    """Premises in which the register records the core edit's authorisation as given.
+
+    The part permitted to change the guard accepted, with a Closure_Record recording a permitting
+    verdict for it, which is what the freedom derivation reads as freedom. Requirement 7 criterion
+    18 records the acceptance of both parts of the Gate as that condition and the fixture Gate has
+    one part, so this is that condition met.
+
+    A model rather than a document, for the reason `_in_code` hands one over: the document route
+    would need a Closure_Record file in the tree and a register naming it, and what is under test
+    here is the rule's reading of the permission.
+    """
+    return _accepting(_register(), {SINGLE_GATE: _permissions(SINGLE_GATE)})
+
+
+def _pair_premises(root: Path, premises: Premises, *, friend: bool, defined: bool) -> Premises:
+    """*premises* rooted at a tree carrying the `ADR-016` pair in the state the test wants."""
+    return replace(premises, root=_pair_sources(root, friend=friend, defined=defined))
+
+
+def test_adr_016_pair_accepts_a_tree_naming_both_halves_in_comments_and_applying_neither(
+    tmp_path: Path,
+) -> None:
+    """The state Requirement 7 criterion 17 protects, with both halves named in prose.
+
+    The fixture files mention the declaration and the define in a comment the way the real two
+    files do, so a rule that searched the text would report an applied pair in the tree that
+    applied neither half. Nothing is reported, and the mentions are asserted to be there, so the
+    pass is evidence that comments were removed rather than that the fixture was quiet.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    assert FRIEND_DECLARATION in (root / CORE_HEADER).read_text(encoding="utf-8")
+    assert FRIENDSHIP_DEFINITION in (root / OVERLAY_MANIFEST).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_adr_016_pair_reports_the_applied_pair_the_register_pins_without_blocking(
+    tmp_path: Path,
+) -> None:
+    """The state this repository stands in: both halves applied, unsigned, disagreement recorded.
+
+    Reported and not blocking, which is the design's one concession carried over from
+    `guard-value`: a rule rejecting the applied pair on every commit until an unrelated
+    authorisation landed would be removed rather than obeyed. The finding names both halves, the
+    part whose acceptance would authorise them, and the owner.
+    """
+    register = _with_guard(_register(), TELEMETRY_GUARD, disagreement=_disagreement())
+
+    result = _review(_tree(tmp_path / "repo", register, applied=True))
+
+    (line,) = _lines(result, register)
+    assert result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR} ({REPORTED}): {SINGLE_GATE}: ")
+    assert f"{FRIEND_DECLARATION} in {CORE_HEADER}" in line
+    assert f"{FRIENDSHIP_DEFINITION} in {OVERLAY_MANIFEST} {CUSTOM_DEFINITIONS}" in line
+    assert f"{part_reference(SINGLE_GATE, BASELINE_PART)}: recorded unaccepted" in line
+    assert HAND_ON_ROW in line
+
+
+def test_adr_016_pair_names_the_owner_the_register_records_rather_than_a_label_of_its_own(
+    tmp_path: Path,
+) -> None:
+    """Requirement 7 criterion 17's second clause: name the owner whose signature it requires.
+
+    Both sources the register offers are read, and they differ in this fixture: the disagreement's
+    own owner, which is the register's answer to who resolves this gap, and the signing owner of
+    the part whose acceptance would free the guard. A check carrying one label as a constant would
+    stop naming the right owner the day that label changed.
+    """
+    register = _with_guard(_register(), TELEMETRY_GUARD, disagreement=_disagreement())
+
+    result = _review(_tree(tmp_path / "repo", register, applied=True))
+
+    (line,) = _lines(result, register)
+    assert _signing_owner(register, SINGLE_GATE) != DISAGREEMENT_OWNER
+    assert DISAGREEMENT_OWNER in line
+    assert _signing_owner(register, SINGLE_GATE) in line
+    assert "names the owner whose signature the core edit requires" in line
+
+
+def test_adr_016_pair_and_guard_value_report_one_gap_as_two_findings_that_do_not_overlap(
+    tmp_path: Path,
+) -> None:
+    """The division, asserted as output: two findings, two subjects, neither blocking.
+
+    `guard-value` names the observed literal, the remedies and the handed-on row; this rule names
+    the two edits and the owner and reports none of the value's evidence. Reporting the same defect
+    twice would be noise, and the test fails if either line grows the other's content.
+    """
+    register = _alone(_register(), TELEMETRY_GUARD, disagreement=_disagreement())
+    root = _tree(tmp_path / "repo", register, applied=True)
+    _write(root / SOLO_DECLARATION, _declares(TELEMETRY_GUARD, ANOTHER_VALUE))
+
+    result = _review(root)
+
+    value, pair = _lines(result, register)
+    assert result.passed
+    assert result.issues == 2
+    assert value.startswith(f"{GUARD_VALUE} ({REPORTED}): {SINGLE_GATE}: {TELEMETRY_GUARD}: ")
+    assert pair.startswith(f"{ADR_016_PAIR} ({REPORTED}): {SINGLE_GATE}: ")
+    assert repr(ANOTHER_VALUE) in value
+    assert repr(ANOTHER_VALUE) not in pair
+    assert all(remedy in value for remedy in DISAGREEMENT_REMEDIES)
+    assert all(remedy not in pair for remedy in DISAGREEMENT_REMEDIES)
+    assert CORE_HEADER not in value
+    assert CORE_HEADER in pair
+
+
+def test_adr_016_pair_rejects_the_applied_pair_that_no_recorded_disagreement_pins(
+    tmp_path: Path,
+) -> None:
+    """The record excuses one known state, not the pair.
+
+    The baseline records no disagreement for the guard, so nothing in the register says this state
+    is known and criterion 17's rejection stands. The owner comes from the part's signing owners,
+    which is the source that resolves whether or not a disagreement is recorded.
+    """
+    register = _register()
+
+    result = _review(_tree(tmp_path / "repo", register, applied=True))
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: ")
+    assert "no disagreement that excuses the applied pair" in line
+    assert _signing_owner(register, SINGLE_GATE) in line
+    assert f"holds the Gate at {OPEN_STATUS}" in line
+
+
+def test_adr_016_pair_rejects_the_half_the_guard_value_rule_cannot_see(tmp_path: Path) -> None:
+    """The friend declaration applied and the define withdrawn, under an unsigned authorisation.
+
+    This is the gap that makes the rule worth having. `isRegistrationAvailable()` returns the
+    recorded `false` in such a tree, so `guard-value` passes over it and this is the only finding --
+    and criterion 17 rejects *either* half, not only the pair.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / CORE_HEADER, _core_header(friend=True))
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: ")
+    assert f"{FRIEND_DECLARATION} in {CORE_HEADER} and not {FRIENDSHIP_DEFINITION} in " in line
+    assert "one edit in two files" in line
+    assert _signing_owner(register, SINGLE_GATE) in line
+
+
+def test_adr_016_pair_rejects_a_half_applied_pair_the_register_records_as_authorised(
+    tmp_path: Path,
+) -> None:
+    """A signed authorisation covers an edit in two files, and this tree carries one of them.
+
+    The define alone is the direction that does not compile, which is why one half is a third
+    state rather than a weaker form of either: it matches neither the authorised pair nor the
+    absence criterion 17 protects.
+    """
+    premises = _pair_premises(tmp_path / "repo", _authorised(), friend=False, defined=True)
+
+    (finding,) = check_adr_016_pair(premises)
+
+    assert finding.check == ADR_016_PAIR
+    assert finding.gates == (SINGLE_GATE,)
+    assert finding.blocking
+    assert f"{FRIENDSHIP_DEFINITION} in {OVERLAY_MANIFEST}" in finding.message
+    assert f"not {FRIEND_DECLARATION} in {CORE_HEADER}" in finding.message
+
+
+def test_adr_016_pair_accepts_the_applied_pair_once_the_register_records_the_authorisation(
+    tmp_path: Path,
+) -> None:
+    """The guard free and both halves applied, which is the pair matching the recorded state."""
+    premises = _pair_premises(tmp_path / "repo", _authorised(), friend=True, defined=True)
+
+    assert check_adr_016_pair(premises) == []
+
+
+def test_adr_016_pair_accepts_an_authorisation_that_nobody_has_acted_on(tmp_path: Path) -> None:
+    """An authorisation is a permission rather than an instruction.
+
+    A signed core-edit authorisation over a tree carrying neither half is no finding here. Whether
+    the guard's value followed the edit is `guard-value`'s, which reads the declaration against the
+    value the register records for it.
+    """
+    premises = _pair_premises(tmp_path / "repo", _authorised(), friend=False, defined=False)
+
+    assert check_adr_016_pair(premises) == []
+
+
+def test_adr_016_pair_names_a_core_header_the_tree_does_not_carry(tmp_path: Path) -> None:
+    """A file this rule cannot read is a failure rather than a pass."""
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    (root / CORE_HEADER).unlink()
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: {FRIEND_DECLARATION}: ")
+    assert f"{CORE_HEADER} does not exist" in line
+    assert '"not found" is not "not applied"' in line
+
+
+def test_adr_016_pair_names_a_manifest_that_sets_no_custom_definitions_list(
+    tmp_path: Path,
+) -> None:
+    """A manifest that changed shape is a half this rule could not read, not a withdrawn define.
+
+    The recorded remedy withdraws the define *from* the list, so a manifest setting no list at all
+    is a different repair and reading it as the remedy would retire the rule by accident.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / OVERLAY_MANIFEST, "# A fixture manifest setting no definitions list.\n")
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: {FRIENDSHIP_DEFINITION}: ")
+    assert f"{OVERLAY_MANIFEST} sets no {CUSTOM_DEFINITIONS} list" in line
+    assert '"not found" is not "not applied"' in line
+
+
+def test_adr_016_pair_rejects_a_register_recording_no_entry_for_the_guard(tmp_path: Path) -> None:
+    """The premise is the data half's and the silence would be this rule's.
+
+    That the registry covers the guard is `guard-registry`'s finding, so this does not restate it
+    -- what it reports is that the pair was read against no recorded authorisation state. Going
+    quiet here would leave the only rule that reads the fork surface switched off by an omission in
+    the register.
+    """
+    register = _register(
+        guards=[_guard(symbol) for symbol in BASELINE_GUARD_GATES if symbol != TELEMETRY_GUARD]
+    )
+
+    result = _review(_tree(tmp_path / "repo", register))
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: {FACT_GROUP_REGISTRAR_GUARD}: ")
+    assert "records no entry" in line
+    assert f"is {GUARD_REGISTRY}'s finding in the data half" in line
+
+
+def test_adr_016_pair_reads_the_real_core_header_and_overlay_manifest_without_writing_them() -> (
+    None
+):
+    """The one case whose evidence is the repository rather than a fixture.
+
+    Both patterns are matched against the two files they exist to watch, with a fixture register
+    recording what the design's Finding 1 records: the authorisation unsigned, and a disagreement
+    standing on the guard. Both halves are applied at this tree, so the rule reports exactly the
+    state task 1.1 established by hand, and reports it without blocking.
+
+    The files come back byte for byte, which is the read-only promise asserted against the files it
+    is about rather than against a fixture.
+    """
+    register = _with_guard(_register(), TELEMETRY_GUARD, disagreement=_disagreement())
+    pair = (CORE_HEADER, OVERLAY_MANIFEST)
+    before = {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in pair}
+
+    (finding,) = check_adr_016_pair(_premises(register))
+
+    assert finding.check == ADR_016_PAIR
+    assert finding.gates == (SINGLE_GATE,)
+    assert not finding.blocking
+    assert f"{FRIEND_DECLARATION} in {CORE_HEADER}" in finding.message
+    assert f"{FRIENDSHIP_DEFINITION} in {OVERLAY_MANIFEST} {CUSTOM_DEFINITIONS}" in finding.message
+    assert "records no acceptance permitting it" in finding.message
+    assert DISAGREEMENT_OWNER in finding.message
+    assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in pair} == before
