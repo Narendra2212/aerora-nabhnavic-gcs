@@ -421,7 +421,7 @@ Constraints every task inherits:
 
 - [ ] 7. `tools/analyzers/gate_guard_check.py` — the source half
 
-  - [~] 7.1 Create the analyzer shell
+  - [x] 7.1 Create the analyzer shell
     - `AnalyzerBase` subclass in `tools/analyzers/`, following `tools/analyzers/vehicle_null_check.py`:
       `name`, `run(files, fix=False) -> AnalysisResult`, a `main()` taking paths or stdin, exit 1 on
       findings, and `find_cpp_files` from `common.file_traversal` for directory arguments
@@ -432,7 +432,7 @@ Constraints every task inherits:
     - _Requirements: 4.2, 4.7_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/`
 
-  - [~] 7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement
+  - [ ] 7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement
     - Each recorded guard's declaration in its recorded `declaredIn` file carries its recorded
       literal. A declaration not found fails naming the symbol and the file — "not found" is not
       "unchanged"
@@ -444,7 +444,7 @@ Constraints every task inherits:
     - _Requirements: 4.6, 4.7, 4.9_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k guard`
 
-  - [~] 7.3 Implement `adr-016-pair`
+  - [ ] 7.3 Implement `adr-016-pair`
     - The friend declaration in `src/Vehicle/Vehicle.h` and the
       `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` definition in `aerora/CMakeLists.txt` must match the
       register's recorded authorisation state. Read-only: the check reads `src/Vehicle/Vehicle.h` and
@@ -452,7 +452,7 @@ Constraints every task inherits:
     - _Requirements: 7.17_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py src/Vehicle/Vehicle.h aerora/CMakeLists.txt`
 
-  - [~] 7.4 Implement `mavlink-identifier`
+  - [ ] 7.4 Implement `mavlink-identifier`
     - No `MAV_CMD_`, `MAVLINK_MSG_ID_`, `MAV_COMP_ID_` or `MAV_FRAME_` token appears under `aerora/**`
       outside the allow-list, which is recorded **by site and reason, never by identifier**
     - The check reads the allow-listed files, takes what it finds there as the current baseline, and
@@ -464,7 +464,7 @@ Constraints every task inherits:
     - _Requirements: 4.2, 6.14_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k mavlink`
 
-  - [~] 7.5 Implement the four absence checks
+  - [ ] 7.5 Implement the four absence checks
     - `populated-file-override`: no `Tier::PopulatedFile` entry in `AeroraQmlOverrides::overrideEntries()`
       while `DG-VID` is `OPEN`
     - `action-seam`: neither pre-approved seam appears in the override allow-list while `DG-ROL` is
@@ -476,7 +476,7 @@ Constraints every task inherits:
     - _Requirements: 5.4, 8.13, 8.16, 10.18, 14.13_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k "override or seam or threshold or sink"`
 
-  - [~] 7.6 Implement `actionable-control` over Aerora QML
+  - [ ] 7.6 Implement `actionable-control` over Aerora QML
     - No `QGCButton`, `MouseArea`, `TapHandler` or other actionable type is written into an Aerora QML
       document outside the single recorded exception, which must carry exactly one and whose
       `objectName` must equal the recorded one
@@ -486,7 +486,7 @@ Constraints every task inherits:
     - _Requirements: 5.1, 5.2, 5.11_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k qml`
 
-  - [~] 7.7 Implement `contract-surface`
+  - [ ] 7.7 Implement `contract-surface`
     - Compare the enumerators, declared constants and registry string-literal keys under
       `aerora/src/**` against the recorded inventory, in both directions: present in source and absent
       from the inventory fails as unassigned Decision_Content naming the symbol; mapped to an `OPEN`
@@ -513,14 +513,14 @@ Constraints every task inherits:
       a third value fails naming all three
     - _Requirements: 4.6, 4.7, 4.9, 5.1, 5.2, 5.4, 6.14, 8.13, 8.16, 10.18, 14.13_
 
-- [~] 8. Checkpoint — both checkers prove themselves on this host
+- [ ] 8. Checkpoint — both checkers prove themselves on this host
   - Run both test files, both direct script invocations, and the lint and type-check commands. This
     is the last point before a hook can gate a commit, and the only evidence available without CI
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Populate the Gate_Register and scaffold the closures directory
 
-  - [~] 9.1 Write the ten Gate_Dossiers
+  - [ ] 9.1 Write the ten Gate_Dossiers
     - One dossier per Gate from Requirements 6 through 15: status, `implementingOwner`, a `rationale`
       reference (document plus anchor) rather than a copy of the narrative, `parts` with signing
       owners and Sign_Off_Conditions, `elements` with `settlementShape` and `requiredAttributes`,
@@ -533,7 +533,7 @@ Constraints every task inherits:
     - _Requirements: 1.1, 1.2, 1.8, 3.6, 4.1, 4.3, 4.10, 6.1, 6.2, 6.3, 6.4, 6.5, 6.9, 6.10, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.9, 7.10, 7.11, 8.1, 8.2, 8.3, 8.4, 8.7, 8.8, 8.9, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.10, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.10, 10.11, 10.20, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.9, 11.10, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.9, 12.10, 12.11, 13.1, 13.2, 13.3, 13.4, 13.5, 13.7, 13.8, 13.13, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.9, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.8, 15.9, 15.15, 15.17_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --schemafile .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json .kiro/specs/aerora-decision-gate-closure/gate-register.json`
 
-  - [~] 9.2 Write the per-screen records and the blocking-entry classifications
+  - [ ] 9.2 Write the per-screen records and the blocking-entry classifications
     - One record per inventory row, with `released`, `observation` and `blockingEntries`. The register
       restates no screen name, class, seam, owner or delivery status — it references screen IDs and
       adds the axes the inventory has no column for
@@ -543,7 +543,7 @@ Constraints every task inherits:
     - _Requirements: 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.7, 2.8, 2.11, 3.9, 14.15, 15.16_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [~] 9.3 Write the guard registry, including the one recorded disagreement
+  - [ ] 9.3 Write the guard registry, including the one recorded disagreement
     - The nine guards Requirement 4 criterion 5 names, plus each Gate's own named guard, with
       `declaredIn`, `recordedValue`, `assertedIn`, `holdsOpen` and `permittedToChangeBy`. This is the
       only place the guard-to-Gate mapping is recorded — the C++ suites assert values, not mappings
@@ -554,7 +554,7 @@ Constraints every task inherits:
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/ src/Vehicle/Vehicle.h`
       reports the one disagreement with its owner and remedies, and exits zero
 
-  - [~] 9.4 Write the `readOnly` block and the contract-surface inventory
+  - [ ] 9.4 Write the `readOnly` block and the contract-surface inventory
     - `readOnly`: `DG-ROL`, the single `SCR-HLP-03` clipboard exception with its file, control
       `objectName` and reason, the `forbiddenUntil` rows, and both pre-approved undeclared seams
     - `contractSurface`: the current enumerators, declared constants and registry string keys under
@@ -563,7 +563,7 @@ Constraints every task inherits:
     - _Requirements: 3.12, 4.2, 5.1, 5.8, 5.11, 9.16_
     - **Local**: both direct script invocations pass
 
-  - [~] 9.5 Scaffold `closures/` with its contract and no content
+  - [ ] 9.5 Scaffold `closures/` with its contract and no content
     - A `closures/README.md` stating the one-file-per-part rule, the `<GATE>.<part>.json` naming, the
       `Gate-Signed-By:` trailer convention, and that `entryCommit` is derived from git and must be
       absent while a part is `submitted`
@@ -579,13 +579,13 @@ Constraints every task inherits:
 
 - [ ] 10. Wire the three gating hooks into `.pre-commit-config.yaml`
 
-  - [~] 10.1 Add `gate-register-schema` to the `check-jsonschema` block
+  - [ ] 10.1 Add `gate-register-schema` to the `check-jsonschema` block
     - Follows the `.github/build-config.json` precedent in the same block, with `pass_filenames: false`
       and a `files` pattern covering the register, its schema and the closures directory
     - _Requirements: 1.1, 2.1, 5.11_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --schemafile <schema> <register>`
 
-  - [~] 10.2 Add the `gate-register` local hook
+  - [ ] 10.2 Add the `gate-register` local hook
     - In the `repo: local` block beside `validate-configs`, same invocation shape, `language: system`,
       `pass_filenames: false`, and a `files` pattern covering the register JSON, the closures
       directory, the screen inventory, `tools/validate_gate_register.py` and
@@ -598,7 +598,7 @@ Constraints every task inherits:
     - _Requirements: 1.6, 2.10, 3.1, 3.2, 4.2_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [~] 10.3 Add the `gate-guards` local hook
+  - [ ] 10.3 Add the `gate-guards` local hook
     - Beside the other repo-local ratchets, `pass_filenames: true`, with a `files` pattern covering
       `aerora/src/**`, `aerora/test/**`, `aerora/CMakeLists.txt`, `src/Vehicle/Vehicle.h` and the
       register
@@ -616,7 +616,7 @@ Constraints every task inherits:
 
 - [ ] 11. The three C++ ratchet assertions
 
-  - [~] 11.1 Generalise the actionable-control predicate in `AeroraFlyViewOverlayUITest`
+  - [ ] 11.1 Generalise the actionable-control predicate in `AeroraFlyViewOverlayUITest`
     - Replace `hasActionableControl()`'s `childItems()` recursion with a walk over the union of the
       visual tree and the object tree, deduplicated by pointer, returning the controls found by
       `objectName` where one is set and by class name otherwise. Keep the `QObject::inherits()`
@@ -633,7 +633,7 @@ Constraints every task inherits:
     - _Requirements: 5.1, 5.2_
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Integration`
 
-  - [~] 11.2 Add the data-driven read-only walk to `AeroraUiFoundationTest`
+  - [ ] 11.2 Add the data-driven read-only walk to `AeroraUiFoundationTest`
     - **Property 24: No Aerora screen document carries an actionable control except the one recorded exception**
     - **Validates: Requirements 5.1, 5.2, 5.11**
     - `_noAeroraScreenCarriesAnActionableControl()` plus `_data()`. The screen set is **discovered**
@@ -658,7 +658,7 @@ Constraints every task inherits:
       `QQmlComponent::create()` returns a constructed tree
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Unit`
 
-  - [~] 11.3 Pin the remaining guards at the composition root in `AeroraVehicleIntegrationTest`
+  - [ ] 11.3 Pin the remaining guards at the composition root in `AeroraVehicleIntegrationTest`
     - Extend the existing guard slot with the recorded guards it does not yet assert
     - `AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()` gets **no** assertion here, and the
       omission is deliberate: asserting `false` would fail CI because the `ADR-016` pair is applied,
@@ -669,7 +669,7 @@ Constraints every task inherits:
     - _Requirements: 4.7, 4.9_
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Integration`
 
-- [~] 12. Final checkpoint
+- [ ] 12. Final checkpoint
   - Local: both Python test files, both direct script invocations, the lint and type-check commands,
     and `uv run --quiet --with jsonschema python tools/validate_gate_register.py` against the
     populated register
