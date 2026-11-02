@@ -195,3 +195,6 @@ pytest-of-*/
 
 # Local and CI link-check results.
 .lycheecache
+
+# Kiro spec task execution bookkeeping: per-session ids and timestamps, not shared state.
+.kiro/specs/*/tasks.meta.json
