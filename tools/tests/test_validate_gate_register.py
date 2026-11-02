@@ -72,6 +72,8 @@ from common.gate_register import (
     Guard,
     GuardPermission,
     InventoryReference,
+    MavlinkIdentifierPosture,
+    MavlinkIdentifierSite,
     Observation,
     OpenStateReading,
     RationaleReference,
@@ -525,6 +527,10 @@ def _register(
             ],
             pre_approved_undeclared_seams=_seams(),
         ),
+        # No site, because an allow-listed site the tree does not carry is a finding of its own and
+        # this file writes no overlay source for one to point at. A test that wants a site writes
+        # the file and records it with `_with_allow_list`.
+        mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=[],
     )
 
@@ -694,6 +700,14 @@ def _with_guard(register: GateRegister, symbol: str, **changes: object) -> GateR
 def _with_posture(register: GateRegister, **changes: object) -> GateRegister:
     """Replace one field of the read-only posture, leaving every other axis as it was."""
     return replace(register, read_only=replace(register.read_only, **changes))
+
+
+def _with_allow_list(register: GateRegister, *sites: MavlinkIdentifierSite) -> GateRegister:
+    """Record *sites* on the MAVLink-identifier posture, leaving every other axis as it was."""
+    return replace(
+        register,
+        mavlink_identifiers=replace(register.mavlink_identifiers, allow_list=list(sites)),
+    )
 
 
 def _messages(findings: Sequence[Finding], check: str) -> list[str]:

@@ -452,7 +452,7 @@ Constraints every task inherits:
     - _Requirements: 7.17_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py src/Vehicle/Vehicle.h aerora/CMakeLists.txt`
 
-  - [ ] 7.4 Implement `mavlink-identifier`
+  - [x] 7.4 Implement `mavlink-identifier`
     - No `MAV_CMD_`, `MAVLINK_MSG_ID_`, `MAV_COMP_ID_` or `MAV_FRAME_` token appears under `aerora/**`
       outside the allow-list, which is recorded **by site and reason, never by identifier**
     - The check reads the allow-listed files, takes what it finds there as the current baseline, and

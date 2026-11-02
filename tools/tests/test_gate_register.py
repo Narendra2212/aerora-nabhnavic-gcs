@@ -36,13 +36,16 @@ from common.gate_register import (
     GateRegister,
     GateRegisterError,
     InventoryReference,
+    MavlinkIdentifierPosture,
     OpenStateReading,
     RationaleReference,
     ReadOnlyPosture,
     ScreenInventoryError,
     ScreenRecord,
     blocking_gates,
+    dump_gate_register,
     gate_open,
+    load_gate_register,
     parse_screen_inventory,
     release_sets,
     released,
@@ -254,9 +257,10 @@ def test_inventory_rows_fail_naming_the_line_of_an_unreadable_row(
 # is how these tests show that: no derivation reads a Gate identifier, only the dossier it keys.
 GATE_A, GATE_B, GATE_C = GATE_IDS[:3]
 
-# The Gate the read-only posture reads, which the schema pins. No derivation under test reads it;
-# the fixtures carry a posture because the register does.
+# The two Gates the postures read, which the schema pins. No derivation under test reads either;
+# the fixtures carry both postures because the register does.
 READ_ONLY_GATE = "DG-ROL"
+MISSION_GATE = "DG-MIS"
 
 SCREEN_A = "SCR-ZZZ-01"
 SCREEN_B = "SCR-ZZZ-02"
@@ -354,6 +358,7 @@ def _register(
             forbidden_until=[],
             pre_approved_undeclared_seams=[],
         ),
+        mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=[],
     )
 
@@ -651,3 +656,67 @@ def test_undelivered_fails_naming_a_screen_carrying_two_rows() -> None:
 
     with pytest.raises(ScreenInventoryError, match=f"{SCREEN_A}: the inventory carries more"):
         undelivered(inventory)
+
+
+# ---------------------------------------------------------------------------
+# The JSON round trip
+# ---------------------------------------------------------------------------
+
+# A register document spelled out rather than dumped from a model, so the field names the loader
+# and the dumper read are compared against something written independently of both. Minimal on
+# every axis the round trip does not exercise: the ten-Gate rule is the schema's and the model
+# carries no count, so an empty `gates` is a register this module loads.
+MAVLINK_ALLOW_LISTED_SITE = "aerora/src/AFixtureAllowListedSource.cc"
+MAVLINK_SITE_REASON = "a fixture reason, which is a role and never an identifier"
+
+
+def _register_document() -> dict[str, object]:
+    return {
+        "inventory": {"path": INVENTORY_PATH.name, "authoritativeFor": ["the screen set"]},
+        "gates": [],
+        "screens": [],
+        "guards": [],
+        "readOnly": {
+            "gate": READ_ONLY_GATE,
+            "exceptions": [],
+            "forbiddenUntil": [],
+            "preApprovedUndeclaredSeams": [],
+        },
+        "mavlinkIdentifiers": {
+            "gate": MISSION_GATE,
+            "allowList": [{"path": MAVLINK_ALLOW_LISTED_SITE, "reason": MAVLINK_SITE_REASON}],
+        },
+        "contractSurface": [],
+    }
+
+
+def test_the_mavlink_identifier_allow_list_reaches_the_model_as_a_site_and_a_reason() -> None:
+    """The allow-list is recorded by site and reason, and the model carries exactly those two."""
+    register = load_gate_register(_register_document())
+
+    posture = register.mavlink_identifiers
+    (site,) = posture.allow_list
+    assert posture.gate == MISSION_GATE
+    assert site.path == MAVLINK_ALLOW_LISTED_SITE
+    assert site.reason == MAVLINK_SITE_REASON
+
+
+def test_a_register_document_carrying_an_allow_list_round_trips_through_the_model() -> None:
+    """`dump(load(document)) == document`, which every check over the register rests on.
+
+    Asserted over a document that carries the allow-list, because a field the loader drops or the
+    dumper spells differently is invisible to every other test here: the derivations do not read
+    it, and a fixture built by dumping a model would agree with the dumper by construction.
+    """
+    document = _register_document()
+
+    assert dump_gate_register(load_gate_register(document)) == document
+
+
+def test_a_register_document_carrying_no_allow_list_is_rejected_naming_the_key() -> None:
+    """The posture cannot be left out, so an absent one is a rejection rather than an empty one."""
+    document = _register_document()
+    del document["mavlinkIdentifiers"]
+
+    with pytest.raises(GateRegisterError, match="mavlinkIdentifiers"):
+        load_gate_register(document)

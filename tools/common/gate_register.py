@@ -91,6 +91,8 @@ __all__ = [
     "InventoryArea",
     "InventoryReference",
     "InventoryRow",
+    "MavlinkIdentifierPosture",
+    "MavlinkIdentifierSite",
     "Observation",
     "OpenStateReading",
     "RationaleReference",
@@ -388,6 +390,26 @@ class ReadOnlyPosture:
 
 
 @dataclass(frozen=True)
+class MavlinkIdentifierSite:
+    """One file the static MAVLink-identifier check permits an identifier in, and why.
+
+    A site and a reason, and nothing else. The identifiers the site holds are read from the file
+    at check time rather than recorded here, so this carries none.
+    """
+
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class MavlinkIdentifierPosture:
+    """The MAVLink-identifier posture: one Gate, and the sites allow-listed against it."""
+
+    gate: str
+    allow_list: list[MavlinkIdentifierSite]
+
+
+@dataclass(frozen=True)
 class ContractSurfaceElement:
     """One recorded contract-surface element, mapped to a Gate or to none with a reason."""
 
@@ -407,6 +429,7 @@ class GateRegister:
     screens: list[ScreenRecord]
     guards: list[Guard]
     read_only: ReadOnlyPosture
+    mavlink_identifiers: MavlinkIdentifierPosture
     contract_surface: list[ContractSurfaceElement]
 
 
@@ -855,6 +878,26 @@ def _read_read_only_posture(value: Any, path: str) -> ReadOnlyPosture:
     return posture
 
 
+def _read_mavlink_identifier_site(value: Any, path: str) -> MavlinkIdentifierSite:
+    reader = _Reader(value, path)
+    site = MavlinkIdentifierSite(
+        path=reader.text("path"),
+        reason=reader.text("reason"),
+    )
+    reader.done()
+    return site
+
+
+def _read_mavlink_identifier_posture(value: Any, path: str) -> MavlinkIdentifierPosture:
+    reader = _Reader(value, path)
+    posture = MavlinkIdentifierPosture(
+        gate=reader.member("gate", GATE_IDS, _GATE_ID_DESCRIPTION),
+        allow_list=reader.children("allowList", _read_mavlink_identifier_site),
+    )
+    reader.done()
+    return posture
+
+
 def _read_contract_surface_element(value: Any, path: str) -> ContractSurfaceElement:
     reader = _Reader(value, path)
     element = ContractSurfaceElement(
@@ -881,6 +924,7 @@ def load_gate_register(document: Any, *, path: str = "gate-register") -> GateReg
         screens=reader.children("screens", _read_screen_record),
         guards=reader.children("guards", _read_guard),
         read_only=reader.child("readOnly", _read_read_only_posture),
+        mavlink_identifiers=reader.child("mavlinkIdentifiers", _read_mavlink_identifier_posture),
         contract_surface=reader.children("contractSurface", _read_contract_surface_element),
     )
     reader.done()
@@ -1185,6 +1229,20 @@ def _dump_read_only_posture(posture: ReadOnlyPosture) -> dict[str, Any]:
     )
 
 
+def _dump_mavlink_identifier_site(site: MavlinkIdentifierSite) -> dict[str, Any]:
+    return _object(
+        ("path", site.path),
+        ("reason", site.reason),
+    )
+
+
+def _dump_mavlink_identifier_posture(posture: MavlinkIdentifierPosture) -> dict[str, Any]:
+    return _object(
+        ("gate", posture.gate),
+        ("allowList", [_dump_mavlink_identifier_site(item) for item in posture.allow_list]),
+    )
+
+
 def _dump_contract_surface_element(element: ContractSurfaceElement) -> dict[str, Any]:
     return _object(
         ("symbol", element.symbol),
@@ -1203,6 +1261,7 @@ def dump_gate_register(register: GateRegister) -> dict[str, Any]:
         ("screens", [_dump_screen_record(item) for item in register.screens]),
         ("guards", [_dump_guard(item) for item in register.guards]),
         ("readOnly", _dump_read_only_posture(register.read_only)),
+        ("mavlinkIdentifiers", _dump_mavlink_identifier_posture(register.mavlink_identifiers)),
         (
             "contractSurface",
             [_dump_contract_surface_element(item) for item in register.contract_surface],

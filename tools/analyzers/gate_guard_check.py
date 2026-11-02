@@ -34,6 +34,14 @@ permitted to change a guard has permitted it, and both before and after that the
 source against the recorded value. The recorded-value side of criterion 6 is ``guard-registry``'s,
 in the data half.
 
+**``mavlink-identifier`` is the one rule that walks a tree, and the one that reads comments.** It
+has to find a token in a file nobody named, so the overlay tree is its input rather than a path the
+register records -- but the selection still decides nothing, and the allow-list it reads is recorded
+by site and reason, never by identifier. It reads the allow-listed files and takes whatever
+identifiers they hold as the current baseline, so the permitted set lives in the tree and the
+register carries none of its own, and it rejects a token in any file the allow-list does not carry.
+Comments are left in, because a MAVLink identifier written into a comment is the identifier.
+
 **``adr-016-pair`` is the one rule that reads core, and it reads the permission rather than the
 value.** Requirement 7 criterion 17 is about two edits -- a friend declaration in
 ``src/Vehicle/Vehicle.h`` and a compile definition in ``aerora/CMakeLists.txt`` -- which no guard's
@@ -76,13 +84,14 @@ from _bootstrap import ensure_tools_dir
 ensure_tools_dir(__file__)
 
 from common.analyzer import AnalysisResult, AnalyzerBase
-from common.file_traversal import find_cpp_files
+from common.file_traversal import DEFAULT_SKIP_DIRS, find_cpp_files, should_skip_path
 from common.gate_register import GATE_IDS, GateRegisterError, guard_freedom, part_reference
 from validate_gate_register import (
     FACT_GROUP_REGISTRAR_GUARD,
     GUARD_REGISTRY,
     MAVLINK_IDENTIFIER_GUARD,
     OPEN_STATUS,
+    OVERLAY_TREE,
     REGISTER_PATH,
     TEST_TREE,
     load_premises,
@@ -91,7 +100,13 @@ from validate_gate_register import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from common.gate_register import Disagreement, GateRegister, Guard, GuardFreedom
+    from common.gate_register import (
+        Disagreement,
+        GateRegister,
+        Guard,
+        GuardFreedom,
+        MavlinkIdentifierPosture,
+    )
     from validate_gate_register import Finding as PremiseFinding
     from validate_gate_register import Premises
 
@@ -103,10 +118,14 @@ ROOT: Final = Path(__file__).resolve().parents[2]
 # The name a finding and the dispatcher's status line carry, which is the hook id as well.
 NAME: Final = "gate-guards"
 
-# The three rules this module carries, named as the design's table names them.
+# The four rules this module carries, named as the design's table names them. The fourth is spelled
+# by the registry entry rather than again: Requirement 4 criterion 5's ninth guard *is* this check,
+# so the guard's symbol and the check's name are one string and a second spelling of it would be a
+# second thing to keep in step.
 GUARD_VALUE: Final = "guard-value"
 GUARD_ASSERTION: Final = "guard-assertion"
 ADR_016_PAIR: Final = "adr-016-pair"
+MAVLINK_IDENTIFIER: Final = MAVLINK_IDENTIFIER_GUARD
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -800,6 +819,260 @@ def check_adr_016_pair(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# mavlink-identifier
+# ---------------------------------------------------------------------------
+
+# The Gate whose Decision_Content this rule holds visible. Read as a constant rather than out of
+# `mavlinkIdentifiers.gate`, for the reason the data half records `READ_ONLY_GATE` as one: the
+# posture is part of the document under check, and the schema pins that key to this Gate as a
+# `const` so the two cannot disagree.
+MISSION_GATE: Final = "DG-MIS"
+
+# The four token classes Requirement 6 criterion 14 is enforced through, which are the four the
+# task and the design's table name. A prefix names a class of identifiers and is not one: no
+# dialect issues `MAV_CMD_`, requirements.md and the design carry all four already, and the Glossary
+# counts the message, command and enumeration *identifier* as the Contract_Value. So the prefixes
+# are constants here while no identifier is -- not in this module, not in the register, not in a
+# fixture -- and no finding prints the token it found.
+IDENTIFIER_PREFIXES: Final = ("MAV_CMD_", "MAVLINK_MSG_ID_", "MAV_COMP_ID_", "MAV_FRAME_")
+
+# A token of any of the four classes: a prefix and at least one character after it, which is what
+# makes it an identifier rather than a mention of the class. That bound is the same one that lets
+# the prefixes be constants in this module -- the Glossary counts the *identifier* as the
+# Contract_Value -- so a sentence naming a class is prose and a sentence naming a member of it is
+# not. Deliberately not left-anchored on a word boundary, because the rule this one takes over from
+# matches the prefix as a substring and the authoritative copy must not be the narrower of the two.
+_IDENTIFIER: Final = re.compile(
+    "|".join(rf"{re.escape(prefix)}\w+" for prefix in IDENTIFIER_PREFIXES)
+)
+
+# What the walk does not descend into: build output and tool caches, which hold generated copies of
+# upstream headers rather than anything the overlay authored. Taken from the shared list minus the
+# one directory it drops that this rule needs -- `find_cpp_files` skips `test/` by default, and the
+# allow-list's third category is the Aerora suites' own fixtures, which live there.
+_SKIP_DIRS: Final = DEFAULT_SKIP_DIRS - {"test"}
+
+
+@dataclass(frozen=True)
+class _Baseline:
+    """What the allow-listed sites hold, which this rule reads rather than records.
+
+    ``identifiers`` is the distinct tokens the readable sites carry. Nothing is compared against
+    it -- a token in a file the allow-list does not carry is rejected whether or not an allow-listed
+    site holds the same one -- so what it is for is the measurement the run states: that the
+    permitted set came from the tree, and that an allow-list whose sites hold none has gone stale.
+
+    ``allowed`` carries every allow-listed path, readable or not, so a site the tree lacks is one
+    finding rather than two.
+    """
+
+    allowed: frozenset[str]
+    identifiers: frozenset[str]
+    unreadable: tuple[tuple[str, str], ...]
+    reasonless: tuple[str, ...]
+
+
+def _searchable(root: Path, relative: str) -> tuple[str | None, str]:
+    """A file's text as this rule searches it, with the reason it could not be read.
+
+    Decoded leniently, which :func:`_read` is not, because the two answer different questions.
+    ``_read`` opens a file the register names and the document's encoding is part of the premise;
+    this opens whatever the overlay tree holds, and an undecodable byte somewhere in a file must
+    not stop the ASCII token elsewhere in it from being found. A file whose bytes are not text at
+    all decodes to no token, which is the right answer rather than a skipped file.
+    """
+    try:
+        data = (root / relative).read_bytes()
+    except FileNotFoundError:
+        return None, "does not exist"
+    except OSError as error:
+        return None, f"could not be read: {error.strerror}"
+    return data.decode("utf-8", errors="replace"), ""
+
+
+def _overlay_files(root: Path) -> list[str]:
+    """Every file under the overlay tree, as repository-relative posix paths in path order."""
+    found: list[str] = []
+    for path in (root / OVERLAY_TREE).rglob("*"):
+        relative = path.relative_to(root)
+        if path.is_file() and not should_skip_path(relative, _SKIP_DIRS):
+            found.append(relative.as_posix())
+    return sorted(found)
+
+
+def _baseline(root: Path, posture: MavlinkIdentifierPosture) -> _Baseline:
+    """Read the allow-listed sites, which is where the permitted identifiers come from."""
+    identifiers: set[str] = set()
+    unreadable: list[tuple[str, str]] = []
+    reasonless: list[str] = []
+    for site in posture.allow_list:
+        if not site.reason.strip():
+            reasonless.append(site.path)
+        text, cannot_read = _searchable(root, site.path)
+        if text is None:
+            unreadable.append((site.path, cannot_read))
+            continue
+        identifiers.update(_IDENTIFIER.findall(text))
+    return _Baseline(
+        allowed=frozenset(site.path for site in posture.allow_list),
+        identifiers=frozenset(identifiers),
+        unreadable=tuple(unreadable),
+        reasonless=tuple(reasonless),
+    )
+
+
+def _classes(tokens: Sequence[str]) -> str:
+    """The token classes *tokens* fall into, in the order :data:`IDENTIFIER_PREFIXES` names them.
+
+    The classes and never the tokens: a finding says which class of identifier a file carries and
+    where, and a reviewer reads the file for the rest. Printing the token would make this rule's
+    own output the place a Contract_Value is written down.
+    """
+    carried = [
+        prefix
+        for prefix in IDENTIFIER_PREFIXES
+        if any(token.startswith(prefix) for token in tokens)
+    ]
+    return ", ".join(carried)
+
+
+def _counted(tokens: Sequence[str]) -> str:
+    """How many tokens a file holds, worded for one as well as for many."""
+    return f"{len(tokens)} MAVLink identifier token{'' if len(tokens) == 1 else 's'}"
+
+
+def _matching_lines(text: str) -> list[tuple[int, tuple[str, ...]]]:
+    """Each line that holds a token, as its one-based number and the tokens on it.
+
+    Comments are not removed, which is the one place this rule parts company with its neighbours.
+    ``guard-value`` strips them because a sentence *about* a guard is not a declaration of one; a
+    MAVLink identifier written into a comment is the identifier, and the tokens in the tree today
+    include a documentation file carrying them in prose.
+    """
+    return [
+        (number, tuple(found))
+        for number, line in enumerate(text.splitlines(), start=1)
+        if (found := _IDENTIFIER.findall(line))
+    ]
+
+
+def _unlisted(relative: str, text: str) -> list[Finding]:
+    """Reject *relative* where it holds a token and the allow-list does not carry the file."""
+    matched = _matching_lines(text)
+    if not matched:
+        return []
+
+    first, _ = matched[0]
+    tokens = [token for _, found in matched for token in found]
+    return [
+        Finding(
+            MAVLINK_IDENTIFIER,
+            (MISSION_GATE,),
+            f"{relative}: holds {_counted(tokens)} of {_classes(tokens)}, first at line {first}, "
+            f"and the register's allow-list does not carry the file. Requirement 6 criterion 14 "
+            f"rejects the change before it enters the repository. The repair is to take the "
+            f"identifier out, or to allow-list the file with the reason it reads one it does not "
+            f"author -- a site and a reason, never the identifier itself",
+        )
+    ]
+
+
+def check_mavlink_identifier(premises: Premises) -> list[Finding]:
+    """No MAVLink identifier appears under the overlay tree outside the allow-listed sites.
+
+    Requirement 4 criterion 2 and Requirement 6 criterion 14 read against the one class of
+    Contract_Value a text check can recognise without classifying anything: the Glossary counts a
+    MAVLink message, command or enumeration identifier as a Contract_Value, and `DG-MIS` is the Gate
+    whose Decision_Content records the mission commands, so a token appearing where no owner
+    allow-listed one is rejected naming the file and that Gate.
+
+    **The allow-list is recorded by site and reason, never by identifier, and this rule is what
+    makes that affordable.** It reads the allow-listed files and takes whatever identifiers they
+    hold as the current baseline, so the permitted set lives in the tree and the register holds not
+    one identifier of its own. That is a ratchet rather than a freeze in both directions: a token
+    added to an allow-listed file is accepted without the register being edited, and a token in any
+    other file is rejected whether or not an allow-listed site already holds the same one. It is
+    also not a cliff -- the tokens standing in the tree today are accepted by recording their sites,
+    which is the only thing an owner signs here.
+
+    **It walks the tree rather than the files the register names, and it is the only rule here that
+    does.** The other three read a file because the register or a criterion names it; this one has
+    to find a token in a file nobody named, so the overlay tree is its input and the selected file
+    list still decides nothing. The walk covers every file under ``aerora/`` and not only the C++
+    ones: ``find_cpp_files`` yields C++ alone and its default skip list drops ``test/``, while the
+    tokens in the tree today include a documentation file carrying them in prose and the Aerora
+    suites' own fixtures, so either bound would let a Contract_Value land somewhere this rule had
+    stopped looking.
+
+    **This is the one rule moved rather than duplicated.**
+    ``.kiro/tools/aerora-ui-static-check.ps1`` keeps working where it is and this is the
+    authoritative copy, which is the wider of the two: that one reads three of the four classes,
+    only the two UI directories, only four file extensions and no allow-list at all. So the two are
+    not equivalent checks and neither answer substitutes for the other.
+
+    Three premise failures, each a finding rather than a quiet pass: an allow-listed site the tree
+    does not carry, because a baseline read from a file that is not there is not a baseline; an
+    allow-list entry whose reason is blank, which is the second line behind a schema that requires
+    one, for the reason :func:`_hand_on_row` is the second line behind ``handOnRow``; and an overlay
+    tree this rule cannot walk, because a run that searched nothing must not read as a run that
+    found nothing.
+    """
+    posture = premises.register.mavlink_identifiers
+    baseline = _baseline(premises.root, posture)
+    findings = [
+        Finding(
+            MAVLINK_IDENTIFIER,
+            (MISSION_GATE,),
+            f"{path}: the allow-list records the site and no reason for it, so nothing says why "
+            f"the file reads an identifier it does not author. The reason is the entry: a site "
+            f"recorded without one is an exemption no reviewer can re-read",
+        )
+        for path in baseline.reasonless
+    ]
+    findings.extend(
+        Finding(
+            MAVLINK_IDENTIFIER,
+            (MISSION_GATE,),
+            f"{path}: the allow-listed site {reason}, so the baseline was read from nothing. The "
+            f"identifiers this rule permits are the ones its allow-listed files hold, so a site "
+            f'the tree does not carry permits nothing and hides that it permits nothing: "not '
+            f'found" is not "unchanged" here either',
+        )
+        for path, reason in baseline.unreadable
+    )
+
+    if not (premises.root / OVERLAY_TREE).is_dir():
+        findings.append(
+            Finding(
+                MAVLINK_IDENTIFIER,
+                (MISSION_GATE,),
+                f"{OVERLAY_TREE}/ is not a directory this rule could walk, so no file was searched "
+                f"for a MAVLink identifier. A run that searched nothing is a failure rather than a "
+                f"pass: it is indistinguishable from a run that found nothing",
+            )
+        )
+        return findings
+
+    for relative in _overlay_files(premises.root):
+        if relative in baseline.allowed:
+            continue
+        text, cannot_read = _searchable(premises.root, relative)
+        if text is None:
+            findings.append(
+                Finding(
+                    MAVLINK_IDENTIFIER,
+                    (MISSION_GATE,),
+                    f"{relative}: the file {cannot_read}, so it was searched for no MAVLink "
+                    f"identifier. A file under {OVERLAY_TREE}/ that this rule cannot read is a "
+                    f"failure rather than a pass",
+                )
+            )
+            continue
+        findings.extend(_unlisted(relative, text))
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 
@@ -809,6 +1082,7 @@ _CHECKS: Final = (
     check_guard_value,
     check_guard_assertion,
     check_adr_016_pair,
+    check_mavlink_identifier,
 )
 
 
@@ -821,19 +1095,28 @@ def _established(premises: Premises, files: int) -> str:
     """What the run established, measured here and now rather than remembered.
 
     It states the premise and what was compared against it, and says that the selection is not what
-    decided any of it: the guard rules read the files the register names and `adr-016-pair` reads
-    the two files Requirement 7 criterion 17 names, so a run claiming to have reviewed the
-    selection would be claiming the wrong thing -- including the run that selects one of those two
-    files, which is read because the criterion names it and not because it was given.
+    decided any of it: the guard rules read the files the register names, `adr-016-pair` reads the
+    two files Requirement 7 criterion 17 names, and `mavlink-identifier` walks the overlay tree, so
+    a run claiming to have reviewed the selection would be claiming the wrong thing -- including the
+    run that selects one of those two files, which is read because the criterion names it and not
+    because it was given.
+
+    The baseline is reported as a measurement for the same reason: the identifiers the allow-listed
+    sites hold are read out of the tree on every run and recorded nowhere, so an allow-list whose
+    sites have stopped holding any is visible as a number rather than as a silence.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
+    posture = premises.register.mavlink_identifiers
+    baseline = _baseline(premises.root, posture)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
         f"assertion sites compared against the files the register names, and the ADR-016 pair "
-        f"against {CORE_HEADER} and {OVERLAY_MANIFEST}; no rule read a file because it was among "
-        f"the {files} selected source files\n"
+        f"against {CORE_HEADER} and {OVERLAY_MANIFEST}; every file under {OVERLAY_TREE}/ searched "
+        f"against {len(posture.allow_list)} allow-listed sites holding "
+        f"{len(baseline.identifiers)} identifiers; no rule read a file because it was among the "
+        f"{files} selected source files\n"
     )
 
 

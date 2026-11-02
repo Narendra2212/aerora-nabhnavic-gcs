@@ -1,0 +1,242 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "4.1 Entry point, loading, schema validation and the error contract": [
+      {
+        "executionId": "14196447-1ea1-46d8-a069-73feea50aaad",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793403452809
+      },
+      {
+        "executionId": "14196447-1ea1-46d8-a069-73feea50aaad",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793403472214
+      },
+      {
+        "executionId": "9340de83-3f44-443c-b76f-7f19443eee00",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793420343525
+      },
+      {
+        "executionId": "9340de83-3f44-443c-b76f-7f19443eee00",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793420346281
+      },
+      {
+        "executionId": "8c6e374c-feed-49da-8270-fbe023baefe0",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793451024636
+      },
+      {
+        "executionId": "8c6e374c-feed-49da-8270-fbe023baefe0",
+        "chatSessionId": "sess_6fe2b2fc-b46c-4bdf-84a5-ee5aea7f7ebe",
+        "timestamp": 1793451052864
+      }
+    ],
+    "4.3 Implement the classification and totals checks": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793562888288
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793565261307
+      }
+    ],
+    "4.4 Implement `verified-observation`": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793565280612
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793567250826
+      }
+    ],
+    "4. `tools/validate_gate_register.py` — the cross-document half": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793567253071
+      }
+    ],
+    "5.1 Implement the three settlement shapes and `closure-completeness`": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793567333466
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793571122261
+      }
+    ],
+    "5.2 Implement `closure-signatures`": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793571181408
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793573848187
+      }
+    ],
+    "5.3 Implement `closure-entry-commit` against git history": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793574000279
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793575462993
+      }
+    ],
+    "5.4 Implement `gate-status-derivation`, `signoff-verdicts` and amendments": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793575489718
+      },
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793577311067
+      }
+    ],
+    "5. `tools/validate_gate_register.py` — the Closure_Record half": [
+      {
+        "executionId": "059ac6a1-fb9b-4ded-9c25-68e704cf279b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793577311919
+      }
+    ],
+    "6.1 Implement `guard-registry`": [
+      {
+        "executionId": "8ba65969-4b47-4657-97c2-abcbd6493d3c",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793590577363
+      },
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793607402009
+      }
+    ],
+    "6.2 Implement `forbidden-until`": [
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793607468853
+      },
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793607624138
+      },
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793607636671
+      },
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793609401714
+      }
+    ],
+    "6. The guard registry and the read-only records in the data half": [
+      {
+        "executionId": "31207d88-8b01-41a7-9ca4-0800939ff668",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793609405137
+      }
+    ],
+    "7.1 Create the analyzer shell": [
+      {
+        "executionId": "fbc05e2c-7984-476c-bdcf-e9a1ba4565ab",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793611582330
+      },
+      {
+        "executionId": "5f870335-7bd4-4bbe-859b-b1e3b6d1333a",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793623693963
+      }
+    ],
+    "7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement": [
+      {
+        "executionId": "5f870335-7bd4-4bbe-859b-b1e3b6d1333a",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793624793769
+      },
+      {
+        "executionId": "2ffa8fe0-9e90-4d05-9e1f-484363e89d0b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793626453502
+      },
+      {
+        "executionId": "2ffa8fe0-9e90-4d05-9e1f-484363e89d0b",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793626461941
+      },
+      {
+        "executionId": "4bddb39a-a17d-48ea-878d-b25e370b100d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793650773023
+      },
+      {
+        "executionId": "4bddb39a-a17d-48ea-878d-b25e370b100d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793650774763
+      },
+      {
+        "executionId": "4bddb39a-a17d-48ea-878d-b25e370b100d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793650814447
+      },
+      {
+        "executionId": "4bddb39a-a17d-48ea-878d-b25e370b100d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793650821805
+      },
+      {
+        "executionId": "4bddb39a-a17d-48ea-878d-b25e370b100d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793651987522
+      }
+    ],
+    "7.3 Implement `adr-016-pair`": [
+      {
+        "executionId": "22868726-5d13-4c49-898a-e0e1c147e58d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793652180469
+      },
+      {
+        "executionId": "22868726-5d13-4c49-898a-e0e1c147e58d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793653537311
+      }
+    ],
+    "7.4 Implement `mavlink-identifier`": [
+      {
+        "executionId": "22868726-5d13-4c49-898a-e0e1c147e58d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793653638977
+      },
+      {
+        "executionId": "22868726-5d13-4c49-898a-e0e1c147e58d",
+        "chatSessionId": "sess_d4c6c052-3b8a-418f-83cc-6617977cb8ec",
+        "timestamp": 1793658801662
+      }
+    ]
+  }
+}

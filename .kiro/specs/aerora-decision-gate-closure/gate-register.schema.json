@@ -10,6 +10,7 @@
     "screens",
     "guards",
     "readOnly",
+    "mavlinkIdentifiers",
     "contractSurface"
   ],
   "properties": {
@@ -291,6 +292,44 @@
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "mavlinkIdentifiers": {
+      "type": "object",
+      "description": "The posture of the static MAVLink-identifier check, which is the guard Requirement 6 criterion 17 records as holding the mission command part of DG-MIS visible. It is recorded by site and reason, NEVER by identifier: writing the identifiers themselves here would put them in one more place and make the artifact that exists to stop a Contract_Value entering the repository the thing that carries one. The check therefore reads the allow-listed files, takes whatever identifiers they hold as the current baseline, and rejects an identifier in any file this allow-list does not carry -- a ratchet rather than a cliff, without this register recording a single identifier of its own.",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "allowList"
+      ],
+      "properties": {
+        "gate": {
+          "const": "DG-MIS",
+          "description": "The Gate whose Decision_Content the check holds visible. Requirement 6 criterion 17 names DG-MIS, so a posture reading another Gate is unrepresentable."
+        },
+        "allowList": {
+          "type": "array",
+          "description": "The files permitted to carry a MAVLink message, command or enumeration identifier. An empty list permits none. Each entry is a file path and the reason that file reads one -- and nothing else: an entry naming the identifier it permits would be the Contract_Value this register exists to keep out.",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "Repository-relative path to the allow-listed file. A site, never an identifier."
+              },
+              "reason": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "Why that file reads an identifier it does not author, stated as the role the file plays rather than as the identifier it carries. This is the sentence the next person to extend the allow-list has to be able to repeat about their own entry."
+              }
+            }
           }
         }
       }
