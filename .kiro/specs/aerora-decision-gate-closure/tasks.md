@@ -398,7 +398,7 @@ Constraints every task inherits:
 
 - [ ] 6. The guard registry and the read-only records in the data half
 
-  - [~] 6.1 Implement `guard-registry`
+  - [x] 6.1 Implement `guard-registry`
     - The registry covers at least the nine guards Requirement 4 criterion 5 names; every Gate records
       its guards or records `restsOnReviewAlone`; every `permittedToChangeBy` entry resolves to a part
       that exists

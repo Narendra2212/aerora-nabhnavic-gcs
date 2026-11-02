@@ -26,6 +26,13 @@ Requirements 2.1, 2.7, 2.10 and 2.11: the register's classified entries and the 
 statement holds. The inventory's declared totals agree with its own rows, which is the only check
 here with evidence outside a fixture and is tested against the real inventory as well.
 
+Requirements 4.5, 4.6 and 4.8: the registry covers the nine guards Requirement 4 criterion 5 names,
+each Gate records the guards that hold it visible or records that it rests on the Gate_Review alone,
+every change permission resolves to a part that exists, and a guard is free exactly when every part
+permitted to change it has recorded a permitting verdict for it. The guard tests are the one group
+here that reads a Closure_Record's content against the register rather than against itself, because
+criterion 6 puts the verdict in the record and the mapping in the register.
+
 Requirement 3.9: every `VERIFIED` row carries an observation naming a suite and a slot that resolve
 against `aerora/test/**` and the overlay's CMake registration, and every status the inventory's rows
 carry is a member of the vocabulary the inventory declares. That check reads three files no fixture
@@ -54,6 +61,8 @@ from common.gate_register import (
     GateDossier,
     GatePart,
     GateRegister,
+    Guard,
+    GuardPermission,
     InventoryReference,
     Observation,
     OpenStateReading,
@@ -69,8 +78,11 @@ from common.gate_register import (
     SignOffConditionVerdict,
     dump_closure_record,
     dump_gate_register,
+    guard_freedom,
     is_entry_id,
     parse_screen_inventory,
+    part_reference,
+    released,
 )
 from common.git import AddCommit, run_git
 from common.markdown import md_table
@@ -85,11 +97,14 @@ from validate_gate_register import (
     ENTRY_CLASSIFICATION,
     ENTRY_COMMIT,
     GATE_STATUS_DERIVATION,
+    GUARD_REGISTRY,
     INVENTORY_COVERAGE,
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
     KEYED_SHAPE,
     MAPPING_SHAPE,
+    MAVLINK_IDENTIFIER_GUARD,
+    MECHANICAL_GUARDS,
     NOT_DELIVERED_LABEL,
     OPEN_STATUS,
     OVERLAY_TREE,
@@ -127,6 +142,7 @@ from validate_gate_register import (
     check_delivered_outside,
     check_entry_classification,
     check_gate_status_derivation,
+    check_guard_registry,
     check_inventory_coverage,
     check_inventory_totals,
     check_partition,
@@ -148,6 +164,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
     from pathlib import Path
 
+    from common.gate_register import GuardFreedom
     from validate_gate_register import Finding
 
 # The register names the inventory, so the fixture inventory is written where the real one lives and
@@ -313,8 +330,114 @@ def _recorded_release_sets(screens: Sequence[ScreenRecord]) -> dict[str, list[st
     return recorded
 
 
-def _dossier(gate: str, release_set: Iterable[str]) -> GateDossier:
-    """An OPEN Gate with one unaccepted part, recording *release_set* as its Release_Set."""
+# The one part every baseline Gate records, which is what a change permission resolves against.
+BASELINE_PART = "whole"
+
+# The three Gates besides SINGLE_GATE that requirements.md records a guard of criterion 5 against.
+MISSION_GATE = "DG-MIS"
+ROLE_GATE = "DG-ROL"
+PAYLOAD_GATE = "DG-PAY"
+
+# The eight guards criterion 5 names by symbol. The ninth is the MAVLink-identifier check, which
+# the criterion names as a check rather than as a symbol, and MAVLINK_IDENTIFIER_GUARD is the name
+# the registry records it under.
+POWER_GUARD = "AeroraPowerModel::kDefinedThresholdCount"
+TELEMETRY_GUARD = "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()"
+AUTHORIZATION_GUARD = "AeroraCorePlugin::isAuthorizationEnforced()"
+ACTUATOR_PATH_GUARD = "kGroundStationActuatorPathImplemented"
+PAYLOAD_ACTION_GUARD = "kAutonomousPayloadActionImplemented"
+SOURCE_TRANSITION_GUARD = "kAutomaticSourceTransitionImplemented"
+ENERGY_ESTIMATION_GUARD = "kRemainingEnergyEstimationImplemented"
+REPLAY_GUARD = "kGcsPayloadStateReplayImplemented"
+
+# Each of the nine against the Gates requirements.md records it holding open: the power, source
+# transition and energy guards against DG-PAY (10.17); the fact-group registrar against DG-TLM
+# (7.18); the authorization guard against DG-ROL (9.16); the actuator-path and payload-action
+# guards against both DG-PAY and DG-ROL (10.17, 10.18, 9.17), which is the conjunction the
+# permission rule turns on; and the replay guard with the MAVLink-identifier check against DG-MIS
+# (6.17).
+#
+# Real symbols and the mapping requirements.md names, for the reason the Two_Gate_Screens are real:
+# a fixture that renamed them would test the check against a different document from the one it
+# protects. The key set is asserted equal to MECHANICAL_GUARDS below, so a drift between the two is
+# a failing test rather than a check with nothing left to compare.
+BASELINE_GUARD_GATES: Mapping[str, tuple[str, ...]] = {
+    POWER_GUARD: (PAYLOAD_GATE,),
+    TELEMETRY_GUARD: (SINGLE_GATE,),
+    AUTHORIZATION_GUARD: (ROLE_GATE,),
+    ACTUATOR_PATH_GUARD: (PAYLOAD_GATE, ROLE_GATE),
+    PAYLOAD_ACTION_GUARD: (PAYLOAD_GATE, ROLE_GATE),
+    SOURCE_TRANSITION_GUARD: (PAYLOAD_GATE,),
+    ENERGY_ESTIMATION_GUARD: (PAYLOAD_GATE,),
+    REPLAY_GUARD: (MISSION_GATE,),
+    MAVLINK_IDENTIFIER_GUARD: (MISSION_GATE,),
+}
+
+# Where the fixture records a guard declared and asserted, and what it records against a guard
+# criterion 5 names no value for. All three are fixtures because the data half reads none of them:
+# `guard-registry` covers, maps and permits, and reading a declaration is `guard-value`'s rule in
+# tools/analyzers/gate_guard_check.py.
+GUARD_DECLARATION = "aerora/src/AFixtureGuard.h"
+GUARD_ASSERTION = f"{TEST_TREE}/AFixtureGuardTest.cc"
+FIXTURE_GUARD_VALUE = "a fixture literal"
+
+# A guard outside the nine, which the registry may carry: criterion 5 covers "at least" the nine,
+# and each Gate's own named guard is one more.
+FIXTURE_GUARD = "AFixtureNamespace::kAFixtureGuard"
+
+
+def _guard(
+    symbol: str,
+    *,
+    holds_open: Sequence[str] | None = None,
+    permitted_to_change_by: Sequence[str] | None = None,
+    recorded_value: str | None = None,
+) -> Guard:
+    """One registry entry, permitted to change by the `whole` part of each Gate it holds open.
+
+    The recorded value defaults to the one criterion 5 names, which is what keeps the baseline both
+    pinned and agreeing: every baseline part is unaccepted, so no guard is free and every recorded
+    value is read.
+    """
+    gates = BASELINE_GUARD_GATES.get(symbol, ()) if holds_open is None else tuple(holds_open)
+    permitting = (
+        [part_reference(gate, BASELINE_PART) for gate in gates]
+        if permitted_to_change_by is None
+        else list(permitted_to_change_by)
+    )
+    return Guard(
+        symbol=symbol,
+        declared_in=GUARD_DECLARATION,
+        recorded_value=recorded_value or MECHANICAL_GUARDS.get(symbol) or FIXTURE_GUARD_VALUE,
+        asserted_in=[GUARD_ASSERTION],
+        holds_open=list(gates),
+        holds_no_gate_open=None if gates else True,
+        permitted_to_change_by=permitting,
+        disagreement=None,
+    )
+
+
+def _gate_guards(registry: Sequence[Guard]) -> dict[str, list[str]]:
+    """The guards each Gate_Dossier records, transposed from the registry it is given.
+
+    Derived rather than written twice, so the two ends of one relation agree by construction and
+    every disagreement a test asserts is one the test wrote.
+    """
+    recorded: dict[str, list[str]] = {gate: [] for gate in FIXTURE_GATES}
+    for guard in registry:
+        for gate in guard.holds_open:
+            recorded[gate].append(guard.symbol)
+    return recorded
+
+
+def _dossier(gate: str, release_set: Iterable[str], guards: Iterable[str] = ()) -> GateDossier:
+    """An OPEN Gate with one unaccepted part, recording *release_set* and *guards*.
+
+    A Gate recording no guard records that it rests on the Gate_Review alone, because Requirement 4
+    criterion 8 requires the absence to be recorded rather than read off an empty list. A Gate that
+    records one leaves the flag absent, which is the only other thing the schema admits.
+    """
+    recorded = list(guards)
     return GateDossier(
         id=gate,
         status="OPEN",
@@ -322,7 +445,7 @@ def _dossier(gate: str, release_set: Iterable[str]) -> GateDossier:
         rationale=RationaleReference(document=INVENTORY_PATH, anchor="#a-fixture-anchor"),
         parts=[
             GatePart(
-                id="whole",
+                id=BASELINE_PART,
                 signing_owners=["Product"],
                 state="open",
                 closure_record=None,
@@ -332,8 +455,8 @@ def _dossier(gate: str, release_set: Iterable[str]) -> GateDossier:
         ],
         release_set=[ReleaseSetEntry(screen=screen, part=None) for screen in release_set],
         excluded_acceptance_criteria=[],
-        guards=[],
-        rests_on_review_alone=True,
+        guards=recorded,
+        rests_on_review_alone=None if recorded else True,
         open_state_reading=OpenStateReading(
             state_class="a fixture class", reports_gate_identifier=True
         ),
@@ -343,19 +466,24 @@ def _dossier(gate: str, release_set: Iterable[str]) -> GateDossier:
 def _register(
     screens: Sequence[ScreenRecord] | None = None,
     release_sets: Mapping[str, Iterable[str]] | None = None,
+    guards: Sequence[Guard] | None = None,
 ) -> GateRegister:
-    """The fixture register. Both axes default to the agreeing baseline."""
+    """The fixture register. Every axis defaults to the agreeing baseline."""
     records = _baseline_screens() if screens is None else list(screens)
     recorded = _recorded_release_sets(records) if release_sets is None else release_sets
+    registry = (
+        [_guard(symbol) for symbol in BASELINE_GUARD_GATES] if guards is None else list(guards)
+    )
+    mapped = _gate_guards(registry)
     return GateRegister(
         schema_ref=None,
         inventory=InventoryReference(
             path=INVENTORY_PATH,
             authoritative_for=["the screen set", "each screen's delivery status"],
         ),
-        gates=[_dossier(gate, recorded.get(gate, ())) for gate in FIXTURE_GATES],
+        gates=[_dossier(gate, recorded.get(gate, ()), mapped[gate]) for gate in FIXTURE_GATES],
         screens=records,
-        guards=[],
+        guards=registry,
         read_only=ReadOnlyPosture(
             gate="DG-ROL",
             exceptions=[
@@ -512,6 +640,28 @@ def _with_screen(
 ) -> list[ScreenRecord]:
     """Replace one screen record's fields, leaving every other record as it was."""
     return [replace(record, **changes) if record.id == screen else record for record in screens]
+
+
+def _with_gate(register: GateRegister, gate: str, **changes: object) -> GateRegister:
+    """Replace one Gate_Dossier's fields, leaving every other dossier as it was."""
+    return replace(
+        register,
+        gates=[
+            replace(dossier, **changes) if dossier.id == gate else dossier
+            for dossier in register.gates
+        ],
+    )
+
+
+def _with_guard(register: GateRegister, symbol: str, **changes: object) -> GateRegister:
+    """Replace one registry entry's fields, leaving every other entry and every dossier as it was."""
+    return replace(
+        register,
+        guards=[
+            replace(guard, **changes) if guard.symbol == symbol else guard
+            for guard in register.guards
+        ],
+    )
 
 
 def _messages(findings: Sequence[Finding], check: str) -> list[str]:
@@ -1359,8 +1509,13 @@ def _closure_record(
     gate: str = UNUSED_GATE,
     part: str = SETTLED_PART,
     state: str = "accepted",
+    permissions: Sequence[GuardPermission] = (),
 ) -> ClosureRecord:
-    """One part's Closure_Record. Every field a signature settles is a fixture."""
+    """One part's Closure_Record. Every field a signature settles is a fixture.
+
+    *permissions* is the verdict the acceptance records for each guard the registry maps to the
+    part. It defaults to none, which is what a part of a Gate no guard rests on records.
+    """
     return ClosureRecord(
         schema_ref=None,
         gate=gate,
@@ -1372,7 +1527,7 @@ def _closure_record(
             Signature(owner="Product", date=FIXTURE_DATE, trailer=None, signature_verified=None)
         ],
         sign_off_condition_verdicts=[],
-        guard_permissions=[],
+        guard_permissions=list(permissions),
         settled=list(settled),
         amendments=None,
     )
@@ -3106,6 +3261,448 @@ def test_verified_observation_resolves_every_real_verified_row_against_the_real_
     )
 
     assert check_verified_observation(premises) == []
+
+
+# ---------------------------------------------------------------------------
+# guard-registry
+#
+# Named with the `guard` prefix for the reason the status tests carry `status`: it is what this
+# task's command selects.
+#
+# Two documents, read against each other. The register maps a guard to the Gates it holds open and
+# records which Gate parts could permit it to move; the Closure_Record settling such a part records
+# whether that acceptance did. Nothing here evaluates a verdict -- a guard every permitting part
+# permitted is free, a guard one of them withheld stays pinned, and both are records an owner
+# signed. What the check establishes is coverage, the mapping in both directions, that every
+# permission resolves, and that no acceptance left a guard mapped to it unanswered.
+# ---------------------------------------------------------------------------
+
+# A part no Gate_Dossier records, which is what a change permission must not resolve to.
+UNRECORDED_PART = "a-fixture-part-no-gate-records"
+
+# A second fixture literal, for the one guard whose recorded value criterion 5 does not name.
+ANOTHER_GUARD_VALUE = "another fixture literal"
+
+
+def _permission(symbol: str, *, permits: bool = True) -> GuardPermission:
+    """One verdict on whether accepting a part permits one guard to change value."""
+    return GuardPermission(symbol=symbol, permits=permits, reason=None)
+
+
+def _permissions(gate: str, *, permits: bool = True) -> list[GuardPermission]:
+    """A verdict on every guard the baseline registry maps to *gate*'s one part.
+
+    Totality is the rule, so the accepting case answers for every guard mapped to the part and a
+    test that wants an omission drops one.
+    """
+    return [
+        _permission(symbol, permits=permits)
+        for symbol, gates in BASELINE_GUARD_GATES.items()
+        if gate in gates
+    ]
+
+
+def _accepting(
+    register: GateRegister, permissions: Mapping[str, Sequence[GuardPermission]]
+) -> Premises:
+    """Premises over *register* with the `whole` part of each Gate in *permissions* accepted.
+
+    Each Gate's recorded status and each screen's Released flag follow its parts, as
+    `_settling_register` does, so the register the guard rules read agrees with itself on every
+    other axis and a finding here is a finding about a guard.
+
+    The two checks that read git history are not read here, for the reason `_settlement` builds a
+    submitted record: an accepted record asserts it is in the repository, and these premises are
+    built in code against the repository root, so no commit adds the path they record.
+    """
+    for gate in permissions:
+        register = _with_gate(
+            register,
+            gate,
+            status=CLOSED_STATUS,
+            parts=[
+                replace(
+                    _dossier(gate, ()).parts[0],
+                    state=ACCEPTED_PART_STATE,
+                    closure_record=_record_path(gate, BASELINE_PART),
+                )
+            ],
+        )
+    derived = released(register)
+    register = replace(
+        register,
+        screens=[
+            replace(record, released=derived[record.id].released) for record in register.screens
+        ],
+    )
+    return _premises(
+        register,
+        closures=_closures(
+            *(
+                _closure_record(gate=gate, part=BASELINE_PART, permissions=verdicts)
+                for gate, verdicts in permissions.items()
+            )
+        ),
+    )
+
+
+def _freedom(premises: Premises) -> dict[str, GuardFreedom]:
+    """The freedom derivation over established premises, as check_guard_registry reads it."""
+    return guard_freedom(
+        premises.register,
+        {reference: closure.record for reference, closure in premises.closures.items()},
+    )
+
+
+def _guard_messages(premises: Premises) -> list[str]:
+    return _messages(check_guard_registry(premises), GUARD_REGISTRY)
+
+
+def test_the_baseline_guard_registry_carries_the_named_facts_the_checks_read() -> None:
+    register = _register()
+
+    # The premises of every test below rather than assertions about the registry the spec will
+    # write: the nine symbols, the Gates requirements.md records them against, and that every one
+    # of them is pinned while no part is accepted.
+    assert {guard.symbol for guard in register.guards} == set(MECHANICAL_GUARDS)
+    assert BASELINE_GUARD_GATES[TELEMETRY_GUARD] == (SINGLE_GATE,)
+    assert BASELINE_GUARD_GATES[POWER_GUARD] == (PAYLOAD_GATE,)
+    assert BASELINE_GUARD_GATES[REPLAY_GUARD] == (MISSION_GATE,)
+    assert BASELINE_GUARD_GATES[ACTUATOR_PATH_GUARD] == (PAYLOAD_GATE, ROLE_GATE)
+    assert not any(verdict.is_free for verdict in _freedom(_premises(register)).values())
+
+
+def test_guard_registry_accepts_the_agreeing_registry() -> None:
+    assert check_guard_registry(_premises()) == []
+
+
+@pytest.mark.parametrize("symbol", sorted(MECHANICAL_GUARDS))
+def test_guard_registry_names_a_criterion_5_guard_the_registry_omits(symbol: str) -> None:
+    register = _register(guards=[_guard(item) for item in BASELINE_GUARD_GATES if item != symbol])
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{symbol}: Requirement 4 criterion 5 records the guard")
+    assert "records no entry for it" in message
+
+
+def test_guard_registry_accepts_a_guard_outside_the_nine_criterion_5_names() -> None:
+    """Criterion 5 covers "at least" the nine, and each Gate's own named guard is one more."""
+    register = _register(
+        guards=[
+            *(_guard(symbol) for symbol in BASELINE_GUARD_GATES),
+            _guard(FIXTURE_GUARD, holds_open=[UNUSED_GATE]),
+        ]
+    )
+
+    assert check_guard_registry(_premises(register)) == []
+
+
+def test_guard_registry_names_a_pinned_guard_recorded_at_another_value() -> None:
+    register = _with_guard(_register(), TELEMETRY_GUARD, recorded_value=FIXTURE_GUARD_VALUE)
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{TELEMETRY_GUARD}: Requirement 4 criterion 5 records the guard at ")
+    assert repr(MECHANICAL_GUARDS[TELEMETRY_GUARD]) in message
+    assert repr(FIXTURE_GUARD_VALUE) in message
+    assert f"{part_reference(SINGLE_GATE, BASELINE_PART)}: the part is not accepted" in message
+
+
+def test_guard_registry_reads_the_recorded_value_of_a_freed_guard_for_nothing() -> None:
+    """Criterion 6 lets a permitted guard move, so the value criterion 5 names stops being a rule.
+
+    A check that still demanded it would reject the one state Requirement 4 exists to allow.
+    """
+    register = _with_guard(_register(), TELEMETRY_GUARD, recorded_value=FIXTURE_GUARD_VALUE)
+    premises = _accepting(register, {SINGLE_GATE: _permissions(SINGLE_GATE)})
+
+    assert _freedom(premises)[TELEMETRY_GUARD].is_free
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_registry_reads_no_value_for_the_mavlink_identifier_check() -> None:
+    """The ninth guard is a check, not a symbol holding a literal, so criterion 5 names no value.
+
+    The registry names it by the source-half check that enforces it, and what it records against it
+    is `mavlink-identifier`'s own rule to read rather than this one's.
+    """
+    assert MECHANICAL_GUARDS[MAVLINK_IDENTIFIER_GUARD] is None
+    register = _with_guard(
+        _register(), MAVLINK_IDENTIFIER_GUARD, recorded_value=ANOTHER_GUARD_VALUE
+    )
+
+    assert check_guard_registry(_premises(register)) == []
+
+
+def test_guard_registry_names_a_gate_recording_neither_guards_nor_review_alone() -> None:
+    register = _with_gate(_register(), UNUSED_GATE, guards=[], rests_on_review_alone=None)
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{UNUSED_GATE}: the Gate_Dossier records no guard")
+    assert "does not record that the Gate rests on the Gate_Review alone" in message
+    assert "Requirement 4 criterion 8" in message
+
+
+def test_guard_registry_names_a_gate_recording_guards_and_review_alone() -> None:
+    register = _with_gate(_register(), SINGLE_GATE, rests_on_review_alone=True)
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{SINGLE_GATE}: the Gate_Dossier records {TELEMETRY_GUARD}")
+    assert "records that the Gate rests on the Gate_Review alone" in message
+
+
+def test_guard_registry_is_the_second_line_against_a_gate_recording_neither(
+    tmp_path: Path,
+) -> None:
+    """The schema rejects it first, and the check's own guard is what records the rule.
+
+    `gate-register.schema.json` requires `restsOnReviewAlone: true` alongside an empty `guards`
+    list, so a dossier recording neither never reaches the check through `load_premises`. The guard
+    above is therefore the second line, and this test is what says so.
+    """
+    register = _with_gate(_register(), UNUSED_GATE, guards=[], rests_on_review_alone=None)
+    root = _repository(
+        tmp_path,
+        register=dump_gate_register(register),
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+    )
+
+    findings = _findings(load_premises(root))
+
+    assert {finding.check for finding in findings} == {SCHEMA}
+    assert any(
+        "'restsOnReviewAlone' is a required property" in finding.message for finding in findings
+    )
+
+
+def test_the_schema_requires_a_gate_dossier_to_record_a_guards_list(tmp_path: Path) -> None:
+    """The other half of the same absence: the list itself cannot be left out either."""
+    register = _register()
+    document = dump_gate_register(register)
+    del document["gates"][0]["guards"]
+    root = _repository(
+        tmp_path,
+        register=document,
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+    )
+
+    findings = _findings(load_premises(root))
+
+    assert {finding.check for finding in findings} == {SCHEMA}
+    assert any("'guards' is a required property" in finding.message for finding in findings)
+
+
+def test_guard_registry_names_a_registry_entry_recording_neither_gate_nor_verdict() -> None:
+    """The guard side of the same obligation, which the schema also rejects first."""
+    register = _with_guard(_register(), TELEMETRY_GUARD, holds_open=[], holds_no_gate_open=None)
+
+    messages = _guard_messages(_premises(register))
+    assert any("records no Gate the guard holds open" in message for message in messages)
+    # The dossier still records the guard, so the mapping disagrees as well. Both are findings.
+    assert any(f"{SINGLE_GATE}: the Gate_Dossier records the guard" in m for m in messages)
+
+
+def test_guard_registry_names_a_registry_entry_recording_a_gate_and_no_gate_at_once() -> None:
+    register = _with_guard(_register(), TELEMETRY_GUARD, holds_no_gate_open=True)
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{TELEMETRY_GUARD}: the registry records the guard as holding ")
+    assert "records that no Gate rests on it" in message
+
+
+def test_guard_registry_names_a_guard_a_dossier_records_and_the_registry_does_not() -> None:
+    register = _with_gate(
+        _register(), UNUSED_GATE, guards=[FIXTURE_GUARD], rests_on_review_alone=None
+    )
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(
+        f"{UNUSED_GATE}: the Gate_Dossier records the guard {FIXTURE_GUARD!r}"
+    )
+    assert "the guard registry records no entry for it" in message
+    assert "The registry is the authority" in message
+
+
+def test_guard_registry_names_a_dossier_recording_a_guard_the_registry_holds_elsewhere() -> None:
+    register = _with_gate(
+        _register(), UNUSED_GATE, guards=[REPLAY_GUARD], rests_on_review_alone=None
+    )
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{UNUSED_GATE}: the Gate_Dossier records the guard {REPLAY_GUARD!r}")
+    assert f"records it as holding {MISSION_GATE} open" in message
+
+
+def test_guard_registry_names_a_dossier_that_drops_a_guard_the_registry_maps_to_it() -> None:
+    register = _with_gate(_register(), SINGLE_GATE, guards=[], rests_on_review_alone=True)
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(
+        f"{TELEMETRY_GUARD}: the registry records the guard as holding {SINGLE_GATE} open"
+    )
+    assert "that Gate_Dossier records no guard" in message
+    assert "Requirement 4 criterion 8" in message
+
+
+def test_guard_registry_names_a_permitting_part_the_register_does_not_record() -> None:
+    reference = part_reference(SINGLE_GATE, UNRECORDED_PART)
+    register = _with_guard(_register(), TELEMETRY_GUARD, permitted_to_change_by=[reference])
+
+    (message,) = _guard_messages(_premises(register))
+    assert message.startswith(f"{TELEMETRY_GUARD}: the registry records {reference} as permitted")
+    assert "the register records no part of that name" in message
+
+
+def test_guard_registry_names_a_guard_the_register_records_twice() -> None:
+    """Two entries for one symbol leave the permission rule with two answers and no way to choose."""
+    register = _register(
+        guards=[
+            *(_guard(symbol) for symbol in BASELINE_GUARD_GATES),
+            _guard(TELEMETRY_GUARD, recorded_value=FIXTURE_GUARD_VALUE),
+        ]
+    )
+
+    (message,) = _guard_messages(_premises(register))
+    assert message == f"{TELEMETRY_GUARD}: the register records more than one guard of that symbol"
+
+
+def test_guard_registry_names_an_accepted_part_recording_no_verdict_for_a_guard() -> None:
+    """Criterion 6 read as totality: omission is a finding, not a default."""
+    premises = _accepting(_register(), {SINGLE_GATE: []})
+
+    (message,) = _guard_messages(premises)
+    assert message.startswith(
+        f"{part_reference(SINGLE_GATE, BASELINE_PART)}: the registry maps the guard "
+        f"{TELEMETRY_GUARD!r} to the part"
+    )
+    assert "the record carries no verdict" in message
+    assert "an omission is a finding and never a default" in message
+    assert not _freedom(premises)[TELEMETRY_GUARD].is_free
+
+
+def test_guard_registry_names_a_verdict_on_a_guard_the_part_cannot_change() -> None:
+    permissions = [*_permissions(SINGLE_GATE), _permission(FIXTURE_GUARD)]
+    premises = _accepting(_register(), {SINGLE_GATE: permissions})
+
+    (message,) = _guard_messages(premises)
+    assert f"the record carries a verdict on the guard {FIXTURE_GUARD!r}" in message
+    assert "records no permission for this part to change that guard" in message
+
+
+def test_guard_registry_names_two_verdicts_on_one_guard() -> None:
+    permissions = [_permission(TELEMETRY_GUARD), _permission(TELEMETRY_GUARD, permits=False)]
+    premises = _accepting(_register(), {SINGLE_GATE: permissions})
+
+    (message,) = _guard_messages(premises)
+    assert f"the record carries 2 verdicts on the guard {TELEMETRY_GUARD!r}" in message
+    assert not _freedom(premises)[TELEMETRY_GUARD].is_free
+
+
+def test_guard_freedom_frees_a_guard_its_one_permitting_part_permitted() -> None:
+    premises = _accepting(_register(), {SINGLE_GATE: _permissions(SINGLE_GATE)})
+
+    verdict = _freedom(premises)[TELEMETRY_GUARD]
+    assert verdict.is_free
+    assert verdict.permitting_parts == (part_reference(SINGLE_GATE, BASELINE_PART),)
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_leaves_a_guard_pinned_by_a_non_permitting_verdict() -> None:
+    """Requirement 6 criterion 17: DG-MIS closes and the replay guard does not move.
+
+    The MAVLink-identifier check is the same part's other guard and this acceptance permits it, so
+    one signature frees one of the two guards put to it and leaves the other pinned. An
+    implementation reading "the Gate closed" as "its guards are free" would let the second go, and
+    nothing else would notice.
+    """
+    permissions = [
+        _permission(REPLAY_GUARD, permits=False),
+        _permission(MAVLINK_IDENTIFIER_GUARD),
+    ]
+    premises = _accepting(_register(), {MISSION_GATE: permissions})
+
+    freedom = _freedom(premises)
+    assert not freedom[REPLAY_GUARD].is_free
+    assert freedom[REPLAY_GUARD].withholding_parts == (part_reference(MISSION_GATE, BASELINE_PART),)
+    assert freedom[MAVLINK_IDENTIFIER_GUARD].is_free
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_pins_a_two_gate_guard_until_both_parts_permit_it() -> None:
+    """The conjunction is the check: one of the two Gates has not been signed."""
+    premises = _accepting(_register(), {PAYLOAD_GATE: _permissions(PAYLOAD_GATE)})
+
+    freedom = _freedom(premises)
+    assert not freedom[ACTUATOR_PATH_GUARD].is_free
+    assert freedom[ACTUATOR_PATH_GUARD].unaccepted_parts == (
+        part_reference(ROLE_GATE, BASELINE_PART),
+    )
+    assert not freedom[PAYLOAD_ACTION_GUARD].is_free
+    # The guards DG-PAY alone holds open are freed by the same acceptance.
+    assert freedom[POWER_GUARD].is_free
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_frees_a_two_gate_guard_once_both_parts_permit_it() -> None:
+    premises = _accepting(
+        _register(),
+        {PAYLOAD_GATE: _permissions(PAYLOAD_GATE), ROLE_GATE: _permissions(ROLE_GATE)},
+    )
+
+    freedom = _freedom(premises)
+    assert freedom[ACTUATOR_PATH_GUARD].is_free
+    assert freedom[PAYLOAD_ACTION_GUARD].is_free
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_pins_a_two_gate_guard_one_of_its_parts_withheld() -> None:
+    """Both parts accepted, one of them withholding: the conjunction reads the withheld verdict."""
+    premises = _accepting(
+        _register(),
+        {
+            PAYLOAD_GATE: _permissions(PAYLOAD_GATE),
+            ROLE_GATE: _permissions(ROLE_GATE, permits=False),
+        },
+    )
+
+    freedom = _freedom(premises)
+    assert not freedom[ACTUATOR_PATH_GUARD].is_free
+    assert freedom[ACTUATOR_PATH_GUARD].withholding_parts == (
+        part_reference(ROLE_GATE, BASELINE_PART),
+    )
+    assert freedom[POWER_GUARD].is_free
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_pins_a_guard_no_part_is_permitted_to_change() -> None:
+    """The conjunction over an empty set is true, and freedom is not what that should read as.
+
+    A guard naming no permitting part is one no signature was ever recorded as unlocking, which is
+    the vacuity `gate_open` rejects for a Gate recording no part.
+    """
+    premises = _premises(_with_guard(_register(), TELEMETRY_GUARD, permitted_to_change_by=[]))
+
+    verdict = _freedom(premises)[TELEMETRY_GUARD]
+    assert not verdict.is_free
+    assert verdict.permitting_parts == ()
+    assert check_guard_registry(premises) == []
+
+
+def test_guard_freedom_pins_a_guard_whose_accepted_part_names_no_record() -> None:
+    """An unreadable verdict is not a permitting one, and the missing record is reported elsewhere.
+
+    `closure-completeness` names a part recorded accepted that names no Closure_Record, so this
+    check reports nothing and leaves the guard pinned.
+    """
+    accepted = replace(
+        _dossier(SINGLE_GATE, ()).parts[0], state=ACCEPTED_PART_STATE, closure_record=None
+    )
+    register = _with_gate(_register(), SINGLE_GATE, status=CLOSED_STATUS, parts=[accepted])
+    premises = _premises(register)
+
+    verdict = _freedom(premises)[TELEMETRY_GUARD]
+    assert not verdict.is_free
+    assert verdict.unrecorded_parts == (part_reference(SINGLE_GATE, BASELINE_PART),)
+    assert check_guard_registry(premises) == []
 
 
 # ---------------------------------------------------------------------------

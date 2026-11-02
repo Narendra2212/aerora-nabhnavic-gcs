@@ -41,10 +41,12 @@ from common.gate_register import (
     ScreenInventoryError,
     blocking_gates,
     gate_open,
+    guard_freedom,
     is_entry_id,
     load_closure_record,
     load_gate_register,
     parse_screen_inventory,
+    part_reference,
     release_sets,
     released,
     two_gate_screens,
@@ -65,6 +67,8 @@ if TYPE_CHECKING:
         GateOpenness,
         GatePart,
         GateRegister,
+        Guard,
+        GuardFreedom,
         Observation,
         ScreenInventory,
         ScreenRelease,
@@ -116,6 +120,7 @@ SIGNOFF_VERDICTS: Final = "signoff-verdicts"
 # key -- so folding them back in would undo the scoping Requirement 3 criterion 11 turns on.
 CLOSURE_AMENDMENTS: Final = "closure-amendments"
 VERIFIED_OBSERVATION: Final = "verified-observation"
+GUARD_REGISTRY: Final = "guard-registry"
 INVENTORY_TOTALS: Final = "inventory-totals"
 
 # The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
@@ -192,6 +197,36 @@ RETAINED_GATES: Final[Mapping[str, tuple[str, ...]]] = {
     "SCR-VEH-04": (),
     "SCR-SEC-01": (),
     "SCR-HLP-03": (),
+}
+
+# Requirement 4 criterion 5's ninth guard, which is not a symbol holding a literal: the criterion
+# names it as *the static MAVLink-identifier check*. The registry therefore names it by the
+# source-half check that enforces it -- `mavlink-identifier` -- so the row reads like the other
+# eight without pretending that a declaring file holds a value for it. The criterion names no value
+# for it either, so MECHANICAL_GUARDS carries none and this check reads its recorded value for
+# nothing: what holds the guard is the check, and the allow-list that check reads is recorded by
+# site and reason, never by identifier.
+MAVLINK_IDENTIFIER_GUARD: Final = "mavlink-identifier"
+
+# Requirement 4 criterion 5: each mechanical guard that holds an open Gate visible, with the value
+# the criterion records it holding. Recorded here rather than read out of the register, for the
+# reason TWO_GATE_SCREENS is: a check that took its expectation from the document it checks agrees
+# with that document by construction.
+#
+# The criterion covers "at least" these, so the registry may record more -- each Gate's own named
+# guard is one (6.17, 8.15, 11.19, 12.20, 13.16, 14.16) -- and a missing one is the finding. A
+# guard symbol and the literal it holds are not Contract_Values: the Glossary's list carries
+# neither, and requirements.md names all nine already.
+MECHANICAL_GUARDS: Final[Mapping[str, str | None]] = {
+    "AeroraPowerModel::kDefinedThresholdCount": "0",
+    "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()": "false",
+    "AeroraCorePlugin::isAuthorizationEnforced()": "false",
+    "kGroundStationActuatorPathImplemented": "false",
+    "kAutonomousPayloadActionImplemented": "false",
+    "kAutomaticSourceTransitionImplemented": "false",
+    "kRemainingEnergyEstimationImplemented": "false",
+    "kGcsPayloadStateReplayImplemented": "false",
+    MAVLINK_IDENTIFIER_GUARD: None,
 }
 
 # The screen inventory is Tab 7's document, so a disagreement between the totals it declares and
@@ -424,11 +459,6 @@ def _schema_findings(document: Any, schema: Any, *, path: str, schema_path: str)
     ]
 
 
-def _part_reference(gate: str, part: str) -> str:
-    """Name one Gate part the way the register names one in ``permittedToChangeBy``."""
-    return f"{gate}:{part}"
-
-
 def _load_closures(
     root: Path, register: GateRegister
 ) -> tuple[dict[str, NamedClosureRecord], list[Finding]]:
@@ -466,7 +496,7 @@ def _load_closures(
     closures: dict[str, NamedClosureRecord] = {}
     naming: dict[str, str] = {}
     for gate, part, path in named:
-        reference = _part_reference(gate, part.id)
+        reference = part_reference(gate, part.id)
         if path in naming:
             findings.append(
                 Finding(
@@ -505,7 +535,7 @@ def _load_closures(
                 Finding(
                     PREMISES,
                     f"{path} records that it settles "
-                    f"{_part_reference(record.gate, record.part)}, and {reference} names it as the "
+                    f"{part_reference(record.gate, record.part)}, and {reference} names it as the "
                     f"Closure_Record that settles that part",
                 )
             )
@@ -1186,7 +1216,7 @@ def _named_key_set(
     per-key rule over a set this check cannot see would pass over nothing.
     """
     named = [
-        _part_reference(dossier.id, part.id)
+        part_reference(dossier.id, part.id)
         for dossier in premises.register.gates
         for part in dossier.parts
         for item in part.elements
@@ -1571,7 +1601,7 @@ def check_closure_completeness(premises: Premises) -> list[Finding]:
         for part in dossier.parts:
             if part.state not in SETTLING_PART_STATES:
                 continue
-            reference = _part_reference(dossier.id, part.id)
+            reference = part_reference(dossier.id, part.id)
             closure = premises.closures.get(reference)
             if closure is not None:
                 findings.extend(_part_settlement(premises, reference, part, closure.record))
@@ -1735,7 +1765,7 @@ def check_closure_signatures(premises: Premises) -> list[Finding]:
     findings: list[Finding] = []
     for dossier in premises.register.gates:
         for part in dossier.parts:
-            reference = _part_reference(dossier.id, part.id)
+            reference = part_reference(dossier.id, part.id)
             if not part.signing_owners:
                 findings.append(
                     Finding(
@@ -1864,7 +1894,7 @@ def check_closure_entry_commit(premises: Premises) -> list[Finding]:
     findings: list[Finding] = []
     for dossier in premises.register.gates:
         for part in dossier.parts:
-            reference = _part_reference(dossier.id, part.id)
+            reference = part_reference(dossier.id, part.id)
             closure = premises.closures.get(reference)
             if closure is None:
                 continue
@@ -1879,7 +1909,7 @@ def _parts(gate: str, parts: Iterable[str]) -> str:
     In the order the Gate_Dossier records the parts, which is the order the derivation reports
     them, so a finding reads down the dossier rather than alphabetically across it.
     """
-    return ", ".join(_part_reference(gate, part) for part in parts)
+    return ", ".join(part_reference(gate, part) for part in parts)
 
 
 def check_gate_status_derivation(premises: Premises) -> list[Finding]:
@@ -2026,7 +2056,7 @@ def check_signoff_verdicts(premises: Premises) -> list[Finding]:
         for part in dossier.parts:
             if part.state != ACCEPTED_PART_STATE:
                 continue
-            reference = _part_reference(dossier.id, part.id)
+            reference = part_reference(dossier.id, part.id)
             closure = premises.closures.get(reference)
             if closure is None:
                 continue
@@ -2187,7 +2217,7 @@ def check_closure_amendments(premises: Premises) -> list[Finding]:
     findings: list[Finding] = []
     for dossier in premises.register.gates:
         for part in dossier.parts:
-            reference = _part_reference(dossier.id, part.id)
+            reference = part_reference(dossier.id, part.id)
             closure = premises.closures.get(reference)
             if closure is None:
                 continue
@@ -2501,6 +2531,308 @@ def check_verified_observation(premises: Premises) -> list[Finding]:
     return findings
 
 
+def _symbols(symbols: Iterable[str]) -> str:
+    """Render a guard symbol set in symbol order, and say so where it is empty.
+
+    Ordered and spelled out for the reason :func:`_owners` is: a message that trailed off where a
+    guard set should be would read as a rendering defect instead of as the finding that the set is
+    empty.
+    """
+    return ", ".join(sorted(symbols)) or "no guard"
+
+
+def _holding(guard: Guard) -> str:
+    """Say which Gates the registry records a guard as holding open."""
+    return (
+        f"holding {_gates(guard.holds_open)} open" if guard.holds_open else "holding no Gate open"
+    )
+
+
+def _pinning(verdict: GuardFreedom) -> str:
+    """Say what pins a guard, naming the part behind each reason.
+
+    One clause per way a part can pin it, because each is a different repair and a guard two Gates
+    hold open can be pinned by both at once.
+    """
+    stated = [
+        f"{', '.join(parts)}: {reason}"
+        for parts, reason in (
+            (verdict.unresolved_parts, "the register records no part of that name"),
+            (verdict.unaccepted_parts, "the part is not accepted"),
+            (verdict.unrecorded_parts, "the accepted part names no Closure_Record"),
+            (verdict.unanswered_parts, "the record carries no verdict on the guard"),
+            (verdict.withholding_parts, "the record records a non-permitting verdict"),
+        )
+        if parts
+    ]
+    if not stated:
+        return "the registry records no part permitted to change it"
+    return "; ".join(stated)
+
+
+def _guard_coverage(premises: Premises, freedom: Mapping[str, GuardFreedom]) -> list[Finding]:
+    """The nine guards Requirement 4 criterion 5 names are recorded, at the value it names.
+
+    The value is read while the guard is pinned. Once every part permitted to change a guard has
+    permitted it, criterion 6 lets the recorded value move, and a check that still demanded the
+    criterion's value would reject the one state Requirement 4 exists to allow. The ninth guard is
+    the MAVLink-identifier check, for which the criterion names no value, so none is compared.
+    """
+    recorded = {guard.symbol: guard for guard in premises.register.guards}
+    findings: list[Finding] = []
+    for symbol, value in MECHANICAL_GUARDS.items():
+        guard = recorded.get(symbol)
+        if guard is None:
+            findings.append(
+                Finding(
+                    GUARD_REGISTRY,
+                    f"{symbol}: Requirement 4 criterion 5 records the guard, and the register's "
+                    f"guard registry records no entry for it. A guard the registry does not carry "
+                    f"is a guard nothing maps to a Gate, holds to a value or permits to move",
+                )
+            )
+            continue
+        verdict = freedom.get(symbol)
+        if (
+            value is None
+            or guard.recorded_value == value
+            or (verdict is not None and verdict.is_free)
+        ):
+            continue
+        pinned = "it is pinned" if verdict is None else _pinning(verdict)
+        findings.append(
+            Finding(
+                GUARD_REGISTRY,
+                f"{symbol}: Requirement 4 criterion 5 records the guard at {value!r}, the registry "
+                f"records it at {guard.recorded_value!r}, and {pinned}",
+            )
+        )
+    return findings
+
+
+def _guard_mapping(premises: Premises) -> list[Finding]:
+    """The Gate side of Requirement 4 criterion 8, and the two ends of one relation.
+
+    Three rules. Each Gate_Dossier records the guards that hold it visible or records that it rests
+    on the Gate_Review alone; each registry entry records the Gates it holds open or records that no
+    Gate rests on it; and those two lists are one relation read from two ends, so they are compared
+    in both directions rather than either being trusted alone. The registry is the authority for the
+    mapping, so a disagreement names the dossier as the repair.
+
+    The schema is the first line under both absences: a dossier recording ``"guards": []`` without
+    ``restsOnReviewAlone: true``, a registry entry recording ``"holdsOpen": []`` without
+    ``holdsNoGateOpen: true``, and either flag recorded ``true`` beside a non-empty list are all
+    unrepresentable. These are the second line, for a model built in code and for the day the schema
+    stops being applied to a document.
+    """
+    dossiers = {dossier.id: dossier for dossier in premises.register.gates}
+    registry = {guard.symbol: guard for guard in premises.register.guards}
+    findings: list[Finding] = []
+
+    for dossier in premises.register.gates:
+        if not dossier.guards and dossier.rests_on_review_alone is not True:
+            findings.append(
+                Finding(
+                    GUARD_REGISTRY,
+                    f"{dossier.id}: the Gate_Dossier records no guard and does not record that the "
+                    f"Gate rests on the Gate_Review alone. Requirement 4 criterion 8 requires the "
+                    f"absence to be recorded rather than read off an empty list",
+                )
+            )
+        if dossier.guards and dossier.rests_on_review_alone is True:
+            findings.append(
+                Finding(
+                    GUARD_REGISTRY,
+                    f"{dossier.id}: the Gate_Dossier records {_symbols(dossier.guards)} and records "
+                    f"that the Gate rests on the Gate_Review alone",
+                )
+            )
+        for symbol in dossier.guards:
+            guard = registry.get(symbol)
+            if guard is None:
+                findings.append(
+                    Finding(
+                        GUARD_REGISTRY,
+                        f"{dossier.id}: the Gate_Dossier records the guard {symbol!r}, and the "
+                        f"guard registry records no entry for it. The registry is the authority "
+                        f"for the guard-to-Gate mapping",
+                    )
+                )
+            elif dossier.id not in guard.holds_open:
+                findings.append(
+                    Finding(
+                        GUARD_REGISTRY,
+                        f"{dossier.id}: the Gate_Dossier records the guard {symbol!r}, and the "
+                        f"registry records it as {_holding(guard)}. The registry is the authority "
+                        f"for the guard-to-Gate mapping",
+                    )
+                )
+
+    for guard in premises.register.guards:
+        if not guard.holds_open and guard.holds_no_gate_open is not True:
+            findings.append(
+                Finding(
+                    GUARD_REGISTRY,
+                    f"{guard.symbol}: the registry records no Gate the guard holds open and does "
+                    f"not record that no Gate rests on it. Requirement 4 criterion 8's obligation "
+                    f"runs in both directions, so this absence is recorded rather than read off an "
+                    f"empty list too",
+                )
+            )
+        if guard.holds_open and guard.holds_no_gate_open is True:
+            findings.append(
+                Finding(
+                    GUARD_REGISTRY,
+                    f"{guard.symbol}: the registry records the guard as {_holding(guard)} and "
+                    f"records that no Gate rests on it",
+                )
+            )
+        for gate in guard.holds_open:
+            dossier = dossiers.get(gate)
+            if dossier is None:
+                findings.append(
+                    Finding(
+                        GUARD_REGISTRY,
+                        f"{guard.symbol}: the registry records the guard as holding {gate} open, "
+                        f"and the register records no Gate_Dossier for {gate}",
+                    )
+                )
+            elif guard.symbol not in dossier.guards:
+                findings.append(
+                    Finding(
+                        GUARD_REGISTRY,
+                        f"{guard.symbol}: the registry records the guard as holding {gate} open, "
+                        f"and that Gate_Dossier records {_symbols(dossier.guards)}. Requirement 4 "
+                        f"criterion 8 puts the obligation on the Gate side too, so the dossier "
+                        f"records every guard that holds it visible",
+                    )
+                )
+    return findings
+
+
+def _verdict_totality(
+    reference: str, mapped: frozenset[str], record: ClosureRecord
+) -> list[Finding]:
+    """The guards the registry maps to one accepted part, against the verdicts its record carries.
+
+    Set equality, reported per guard, plus the one fact a verdict row cannot carry twice. Each is a
+    different repair: an unanswered guard is a verdict to reach, a verdict on a guard the registry
+    does not map to the part answers for a signature that cannot unlock it, and two verdicts on one
+    guard record no verdict at all.
+    """
+    answered: dict[str, int] = {}
+    for permission in record.guard_permissions:
+        answered[permission.symbol] = answered.get(permission.symbol, 0) + 1
+
+    findings = [
+        Finding(
+            GUARD_REGISTRY,
+            f"{reference}: the registry maps the guard {symbol!r} to the part, the part is "
+            f"accepted, and the record carries no verdict on whether accepting it permits that "
+            f"guard to change value. Requirement 4 criterion 6 records a verdict for each guard at "
+            f"acceptance, so an omission is a finding and never a default",
+        )
+        for symbol in sorted(mapped - answered.keys())
+    ]
+    findings.extend(
+        Finding(
+            GUARD_REGISTRY,
+            f"{reference}: the record carries a verdict on the guard {symbol!r}, and the registry "
+            f"records no permission for this part to change that guard. It maps "
+            f"{_symbols(mapped)} to the part",
+        )
+        for symbol in sorted(answered.keys() - mapped)
+    )
+    findings.extend(
+        Finding(
+            GUARD_REGISTRY,
+            f"{reference}: the record carries {count} verdicts on the guard {symbol!r}. One "
+            f"acceptance reaches one verdict per guard, and two leave which one it reached "
+            f"unrecorded",
+        )
+        for symbol, count in sorted(answered.items())
+        if count > 1
+    )
+    return findings
+
+
+def _guard_permissions(premises: Premises, freedom: Mapping[str, GuardFreedom]) -> list[Finding]:
+    """Requirement 4 criterion 6 read as totality, and the resolution the permission rests on.
+
+    Two rules. Every change permission resolves to a part the register records, because a permission
+    nothing can accept is a guard nothing could ever free. And every part the register records
+    `accepted` carries a verdict on each guard the registry maps to it, in both directions.
+
+    **Nothing here evaluates a verdict.** A guard every permitting part has permitted is free, a
+    guard one of them withheld stays pinned, and both are records an owner signed:
+    :func:`guard_freedom` reports which, ``guard-value`` in the source half reads that to decide
+    whether a value in source is allowed to have moved, and neither asks whether the owner was
+    right. What no owner can be protected from is a guard that was never put to them, which is what
+    the totality rule is for.
+
+    A part recorded `accepted` that names no Closure_Record is ``closure-completeness``'s finding,
+    reported once there. It leaves the guard pinned here, which is the safe reading of a verdict
+    that could not be read.
+    """
+    findings = [
+        Finding(
+            GUARD_REGISTRY,
+            f"{symbol}: the registry records {reference} as permitted to change the guard, and the "
+            f"register records no part of that name. A permission nothing can accept is a guard no "
+            f"signature could free",
+        )
+        for symbol, verdict in sorted(freedom.items())
+        for reference in verdict.unresolved_parts
+    ]
+
+    mapped: dict[str, set[str]] = {}
+    for guard in premises.register.guards:
+        for reference in guard.permitted_to_change_by:
+            mapped.setdefault(reference, set()).add(guard.symbol)
+
+    for dossier in premises.register.gates:
+        for part in dossier.parts:
+            if part.state != ACCEPTED_PART_STATE:
+                continue
+            reference = part_reference(dossier.id, part.id)
+            closure = premises.closures.get(reference)
+            if closure is None:
+                continue
+            findings.extend(
+                _verdict_totality(reference, frozenset(mapped.get(reference, ())), closure.record)
+            )
+    return findings
+
+
+def check_guard_registry(premises: Premises) -> list[Finding]:
+    """The guard registry covers Requirement 4 criterion 5, maps to the Gates, and records permits.
+
+    Four rules, each reported as itself: the nine guards criterion 5 names are recorded at the value
+    it names while they are pinned; each Gate records its guards or records that it rests on the
+    Gate_Review alone, in agreement with the registry in both directions; every change permission
+    resolves to a part that exists; and every accepted part carries a verdict for each guard mapped
+    to it.
+
+    The freedom derivation is the shared model's, so this check and the source half's ``guard-value``
+    read one verdict rather than two readings of one rule. A guard or a part the register records
+    twice leaves that derivation with two answers, so it is reported as itself and the rules that
+    read the derivation do not run over a reading that could be either.
+    """
+    try:
+        freedom = guard_freedom(
+            premises.register,
+            {reference: closure.record for reference, closure in premises.closures.items()},
+        )
+    except GateRegisterError as error:
+        return [Finding(GUARD_REGISTRY, str(error))]
+
+    return [
+        *_guard_coverage(premises, freedom),
+        *_guard_mapping(premises),
+        *_guard_permissions(premises, freedom),
+    ]
+
+
 def _declared_count(
     path: str, site: str, declared: int, derived: int, counted: str
 ) -> list[Finding]:
@@ -2650,6 +2982,7 @@ _CHECKS: Final = (
     check_signoff_verdicts,
     check_closure_amendments,
     check_verified_observation,
+    check_guard_registry,
     check_inventory_totals,
 )
 

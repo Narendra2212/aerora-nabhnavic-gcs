@@ -33,6 +33,12 @@ functions over the model and the parsed rows, and every check the Gate_Review ru
 recorded value against one of them. Each derives from the register and the rows at call time and
 holds no screen count, no Gate count beyond the ten identifiers and no Release_Set membership,
 because a remembered figure is the one that goes stale.
+
+:func:`guard_freedom` is the sixth, and it is here because *both* entry points read it: the data
+half rejects an acceptance that recorded no verdict for a guard mapped to it, and the source half
+reads the same verdict to decide whether a guard's value in source is allowed to have moved. It is
+a pure function over the register and the Closure_Records, so it belongs beside the five rather
+than inside either checker.
 """
 
 from __future__ import annotations
@@ -80,6 +86,7 @@ __all__ = [
     "GateRegister",
     "GateRegisterError",
     "Guard",
+    "GuardFreedom",
     "GuardPermission",
     "InventoryArea",
     "InventoryReference",
@@ -103,10 +110,12 @@ __all__ = [
     "dump_closure_record",
     "dump_gate_register",
     "gate_open",
+    "guard_freedom",
     "is_entry_id",
     "load_closure_record",
     "load_gate_register",
     "parse_screen_inventory",
+    "part_reference",
     "release_sets",
     "released",
     "two_gate_screens",
@@ -1674,3 +1683,152 @@ def undelivered(inventory: ScreenInventory) -> frozenset[str]:
         if row.status not in DELIVERED_STATUSES:
             screens.add(row.screen)
     return frozenset(screens)
+
+
+# ---------------------------------------------------------------------------
+# The guard freedom derivation
+# ---------------------------------------------------------------------------
+
+
+def part_reference(gate: str, part: str) -> str:
+    """Name one Gate part the way the register names one in ``permittedToChangeBy``.
+
+    Public because three places read the same notation: the registry records a change permission as
+    one, the Gate_Review keys a Closure_Record by one, and :func:`guard_freedom` resolves one
+    against the Gate_Dossiers. A second spelling of it anywhere is the drift that would let a
+    permission stop resolving while every document still looked well formed.
+    """
+    return f"{gate}:{part}"
+
+
+@dataclass(frozen=True)
+class GuardFreedom:
+    """Whether one guard's recorded value may move, with everything that pins it named.
+
+    ``is_free`` is Requirement 4 criterion 6 read as a conjunction: the guard names at least one
+    part permitted to change it, every one of those parts is accepted, and each of those parts'
+    Closure_Records records a permitting verdict for this guard. Anything else leaves the guard
+    pinned, and each tuple below says which part pinned it and how, because each is a different
+    repair:
+
+    - ``unresolved_parts`` -- a permission naming a part the register does not record. Nothing can
+      accept it, so it can never be the signature that frees the guard.
+    - ``unaccepted_parts`` -- a part recorded `open` or `submitted`. The ordinary pinned state, and
+      the first row of the design's table.
+    - ``unrecorded_parts`` -- a part recorded `accepted` that names no Closure_Record the caller
+      supplied. The verdict is unreadable rather than absent, so the guard stays pinned and the
+      record that is missing is reported where a missing record belongs.
+    - ``unanswered_parts`` -- a part whose record carries no verdict on this guard. Omission is a
+      finding, not a default: an acceptance that said nothing about a guard mapped to it has not
+      permitted it.
+    - ``withholding_parts`` -- a part whose record records a non-permitting verdict. Closing the
+      Gate did not unlock this guard, which is the state Requirement 6 criterion 17 needs for
+      ``kGcsPayloadStateReplayImplemented`` after `DG-MIS` is recorded `CLOSED`.
+
+    A guard recording no permission at all is pinned rather than free. The conjunction over an
+    empty set is true, so reading it as freedom would free a guard no signature was ever recorded
+    as unlocking -- the vacuity :func:`gate_open` rejects for a Gate recording no part.
+    """
+
+    symbol: str
+    is_free: bool
+    permitting_parts: tuple[str, ...]
+    unresolved_parts: tuple[str, ...]
+    unaccepted_parts: tuple[str, ...]
+    unrecorded_parts: tuple[str, ...]
+    unanswered_parts: tuple[str, ...]
+    withholding_parts: tuple[str, ...]
+
+
+def _gate_parts(register: GateRegister) -> dict[str, GatePart]:
+    """Index every Gate part by the reference the register names it with.
+
+    Two parts of one Gate recording one id leave a change permission with two answers about
+    whether it is accepted, so it is a named failure for the reason two dossiers for one Gate are.
+    """
+    parts: dict[str, GatePart] = {}
+    for gate, dossier in _gate_dossiers(register).items():
+        for part in dossier.parts:
+            reference = part_reference(gate, part.id)
+            if reference in parts:
+                raise GateRegisterError(
+                    f"{reference}: the Gate_Dossier records more than one part of that id"
+                )
+            parts[reference] = part
+    return parts
+
+
+def _guards(register: GateRegister) -> dict[str, Guard]:
+    """Index the guard registry by symbol, rejecting a guard recorded twice.
+
+    Two entries for one symbol can record two values, two Gate mappings and two permission sets,
+    and the derivation has no way to choose between them. The schema's ``uniqueItems`` rejects a
+    verbatim duplicate; this rejects the rest.
+    """
+    guards: dict[str, Guard] = {}
+    for guard in register.guards:
+        if guard.symbol in guards:
+            raise GateRegisterError(
+                f"{guard.symbol}: the register records more than one guard of that symbol"
+            )
+        guards[guard.symbol] = guard
+    return guards
+
+
+def guard_freedom(
+    register: GateRegister, records: Mapping[str, ClosureRecord]
+) -> dict[str, GuardFreedom]:
+    """Derive, for each recorded guard, whether its recorded value may move.
+
+    ``free(g) <=> permittedToChangeBy(g) is non-empty and, for every part p in it, p is accepted
+    and the Closure_Record settling p records permits(g) = true``.
+
+    *records* is the Closure_Record settling each part, keyed by :func:`part_reference`, which is
+    how the Gate_Review already holds them. A part the mapping omits is read as a verdict that
+    could not be read rather than as one that permits.
+
+    One entry per registry entry, including a guard no Gate rests on. Nothing here evaluates a
+    verdict or reads a Gate's recorded status: the verdict is the accepting owner's, and a Gate
+    recorded `CLOSED` whose acceptance withheld a guard leaves that guard pinned. It reads no
+    source file and no git history either, because freedom is a property of the records alone.
+    """
+    parts = _gate_parts(register)
+    freedom: dict[str, GuardFreedom] = {}
+    for symbol, guard in _guards(register).items():
+        unresolved: list[str] = []
+        unaccepted: list[str] = []
+        unrecorded: list[str] = []
+        unanswered: list[str] = []
+        withholding: list[str] = []
+        for reference in guard.permitted_to_change_by:
+            part = parts.get(reference)
+            if part is None:
+                unresolved.append(reference)
+            elif part.state != ACCEPTED_PART_STATE:
+                unaccepted.append(reference)
+            elif (record := records.get(reference)) is None:
+                unrecorded.append(reference)
+            else:
+                # Every verdict the record carries on this guard, because a record carrying two
+                # has not reached one: the conjunction reads a withheld verdict as withheld.
+                verdicts = [
+                    permission.permits
+                    for permission in record.guard_permissions
+                    if permission.symbol == symbol
+                ]
+                if not verdicts:
+                    unanswered.append(reference)
+                elif not all(verdicts):
+                    withholding.append(reference)
+        pinning = (unresolved, unaccepted, unrecorded, unanswered, withholding)
+        freedom[symbol] = GuardFreedom(
+            symbol=symbol,
+            is_free=bool(guard.permitted_to_change_by) and not any(pinning),
+            permitting_parts=tuple(guard.permitted_to_change_by),
+            unresolved_parts=tuple(unresolved),
+            unaccepted_parts=tuple(unaccepted),
+            unrecorded_parts=tuple(unrecorded),
+            unanswered_parts=tuple(unanswered),
+            withholding_parts=tuple(withholding),
+        )
+    return freedom
