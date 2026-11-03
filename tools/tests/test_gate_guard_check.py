@@ -69,6 +69,14 @@ the design's one concession to being gating lives. `Finding.blocking` defaults t
 them blocks, so a guard standing in its recorded disagreement is `passed` with a non-zero `issues`
 and a line carrying the reported marker. A change that quietly made that case block, or made it
 vanish, breaks a test here.
+
+The last section is the two rules that answer per registry entry rather than per tree, and it is
+parametrised over every `literal` guard the register records instead of over one of them:
+`guard-value` resolves a declaration per entry and `guard-assertion` a site per entry, so a guard
+whose file either of them stopped finding would go quiet on its own while the rest kept passing.
+`contract-surface` is quantified rather than parametrised, because what it asserts is a set equality
+and the interesting cases are the combinations of declared and recorded across several elements at
+once.
 """
 
 from __future__ import annotations
@@ -137,6 +145,7 @@ from common.file_traversal import find_cpp_files
 from common.gate_register import (
     CHECK_GUARD,
     GATE_IDS,
+    LITERAL_GUARD,
     NO_GATE,
     PREDICATE_GUARD,
     ActionableControlSite,
@@ -146,6 +155,8 @@ from common.gate_register import (
     dump_gate_register,
     part_reference,
 )
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from validate_gate_register import (
     FACT_GROUP_REGISTRAR_GUARD,
     GUARD_REGISTRY,
@@ -161,6 +172,7 @@ from validate_gate_register import (
 )
 
 from ._helpers import REPO_ROOT, TOOLS_DIR
+from ._strategies import MAX_EXAMPLES
 from .test_validate_gate_register import (
     ACTUATOR_PATH_GUARD,
     ASSERTION_REMEDY,
@@ -3700,3 +3712,158 @@ def test_simulated_source_reads_the_real_tree_and_finds_no_declaration() -> None
 
     assert "enum Attribution" in source
     assert check_simulated_source(_premises(_register())) == []
+
+
+# ---------------------------------------------------------------------------
+# Properties
+#
+# Quantified over mutations of the agreeing tree, for the reason the data half's properties are
+# quantified over mutations of the agreeing register: every rule here is a predicate relating a
+# source tree to a recorded inventory, and a tree drawn from nothing disagrees with the register on
+# a dozen axes at once, so a finding would prove nothing about which rule caught it.
+# ---------------------------------------------------------------------------
+
+# Property 23: The contract surface in source and in the register agree in both directions.
+# Validates: Requirements 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14.
+#
+# Three fixture symbols, each independently in one of five states. The states are what the rule has
+# to tell apart: declared and unrecorded, recorded and undeclared, declared and recorded against an
+# open Gate, declared and recorded as cleared, and neither. Three of the five are findings and two
+# are not, so a rule that reported everything and a rule that reported nothing each fail half of
+# this.
+_SURFACE_ELEMENTS = ("kAFixtureAlpha", "kAFixtureBeta", "kAFixtureGamma")
+_DECLARED_ONLY = "declared-and-unrecorded"
+_RECORDED_ONLY = "recorded-and-undeclared"
+_MAPPED_OPEN = "declared-and-mapped-to-an-open-gate"
+_CLEARED = "declared-and-cleared"
+_NEITHER = "neither"
+_SURFACE_STATES = (_DECLARED_ONLY, _RECORDED_ONLY, _MAPPED_OPEN, _CLEARED, _NEITHER)
+_RECORDED_STATES = frozenset({_RECORDED_ONLY, _MAPPED_OPEN, _CLEARED})
+_DECLARED_STATES = frozenset({_DECLARED_ONLY, _MAPPED_OPEN, _CLEARED})
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.dictionaries(
+        st.sampled_from(_SURFACE_ELEMENTS), st.sampled_from(_SURFACE_STATES), min_size=1
+    )
+)
+def test_the_contract_surface_in_source_and_in_the_register_agree_in_both_directions(
+    tmp_path_factory: pytest.TempPathFactory, states: dict[str, str]
+) -> None:
+    """Set equality, which is what lets the surface grow and shrink only deliberately.
+
+    A containment either way would be half a ratchet. Reading source against the inventory alone
+    lets a recorded element be deleted from the tree without anybody noticing the register still
+    carries it; reading the inventory against source alone lets a new Contract_Value be declared
+    and go unassigned. So the rule is an equality, and each direction has its own message because
+    each has its own repair.
+
+    The finding count is asserted alongside the memberships. Three disagreeing elements are three
+    findings and never one summary, and a rule that reported the two sets as differing would
+    satisfy every membership assertion here while naming nothing a reviewer could act on.
+    """
+    recorded = [
+        _element(
+            symbol,
+            CONSTANT_KIND,
+            ROLE_GATE if state == _MAPPED_OPEN else NO_GATE,
+            None if state == _MAPPED_OPEN else "a fixture reason",
+        )
+        for symbol, state in sorted(states.items())
+        if state in _RECORDED_STATES
+    ]
+    declared = sorted(symbol for symbol, state in states.items() if state in _DECLARED_STATES)
+    register = _with_surface(_register(), *recorded)
+    root = _tree(tmp_path_factory.mktemp("surface") / "repo", register)
+    _write(
+        root / SURFACE_SOURCE,
+        _surface_header(*(f"constexpr int {symbol} = 1;" for symbol in declared)),
+    )
+
+    findings = check_contract_surface(_over(register, root))
+
+    unassigned = sorted(name for name, state in states.items() if state == _DECLARED_ONLY)
+    withheld = sorted(name for name, state in states.items() if state == _MAPPED_OPEN)
+    removed = sorted(name for name, state in states.items() if state == _RECORDED_ONLY)
+    assert len(findings) == len(unassigned) + len(withheld) + len(removed)
+    assert _unassigned(findings) == [f"{CONSTANT_KIND} {symbol}" for symbol in unassigned]
+    for symbol in withheld:
+        assert any(
+            symbol in finding.message
+            and "waits on the signature" in finding.message
+            and finding.gates == (ROLE_GATE,)
+            for finding in findings
+        )
+    for symbol in removed:
+        assert any(
+            symbol in finding.message
+            and "is a removal rather than a satisfied entry" in finding.message
+            for finding in findings
+        )
+    assert all(finding.blocking for finding in findings)
+    assert all(finding.check == CONTRACT_SURFACE for finding in findings)
+
+
+# Every recorded guard, flipped in its own declaration.
+#
+# Task 7.9 asks for a header flipping *each* recorded guard rather than one of them, and the reason
+# is the shape of the rule: it resolves a declaration per registry entry, so a guard whose
+# declaration it stopped finding would go quiet on its own while the other seven kept passing. The
+# parametrisation is over the registry's `literal` entries, because those are the ones that carry a
+# value to flip -- a `predicate` entry carries an expression and a `check` entry carries the name of
+# the rule that holds it, and both have cases of their own above.
+_LITERAL_GUARDS = tuple(
+    sorted(guard.symbol for guard in _register().guards if guard.kind == LITERAL_GUARD)
+)
+
+
+@pytest.mark.parametrize("symbol", _LITERAL_GUARDS)
+def test_guard_value_rejects_each_recorded_guard_flipped_in_its_declaration(
+    tmp_path: Path, symbol: str
+) -> None:
+    """One case per guard, each naming the guard, both values and every Gate it holds open.
+
+    The Gates are compared against `BASELINE_GUARD_GATES`, which is requirements.md's mapping read
+    out by hand, so what this asserts is that the finding names the decisions Requirement 4
+    criterion 5 maps the guard to rather than whatever the register happens to record.
+    """
+    register = _alone(_register(), symbol)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, _declares(symbol, ANOTHER_VALUE))
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    gates = ", ".join(BASELINE_GUARD_GATES[symbol])
+    assert line.startswith(f"{GUARD_VALUE}: {gates}: {symbol}: ")
+    assert repr(_literal(register, symbol)) in line
+    assert repr(ANOTHER_VALUE) in line
+    assert SOLO_DECLARATION in line
+
+
+@pytest.mark.parametrize("symbol", _LITERAL_GUARDS)
+def test_guard_assertion_rejects_each_recorded_guard_whose_site_stopped_naming_it(
+    tmp_path: Path, symbol: str
+) -> None:
+    """And one per guard from the assertion side, because removing the check is the other half.
+
+    Requirement 4 criterion 9 treats removing the assertion as seriously as moving the value, and
+    the two rules resolve different files -- a declaration under `aerora/src/**` and a site under
+    `aerora/test/**` -- so a guard covered by one is not covered by the other.
+    """
+    register = _alone(_register(), symbol)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_SITE, ASSERTS_NOTHING)
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    gates = ", ".join(BASELINE_GUARD_GATES[symbol])
+    assert line.startswith(f"{GUARD_ASSERTION}: {gates}: {symbol}: ")
+    assert f"{SOLO_SITE} no longer names the symbol" in line
+    assert "Requirement 4 criterion 9" in line

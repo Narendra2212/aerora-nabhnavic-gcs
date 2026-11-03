@@ -567,11 +567,11 @@ Constraints every task inherits:
     - _Requirements: 4.5, 4.6, 4.7, 4.8, 4.9, 11.9, 11.17, 11.19, 15.8, 15.14, 15.15, 15.16_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k "guard or autonomy or simulated"`
 
-  - [ ]* 7.8 Write property test for the contract surface in both directions
+  - [x]* 7.8 Write property test for the contract surface in both directions
     - **Property 23: The contract surface in source and in the register agree in both directions**
     - **Validates: Requirements 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14**
 
-  - [ ]* 7.9 Write source-fixture tests for every guard-check rule
+  - [x]* 7.9 Write source-fixture tests for every guard-check rule
     - A header flipping each recorded guard; a test file with an assertion site removed; a `MAV_CMD_`
       token added outside the allow-list; a `Tier::PopulatedFile` entry; an action seam added to the
       override allow-list; a `setThreshold(` call site; an implementation of
