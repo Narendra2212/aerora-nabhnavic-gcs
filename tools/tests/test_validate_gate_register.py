@@ -59,8 +59,10 @@ from typing import TYPE_CHECKING
 import pytest
 from common.gate_register import (
     ABSENT,
+    ACCEPTANCE_CRITERION_CLASSIFICATION,
     ACCEPTED_PART_STATE,
     CHECK_GUARD,
+    GATE_CLASSIFICATION,
     INVENTORY_COLUMNS,
     LITERAL_GUARD,
     PREDICATE_GUARD,
@@ -95,6 +97,7 @@ from common.gate_register import (
     dump_gate_register,
     guard_freedom,
     is_entry_id,
+    load_gate_register,
     parse_screen_inventory,
     part_reference,
     released,
@@ -4240,3 +4243,146 @@ def test_the_json_pointer_addresses_what_the_schema_rejected(
     tokens: list[object], expected: str
 ) -> None:
     assert _pointer(tokens) == expected
+
+
+# ---------------------------------------------------------------------------
+# The named facts, against the real register
+#
+# Everything above this line tests the checks over a fixture. These test the *register* — the five
+# groups requirements.md names by identifier, read out of the document the Gate_Review accepts.
+#
+# They exist because a check and the document it checks can agree while both are wrong about a fact
+# the requirements state. `check_reclassifications` asserts that each recorded misread carries its
+# reclassification; it cannot assert that the five misreads are the five criterion 7 names, because
+# it reads that set from the same constant the register was written against. These read the register
+# and compare against the identifiers spelled out in requirements.md.
+# ---------------------------------------------------------------------------
+
+
+def _real_register() -> GateRegister:
+    """The repository's own Gate_Register, loaded through the model the checks use."""
+    return load_gate_register(json.loads((REPO_ROOT / REGISTER_PATH).read_text(encoding="utf-8")))
+
+
+def _real_screens() -> dict[str, ScreenRecord]:
+    return {record.id: record for record in _real_register().screens}
+
+
+def _named_gates(record: ScreenRecord) -> set[str]:
+    """The distinct Gates *record*'s Gate-classified entries name.
+
+    A Gate-classified entry naming no Gate is unrepresentable in the schema and is the data half's
+    finding where a model carries one, so the `is not None` filter narrows the type rather than
+    hiding a case: what it drops cannot reach here through a document.
+    """
+    return {
+        entry.gate
+        for entry in record.blocking_entries
+        if entry.classification == GATE_CLASSIFICATION and entry.gate is not None
+    }
+
+
+@pytest.mark.parametrize(("screen", "entry_id"), sorted(RECLASSIFIED_ENTRIES.items()))
+def test_the_register_records_each_misread_of_criterion_seven(screen: str, entry_id: str) -> None:
+    """Requirement 2 criterion 7's five misreads, each reclassified as an Acceptance_Criterion.
+
+    The reclassification is recorded rather than merely applied: an entry corrected with no record
+    that it was a misread reads as though it was always classified correctly, and the five are the
+    evidence that reviewer-dependent classification is what this spec exists to remove.
+    """
+    record = _real_screens()[screen]
+    entry = next((item for item in record.blocking_entries if item.id == entry_id), None)
+
+    assert entry is not None, f"{screen} records no blocking entry {entry_id}"
+    assert entry.classification == ACCEPTANCE_CRITERION_CLASSIFICATION
+    assert entry.reclassified_from == GATE_CLASSIFICATION
+
+
+@pytest.mark.parametrize("screen", sorted(RELEASED_WITH_NO_GATE))
+def test_the_register_records_each_released_with_no_gate_screen(screen: str) -> None:
+    """Requirement 2 criterion 8's five screens: nothing holds their work shut.
+
+    Every entry of each blocking list classifies as an Acceptance_Criterion, so each is Released
+    with no Gate. They are buildable product work for their screen owners and are outside this
+    spec, which is why the register has to say so rather than leave them looking blocked.
+    """
+    record = _real_screens()[screen]
+
+    assert record.released is True
+    assert [entry.classification for entry in record.blocking_entries] == [
+        ACCEPTANCE_CRITERION_CLASSIFICATION for _ in record.blocking_entries
+    ]
+    assert all(entry.gate is None for entry in record.blocking_entries)
+
+
+@pytest.mark.parametrize(("screen", "gates"), sorted(RETAINED_GATES.items()))
+def test_the_register_records_each_retained_entry_count_of_criterion_eleven(
+    screen: str, gates: list[str]
+) -> None:
+    """Requirement 2 criterion 11: what each misread screen *retains* after the correction.
+
+    Four retain no Gate-classified entry and `SCR-VID-01` retains one. Read as the derived Gate set
+    rather than as a row count, so two entries naming one Gate count once: the statement is about
+    decisions and not about rows.
+    """
+    record = _real_screens()[screen]
+    retained = sorted(_named_gates(record))
+
+    assert retained == sorted(gates)
+
+
+@pytest.mark.parametrize("symbol", sorted(MECHANICAL_GUARDS))
+def test_the_register_records_each_guard_of_criterion_five(symbol: str) -> None:
+    """Requirement 4 criterion 5's nine guards, each at the value the criterion names.
+
+    The ninth names no value, because it is the static MAVLink-identifier check rather than a
+    symbol, and the register records it as a `check` holding no value at all. The other eight carry
+    the criterion's value in `recordedValue` whatever their kind: a predicate records the value the
+    criterion states *and* the expression its source carries, which is why the two are separate
+    fields.
+    """
+    guard = next((item for item in _real_register().guards if item.symbol == symbol), None)
+    expected = MECHANICAL_GUARDS[symbol]
+
+    assert guard is not None, f"the registry records no entry for {symbol}"
+    assert guard.recorded_value == expected
+    assert guard.holds_open or guard.holds_no_gate_open is True
+
+
+@pytest.mark.parametrize(("item", "gate"), sorted(FORBIDDEN_UNTIL_ITEMS.items()))
+def test_the_register_records_each_forbidden_until_row(item: str, gate: str) -> None:
+    """Requirement 5 criterion 8: `P7-FLY-004` is `FORBIDDEN-UNTIL` `DG-ROL` is recorded `CLOSED`.
+
+    `FORBIDDEN-UNTIL` rather than pending, which is the distinction the row carries: the work is not
+    waiting to be scheduled, it is prohibited until its precondition closes. An inert button that
+    looks live is worse than no button.
+    """
+    recorded = {row.id: row.gate for row in _real_register().read_only.forbidden_until}
+
+    assert recorded.get(item) == gate
+
+
+@pytest.mark.parametrize("seam", sorted(PRE_APPROVED_SEAMS))
+def test_the_register_records_each_pre_approved_seam_as_waiting(seam: str) -> None:
+    """Requirement 5 criterion 4 and Requirement 9 criterion 16: both seams wait on the Gate.
+
+    Matched on the file name rather than the whole path, because the criterion names a file and the
+    posture records the resource path the override allow-list would carry. Either spelling is the
+    seam, and what matters is that neither is declared.
+    """
+    recorded = _real_register().read_only.pre_approved_undeclared_seams
+
+    assert any(entry.endswith(seam) for entry in recorded), f"{seam} is not recorded as waiting"
+
+
+def test_the_real_register_records_the_two_gate_screens_and_no_others() -> None:
+    """Requirement 1 criterion 5, read off the register rather than off the derivation.
+
+    Exactly four screens carry two Gate-classified entries, and the pairs are the ones the
+    requirements name. Three of the four cells were corrected to record their second blocker while
+    this register was written, so this is the test that notices if one is dropped again.
+    """
+    two_gate = {record.id: sorted(_named_gates(record)) for record in _real_register().screens}
+    carried = {screen: gates for screen, gates in two_gate.items() if len(gates) > 1}
+
+    assert carried == {screen: sorted(gates) for screen, gates in TWO_GATE_SCREENS.items()}

@@ -674,7 +674,7 @@ Constraints every task inherits:
       elicit it rather than to supply it
     - _Requirements: 3.1, 3.6_
 
-  - [ ]* 9.6 Write the named-fact tests against the real register
+  - [x]* 9.6 Write the named-fact tests against the real register
     - One data-driven test each for the five recorded groups: the reclassifications of Requirement 2
       criterion 7, the Released-with-no-Gate screens of criterion 8, the retained-entry counts of
       criterion 11, the nine guards of Requirement 4 criterion 5, and the `FORBIDDEN-UNTIL` rows
@@ -709,7 +709,7 @@ Constraints every task inherits:
     - _Requirements: 3.12, 4.2, 4.7, 4.9, 5.2, 5.4, 6.14, 14.13_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/ src/Vehicle/Vehicle.h`
 
-  - [ ]* 10.4 Write a hook-wiring test
+  - [x]* 10.4 Write a hook-wiring test
     - Assert the three hook IDs exist, that none carries `stages: [manual]`, and that each `files`
       pattern matches the register path, the inventory path and the guard source paths — a hook whose
       pattern misses the register is a hook that never runs
