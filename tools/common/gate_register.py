@@ -60,15 +60,19 @@ __all__ = [
     "ABSENT",
     "ACCEPTANCE_CRITERION_CLASSIFICATION",
     "ACCEPTED_PART_STATE",
+    "CHECK_GUARD",
     "CLASSIFICATIONS",
     "DELIVERED_STATUSES",
     "GATE_CLASSIFICATION",
     "GATE_IDS",
     "GATE_STATUSES",
+    "GUARD_KINDS",
     "INVENTORY_COLUMNS",
+    "LITERAL_GUARD",
     "NO_GATE",
     "OWNER_LABELS",
     "PART_STATES",
+    "PREDICATE_GUARD",
     "RECORD_STATES",
     "SETTLEMENT_SHAPES",
     "Absent",
@@ -163,6 +167,20 @@ OWNER_LABELS: Final = frozenset(
         "Tab 8",
     }
 )
+
+# What holds a guard still, and therefore how the source half reads it.
+#
+# `literal` is a declaration carrying a value a text comparison can read, which is the shape six of
+# Requirement 4 criterion 5's nine guards have and the only shape a recorded disagreement means
+# anything on. `predicate` is a declaration whose *expression* is the guard: two of the nine hold no
+# literal at all -- one delegates to a singleton, one derives from an uninitialised member -- so what
+# is pinned is the text a reviewer read. `check` is a rule in the source half with no declaration at
+# all, which is the ninth guard of criterion 5 and also the shape of a guard whose content is an
+# absence: there is no symbol to record a value for, so the guard is that nothing declares one.
+LITERAL_GUARD: Final = "literal"
+PREDICATE_GUARD: Final = "predicate"
+CHECK_GUARD: Final = "check"
+GUARD_KINDS: Final = frozenset({LITERAL_GUARD, PREDICATE_GUARD, CHECK_GUARD})
 
 GATE_STATUSES: Final = frozenset({"OPEN", "CLOSED"})
 PART_STATES: Final = frozenset({"open", "submitted", "accepted"})
@@ -348,12 +366,26 @@ class Guard:
     ``holds_no_gate_open`` is the guard-side counterpart of a dossier's ``rests_on_review_alone``:
     Requirement 4 criterion 8's obligation runs in both directions, so an empty ``holds_open`` is
     accompanied by an explicit record rather than read off the emptiness.
+
+    ``kind`` is what holds the guard still, and therefore how the source half reads it. Requirement 4
+    criterion 5 names its nine guards in three different shapes without distinguishing them: six are
+    ``static constexpr`` values, two are functions carrying no literal at all, and the ninth is a
+    check rather than a symbol. Recording one shape for all three would have forced the two function
+    guards to record a value their source does not hold. See :data:`GUARD_KINDS`.
+
+    ``asserted_nowhere`` follows the same discipline as ``holds_no_gate_open``: two of the nine are
+    asserted by nothing under ``aerora/test/**`` today, and an empty ``asserted_in`` read as
+    satisfied would be indistinguishable from one whose sites were deleted. ``remedy`` carries the
+    work that ends the gap, so an absence cannot stand as a permanent exemption.
     """
 
     symbol: str
+    kind: str
     declared_in: str
     recorded_value: str
     asserted_in: list[str]
+    asserted_nowhere: bool | None
+    remedy: str | None
     holds_open: list[str]
     holds_no_gate_open: bool | None
     permitted_to_change_by: list[str]
@@ -560,6 +592,7 @@ _T = TypeVar("_T")
 _MISSING: Final = object()
 
 _GATE_ID_DESCRIPTION: Final = "one of the ten Gate identifiers"
+_GUARD_KIND_DESCRIPTION: Final = "one of the three guard kinds"
 _OWNER_DESCRIPTION: Final = "a recorded owner label"
 
 
@@ -863,9 +896,12 @@ def _read_guard(value: Any, path: str) -> Guard:
     reader = _Reader(value, path)
     guard = Guard(
         symbol=reader.text("symbol"),
+        kind=reader.member("kind", GUARD_KINDS, _GUARD_KIND_DESCRIPTION),
         declared_in=reader.text("declaredIn"),
         recorded_value=reader.text("recordedValue"),
         asserted_in=reader.text_list("assertedIn"),
+        asserted_nowhere=reader.optional_flag("assertedNowhere"),
+        remedy=reader.optional_text("remedy"),
         holds_open=reader.member_list("holdsOpen", GATE_IDS, _GATE_ID_DESCRIPTION),
         holds_no_gate_open=reader.optional_flag("holdsNoGateOpen"),
         permitted_to_change_by=reader.text_list("permittedToChangeBy"),
@@ -1240,9 +1276,12 @@ def _dump_guard(guard: Guard) -> dict[str, Any]:
     disagreement = guard.disagreement
     return _object(
         ("symbol", guard.symbol),
+        ("kind", guard.kind),
         ("declaredIn", guard.declared_in),
         ("recordedValue", guard.recorded_value),
         ("assertedIn", list(guard.asserted_in)),
+        ("assertedNowhere", _or_omit(guard.asserted_nowhere)),
+        ("remedy", _or_omit(guard.remedy)),
         ("holdsOpen", list(guard.holds_open)),
         ("holdsNoGateOpen", _or_omit(guard.holds_no_gate_open)),
         ("permittedToChangeBy", list(guard.permitted_to_change_by)),

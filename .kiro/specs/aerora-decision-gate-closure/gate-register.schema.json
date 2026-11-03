@@ -873,6 +873,7 @@
       "additionalProperties": false,
       "required": [
         "symbol",
+        "kind",
         "declaredIn",
         "recordedValue",
         "assertedIn",
@@ -883,20 +884,37 @@
         "symbol": {
           "$ref": "#/$defs/nonEmptyString"
         },
+        "kind": {
+          "description": "What holds this guard still, and therefore how the source half reads it. Requirement 4 criterion 5 names nine guards in three different shapes and does not distinguish them, so the register does: six are static constexpr values, two are functions holding no literal at all, and the ninth is a check rather than a symbol. A single shape would have forced the two function guards to record a value their source does not carry.\n\nliteral: the declaring source carries recordedValue as an initialiser or as the literal its body returns. This is the only shape a value comparison is meaningful for, and the only shape a disagreement may be recorded on.\n\npredicate: the declaring source carries recordedValue as the text of the expression a reviewer read. The guard is the expression, not a value -- AeroraCorePlugin::isAuthorizationEnforced() delegates to the authorizer and AeroraVehicleIdentity::fleetIdentityKnown() derives from an uninitialised member, so neither holds a false a checker could read. Pinning the reviewed expression rejects a change to the behaviour without claiming a value that is not there.\n\ncheck: a rule in tools/analyzers/gate_guard_check.py holds it, and no source declares it. The static MAVLink-identifier check of criterion 5 is this shape, and so is a guard whose content is an absence -- there is no autonomy-source symbol and no simulated-source field to declare a value for, so the guard is that nothing declares one. guard-value and guard-assertion skip this kind and the named rule enforces it.",
+          "enum": [
+            "literal",
+            "predicate",
+            "check"
+          ]
+        },
         "declaredIn": {
-          "$ref": "#/$defs/nonEmptyString"
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The file the guard is declared in, or, for a check, the module carrying the rule that holds it."
         },
         "recordedValue": {
           "$ref": "#/$defs/nonEmptyString",
-          "description": "The literal the declaring source must carry, recorded as text because the check compares text."
+          "description": "For a literal, the value the declaring source must carry. For a predicate, the text of the reviewed expression. For a check, the name of the rule that enforces it. Recorded as text in every case, because the check compares text."
         },
         "assertedIn": {
           "type": "array",
-          "description": "The recorded assertion sites. Removing the assertion is as serious as removing the guard, so the sites are recorded rather than discovered.",
+          "description": "The recorded assertion sites. Removing the assertion is as serious as removing the guard, so the sites are recorded rather than discovered. An empty list is permitted only alongside assertedNowhere, because two of the nine guards have no assertion anywhere today and an empty list read as satisfied would hide that.",
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/nonEmptyString"
           }
+        },
+        "assertedNowhere": {
+          "type": "boolean",
+          "description": "That no suite asserts this guard today. Recorded rather than inferred from an empty list, on the same discipline as holdsNoGateOpen and restsOnReviewAlone: AeroraVehicleFactGroupRegistrar::isRegistrationAvailable() and AeroraCorePlugin::isAuthorizationEnforced() are asserted by nothing under aerora/test/**, and a register that left that to an empty array would report the same thing as a register whose sites were deleted."
+        },
+        "remedy": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "What closes the gap, where a guard is asserted nowhere. Required alongside assertedNowhere so the absence carries the work that ends it rather than standing as a permanent exemption."
         },
         "holdsOpen": {
           "type": "array",
@@ -922,33 +940,89 @@
           "$ref": "#/$defs/disagreement"
         }
       },
-      "if": {
-        "required": [
-          "holdsOpen"
-        ],
-        "properties": {
-          "holdsOpen": {
-            "maxItems": 0
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "holdsOpen"
+            ],
+            "properties": {
+              "holdsOpen": {
+                "maxItems": 0
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "holdsNoGateOpen"
+            ],
+            "properties": {
+              "holdsNoGateOpen": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "holdsNoGateOpen": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "assertedIn"
+            ],
+            "properties": {
+              "assertedIn": {
+                "maxItems": 0
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assertedNowhere",
+              "remedy"
+            ],
+            "properties": {
+              "assertedNowhere": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "assertedNowhere": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "not": {
+                  "const": "literal"
+                }
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "disagreement"
+              ]
+            },
+            "description": "A disagreement pins an observed value against a recorded one, which only a literal has. A predicate or a check carrying one would claim a value comparison nothing performed."
           }
         }
-      },
-      "then": {
-        "required": [
-          "holdsNoGateOpen"
-        ],
-        "properties": {
-          "holdsNoGateOpen": {
-            "const": true
-          }
-        }
-      },
-      "else": {
-        "properties": {
-          "holdsNoGateOpen": {
-            "const": false
-          }
-        }
-      }
+      ]
     },
     "disagreement": {
       "type": "object",

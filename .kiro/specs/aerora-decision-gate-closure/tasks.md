@@ -134,6 +134,13 @@ Constraints every task inherits:
       `uv run --quiet --with pytest --with hypothesis python -c "import hypothesis"`
 
   - [x] 2.2 Author `gate-register.schema.json` and `closure-record.schema.json`
+    - **Amended by task 7.10.** A guard gained a required `kind` of `literal`, `predicate` or
+      `check`, plus `assertedNowhere` and `remedy` for a guard nothing asserts, and a
+      `disagreement` is now representable only on a `literal`. The register as first shaped could
+      not be written: six of Requirement 4 criterion 5's nine guards carry a readable literal and
+      the rest do not, so recording one shape for all nine would have put values in the register
+      that the source does not hold. The read-only block also gained `actionableControlSites`
+      (task 7.6)
     - Shape only, no Gate content beyond the ten identifiers. The three rules that become
       unrepresentable: `gates` exactly 10 items with `id` an enum of the ten identifiers and
       `uniqueItems`; `blockingEntries[].classification` a required enum of `Gate` and
@@ -433,6 +440,9 @@ Constraints every task inherits:
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/`
 
   - [x] 7.2 Implement `guard-value`, `guard-assertion` and the recorded disagreement
+    - **Amended by task 7.10.** `guard-value` now dispatches on the recorded `kind`, `_registry()`
+      selects on it rather than naming the one exception, and `guard-assertion` reports a recorded
+      `assertedNowhere` without blocking
     - Each recorded guard's declaration in its recorded `declaredIn` file carries its recorded
       literal. A declaration not found fails naming the symbol and the file — "not found" is not
       "unchanged"
@@ -532,6 +542,31 @@ Constraints every task inherits:
     - _Requirements: 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k contract_surface`
 
+  - [x] 7.10 Record a guard's shape, and hold the two guards whose content is an absence
+    - **Raised while authoring task 9.3, which could not be executed as written.** Reading all
+      fifteen guards against the tree found seven that cannot be recorded as symbol-plus-literal:
+      two of the nine delegate or derive and hold no literal, two have *no symbol at all*, one is an
+      enum member with no initialiser, one is a runtime accumulator, and two of the nine are
+      asserted by nothing anywhere. A register recording a literal for those would have failed the
+      gating hook of task 10.3 on seven entries
+    - Add a required `kind` to a guard — `literal`, `predicate`, `check` — and dispatch
+      `guard-value` on it. A `predicate` pins the expression a reviewer read, which rejects a change
+      to the behaviour without claiming a value that is absent. A `disagreement` becomes
+      representable only on a `literal`, because it pins an observed value against a recorded one
+    - Add `assertedNowhere` and `remedy`, on the discipline `holdsNoGateOpen` and
+      `restsOnReviewAlone` already use: `isRegistrationAvailable()` and `isAuthorizationEnforced()`
+      are asserted by nothing under `aerora/test/**`, and an empty list read as satisfied hides that
+      while read as a failure rejects a correct register
+    - Add `autonomy-source` and `simulated-source`, holding the two absences the way
+      `payload-command-sink` holds its own. Nothing declares an autonomy-source type and
+      `AeroraTelemetrySource` carries no simulated axis, so these are `check`-kind guards and the
+      registry names each by the rule that holds it. `_registry()` selects on the kind, so the next
+      guard of that shape is not a second name in an exclusion list
+    - `guard-value` resolves a `check` guard's rule name against the rules this module carries, so a
+      guard held by a rule that does not exist is rejected rather than reading as covered
+    - _Requirements: 4.5, 4.6, 4.7, 4.8, 4.9, 11.9, 11.17, 11.19, 15.8, 15.14, 15.15, 15.16_
+    - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k "guard or autonomy or simulated"`
+
   - [ ]* 7.8 Write property test for the contract surface in both directions
     - **Property 23: The contract surface in source and in the register agree in both directions**
     - **Validates: Requirements 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14**
@@ -584,9 +619,16 @@ Constraints every task inherits:
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
   - [ ] 9.3 Write the guard registry, including the one recorded disagreement
+    - **Unblocked by task 7.10**, which this task raised: seven of the fifteen guards cannot be
+      recorded as symbol-plus-literal, so each entry now carries a `kind`. The shapes are settled;
+      what remains is writing the fifteen entries
     - The nine guards Requirement 4 criterion 5 names, plus each Gate's own named guard, with
-      `declaredIn`, `recordedValue`, `assertedIn`, `holdsOpen` and `permittedToChangeBy`. This is the
-      only place the guard-to-Gate mapping is recorded — the C++ suites assert values, not mappings
+      `kind`, `declaredIn`, `recordedValue`, `assertedIn`, `holdsOpen` and `permittedToChangeBy`.
+      This is the only place the guard-to-Gate mapping is recorded — the C++ suites assert values,
+      not mappings
+    - `assertedNowhere` with a remedy for `isRegistrationAvailable()` and
+      `isAuthorizationEnforced()`, which nothing under `aerora/test/**` asserts today. Task 11.3 is
+      the remedy for the second; the first waits on whichever `ADR-016` remedy lands
     - One `disagreement`, for `AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()`: both values
       pinned, the criteria the gap is against, Tab 1 as owner, the two remedies, and
       `handOnRow: "finding-1"`. Zero is the target

@@ -51,6 +51,21 @@ permission on the same registry entry, through the freedom derivation, because R
 criterion 18 records exactly that as the condition under which the core edit's authorisation lets
 the guard move. Both files are read as characters and neither is written.
 
+**A guard has one of three shapes, and the register records which.** Requirement 4 criterion 5 names
+its nine guards without distinguishing them, and they are not alike: six are ``static constexpr``
+values a text comparison can read, two are functions holding no literal at all -- one delegates to a
+singleton, one derives from an uninitialised member -- and the ninth is a check rather than a symbol.
+``guard-value`` therefore dispatches on the recorded ``kind``: a ``literal``'s declaration must carry
+its recorded value, a ``predicate``'s must carry the recorded *expression a reviewer read*, and a
+``check`` is held by a rule here instead, with only the existence of that rule read. Recording one
+shape for all three would have put values in the register that the source does not hold.
+
+Two Gates' guards are an **absence** rather than a value, and they take the ``check`` shape for that
+reason: nothing declares an autonomy-source type and nothing declares a simulated-source field, so
+``autonomy-source`` and ``simulated-source`` hold the absences the way ``payload-command-sink`` holds
+its own. The alternative was to record a symbol neither Gate has, or to record the Gates as resting
+on review alone, which would say no guard holds them when one does.
+
 **``contract-surface`` answers a decidable question in place of an undecidable one, and says so.**
 "Reject a change that introduces a Contract_Value" cannot be checked: no rule can look at a new
 enumerator and know whether it is a value some Gate settles. So it compares the enumerators,
@@ -118,8 +133,10 @@ ensure_tools_dir(__file__)
 from common.analyzer import AnalysisResult, AnalyzerBase
 from common.file_traversal import DEFAULT_SKIP_DIRS, find_cpp_files, should_skip_path
 from common.gate_register import (
+    CHECK_GUARD,
     GATE_IDS,
     NO_GATE,
+    PREDICATE_GUARD,
     GateRegisterError,
     guard_freedom,
     part_reference,
@@ -173,6 +190,31 @@ FRESHNESS_THRESHOLD: Final = "freshness-threshold"
 PAYLOAD_COMMAND_SINK: Final = "payload-command-sink"
 ACTIONABLE_CONTROL: Final = "actionable-control"
 CONTRACT_SURFACE: Final = "contract-surface"
+AUTONOMY_SOURCE: Final = "autonomy-source"
+SIMULATED_SOURCE: Final = "simulated-source"
+
+# Every rule this module carries, which is what a `check`-kind guard's recorded value has to name.
+#
+# A guard held by a rule rather than by a declaration is only held if the rule exists. Recording one
+# that names nothing would be the failure mode this whole module is written against -- a check that
+# appears to cover a criterion stops anyone looking at it -- so the name is resolved rather than
+# trusted, and the registry is read against this set.
+RULE_NAMES: Final = frozenset(
+    {
+        GUARD_VALUE,
+        GUARD_ASSERTION,
+        ADR_016_PAIR,
+        MAVLINK_IDENTIFIER,
+        POPULATED_FILE_OVERRIDE,
+        ACTION_SEAM,
+        FRESHNESS_THRESHOLD,
+        PAYLOAD_COMMAND_SINK,
+        ACTIONABLE_CONTROL,
+        CONTRACT_SURFACE,
+        AUTONOMY_SOURCE,
+        SIMULATED_SOURCE,
+    }
+)
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -326,6 +368,11 @@ class _Declaration:
     named: bool
     value: str | None
 
+    # The declaring file with its comments blanked, which is what a `predicate` guard's recorded
+    # expression is looked for in. Carried on the declaration rather than re-read, so both kinds
+    # read the file once and read the same text: a comment quoting the expression declares nothing.
+    text: str = ""
+
 
 def _declaration(root: Path, guard: Guard) -> _Declaration:
     """Read *guard*'s declaration out of the file the register records it in.
@@ -342,7 +389,7 @@ def _declaration(root: Path, guard: Guard) -> _Declaration:
     code = _code(text)
     name = _declared_name(guard.symbol)
     if re.search(rf"\b{re.escape(name)}\b", code) is None:
-        return _Declaration(unreadable="", named=False, value=None)
+        return _Declaration(unreadable="", named=False, value=None, text=code)
 
     initialiser = re.search(
         rf"\b{re.escape(name)}\b\s*"
@@ -353,27 +400,32 @@ def _declaration(root: Path, guard: Guard) -> _Declaration:
         assigned = initialiser["assigned"]
         literal = (assigned if assigned is not None else initialiser["braced"]).strip()
         if literal:
-            return _Declaration(unreadable="", named=True, value=literal)
+            return _Declaration(unreadable="", named=True, value=literal, text=code)
 
     definition = re.search(rf"\b{re.escape(name)}\s*\([^)]*\)[^;{{}}]*\{{", code)
     if definition is None:
-        return _Declaration(unreadable="", named=True, value=None)
+        return _Declaration(unreadable="", named=True, value=None, text=code)
 
     returned = _RETURN.search(code, definition.end())
     value = None if returned is None else returned["value"].strip()
-    return _Declaration(unreadable="", named=True, value=value or None)
+    return _Declaration(unreadable="", named=True, value=value or None, text=code)
 
 
 def _registry(premises: Premises) -> list[Guard]:
-    """The registry entries these two rules read, which is every entry but one.
+    """The registry entries these two rules read, which is every entry a source file declares.
 
-    Requirement 4 criterion 5's ninth guard is the static MAVLink-identifier check rather than a
-    symbol holding a literal: no file declares it and no site asserts a value for it, so what holds
-    it is `mavlink-identifier`'s own rule over the allow-list the register records by site. The data
-    half reads its recorded value for nothing for the same reason, and the registry names it by that
-    check so the row reads like the other eight without pretending a declaring file holds a value.
+    A `check`-kind guard is held by a rule in this module rather than by a declaration: no file
+    declares it and no site asserts a value for it. Requirement 4 criterion 5's ninth guard is that
+    shape -- the static MAVLink-identifier check, held by `mavlink-identifier`'s own rule over an
+    allow-list recorded by site -- and so is a guard whose content is an *absence*: there is no
+    autonomy-source symbol and no simulated-source field to declare a value for, so what holds each
+    is `autonomy-source`'s and `simulated-source`'s rule that nothing declares one.
+
+    Selected on the recorded kind rather than by naming the exceptions. The exclusion was one symbol
+    when one guard had this shape; reading the kind is what stops the next one being a second name
+    in this expression, and it is why the kind is recorded rather than inferred from an empty field.
     """
-    return [guard for guard in premises.register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
+    return [guard for guard in premises.register.guards if guard.kind != CHECK_GUARD]
 
 
 def _excusing(guard: Guard) -> Disagreement | None:
@@ -417,6 +469,61 @@ def _hand_on_row(guard: Guard) -> list[Finding]:
             f"nothing. A disagreement cannot be added without pointing at the row that tracks it "
             f'in "Open items this design hands on" -- whether the row says the right thing is a '
             f"reviewer's call, whether one was named is not",
+        )
+    ]
+
+
+def _expression(guard: Guard, declaration: _Declaration) -> list[Finding]:
+    """Compare a `predicate` guard's declaring file against the expression the register records.
+
+    Two of Requirement 4 criterion 5's nine guards hold no literal: `isAuthorizationEnforced()`
+    delegates to the authorizer singleton and `fleetIdentityKnown()` derives from an uninitialised
+    member, so neither carries a `false` a value comparison could read. Recording one anyway would
+    put a value in the register that the source does not hold, and reading the first `return` would
+    compare a delegation against the word "false" and reject a correct tree on every run.
+
+    So what is pinned is the *expression a reviewer read*. The declaring file has to carry the
+    symbol and has to carry that text, and a change to either is rejected naming both. That rejects
+    a change to the behaviour, which is what the guard is, without claiming a value that is absent.
+
+    No disagreement is consulted, and the schema forbids one on this kind: a disagreement pins an
+    observed value against a recorded one, and there is no value here for the two to differ on.
+    """
+    gates = tuple(guard.holds_open)
+    recorded = guard.recorded_value
+
+    if declaration.unreadable:
+        return [
+            Finding(
+                GUARD_VALUE,
+                gates,
+                f"{guard.symbol}: {guard.declared_in} {declaration.unreadable}, so the expression "
+                f"the register records at {recorded!r} was compared against nothing. A declaration "
+                f'this check cannot read is a failure rather than a pass: "not found" is not '
+                f'"unchanged"',
+            )
+        ]
+    if not declaration.named:
+        return [
+            Finding(
+                GUARD_VALUE,
+                gates,
+                f"{guard.symbol}: {guard.declared_in} declares no symbol of that name, so the "
+                f"expression the register records at {recorded!r} was compared against nothing. A "
+                f'renamed or withdrawn predicate is a failure rather than a pass: "not found" is '
+                f'not "unchanged"',
+            )
+        ]
+    if recorded in declaration.text:
+        return []
+    return [
+        Finding(
+            GUARD_VALUE,
+            gates,
+            f"{guard.symbol}: {guard.declared_in} no longer carries the expression the register "
+            f"records for it, {recorded!r}. This guard holds no literal, so what was reviewed is "
+            f"the expression itself and a change to it has not been reviewed. Requirement 4 "
+            f"criterion 7 rejects the change and holds the Gate at {OPEN_STATUS}",
         )
     ]
 
@@ -508,11 +615,38 @@ def _value(guard: Guard, declaration: _Declaration) -> list[Finding]:
 
 
 def check_guard_value(premises: Premises) -> list[Finding]:
-    """Each recorded guard's declaration carries its recorded literal, or its recorded exception."""
+    """Each recorded guard's declaration carries what the register records for its kind.
+
+    Two comparisons, dispatched on the recorded kind, because Requirement 4 criterion 5 names its
+    guards in more than one shape. A `literal` guard's declaration must carry its recorded value, a
+    `predicate` guard's must carry its recorded expression, and a `check` guard reaches neither --
+    `_registry` leaves it to the rule that holds it, and the only thing read here is that the rule
+    it names exists, because a guard held by a rule that does not exist is not held at all.
+
+    The handed-on row is read for both, because the schema admits a disagreement only on a
+    `literal`: this is the second line for a model that bypassed it, and reporting a disagreement on
+    the wrong kind is better than reading past one.
+    """
     findings: list[Finding] = []
+    findings.extend(
+        Finding(
+            GUARD_VALUE,
+            tuple(guard.holds_open),
+            f"{guard.symbol}: the register records it as held by a rule named "
+            f"{guard.recorded_value!r}, and this module carries no rule of that name. A guard held "
+            f"by a rule is only held if the rule exists, so a name that resolves to nothing leaves "
+            f"the guard unenforced while reading as covered",
+        )
+        for guard in premises.register.guards
+        if guard.kind == CHECK_GUARD and guard.recorded_value not in RULE_NAMES
+    )
     for guard in _registry(premises):
         findings.extend(_hand_on_row(guard))
-        findings.extend(_value(guard, _declaration(premises.root, guard)))
+        declaration = _declaration(premises.root, guard)
+        if guard.kind == PREDICATE_GUARD:
+            findings.extend(_expression(guard, declaration))
+            continue
+        findings.extend(_value(guard, declaration))
     return findings
 
 
@@ -560,10 +694,22 @@ def check_guard_assertion(premises: Premises) -> list[Finding]:
     why each one did not count, because a reviewer repairing this has to know whether the site moved,
     the symbol was renamed, or the assertion was dropped.
 
-    A guard standing in the state its recorded disagreement pins is the one case this reports without
-    blocking. The design records that the C++ assertion for such a guard is deliberately not written
-    -- asserting the recorded value would fail CI and asserting the observed one would launder an
-    unauthorised edit into a passing test -- and that this check carries the finding instead.
+    Two cases report without blocking, and both are states the register writes down rather than
+    states this rule infers.
+
+    A guard standing in the state its recorded disagreement pins is the first. The design records
+    that the C++ assertion for such a guard is deliberately not written -- asserting the recorded
+    value would fail CI and asserting the observed one would launder an unauthorised edit into a
+    passing test -- and that this check carries the finding instead.
+
+    A guard the register records as asserted nowhere is the second, and it exists because two of the
+    nine are in that state today: nothing under ``aerora/test/**`` names
+    ``AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()`` or
+    ``AeroraCorePlugin::isAuthorizationEnforced()``. An empty ``assertedIn`` read as satisfied would
+    have hidden that, and read as a blocking failure would have rejected a correct register on every
+    run, so the absence is recorded with the remedy that ends it and printed on every run until it
+    does. What criterion 9 rejects is a *site being removed*, which a recorded absence keeps
+    distinguishable from a register that never had one.
     """
     findings: list[Finding] = []
     for guard in _registry(premises):
@@ -571,9 +717,24 @@ def check_guard_assertion(premises: Premises) -> list[Finding]:
         if any(site.names for site in sites):
             continue
 
+        if guard.asserted_nowhere and not guard.asserted_in:
+            findings.append(
+                Finding(
+                    GUARD_ASSERTION,
+                    tuple(guard.holds_open),
+                    f"{guard.symbol}: no suite asserts this guard, and the register records that "
+                    f"rather than leaving it to an empty list. Remedy: {guard.remedy}. Two of "
+                    f"Requirement 4 criterion 5's nine guards are in this state today; what "
+                    f"criterion 9 rejects is a site being removed, which a recorded absence makes "
+                    f"visible instead of indistinguishable from one",
+                    blocking=False,
+                )
+            )
+            continue
+
         read = (
             "; ".join(f"{site.site} {site.reason}" for site in sites)
-            or "the register records no assertion site for it"
+            or "the register records no assertion site for it and does not record that none exists"
         )
         blocking = not _matched(guard, _declaration(premises.root, guard))
         standing = (
@@ -1184,17 +1345,25 @@ _SOURCE_SUFFIXES: Final = (".h", ".cc")
 VIDEO_GATE: Final = "DG-VID"
 FRESHNESS_GATE: Final = "DG-FRS"
 PAYLOAD_GATE: Final = "DG-PAY"
+AUTONOMY_GATE: Final = "DG-AUT"
+SIMULATION_GATE: Final = "DG-SIM"
 
-# Every rule whose criterion is written `WHILE <gate> is OPEN`, which is the four absence rules and
-# `actionable-control`. The fifth is not an absence rule -- it compares two sets rather than
-# asserting that something is missing -- but its conditional is the same one, and `_standing` and the
-# run's summary read this mapping for the stand-down reasoning that applies identically to all five.
+# Every rule whose criterion is written `WHILE <gate> is OPEN`: the four absence rules,
+# `actionable-control`, and the two rules holding a guard whose content is an absence.
+# `actionable-control` is not an absence rule -- it compares two sets rather than asserting that
+# something is missing -- but its conditional is the same one, and `_standing` and the run's summary
+# read this mapping for the stand-down reasoning that applies identically to all seven.
+#
+# `contract-surface` is deliberately absent: it reads the Gate each *element* maps to rather than one
+# Gate of its own, so it has no single conditional to stand down on.
 CONDITIONAL_GATES: Final[Mapping[str, tuple[str, ...]]] = {
     POPULATED_FILE_OVERRIDE: (VIDEO_GATE,),
     ACTION_SEAM: (READ_ONLY_GATE,),
     FRESHNESS_THRESHOLD: (FRESHNESS_GATE,),
     PAYLOAD_COMMAND_SINK: (PAYLOAD_GATE, READ_ONLY_GATE),
     ACTIONABLE_CONTROL: (READ_ONLY_GATE,),
+    AUTONOMY_SOURCE: (AUTONOMY_GATE,),
+    SIMULATED_SOURCE: (SIMULATION_GATE,),
 }
 
 
@@ -2117,6 +2286,109 @@ def check_actionable_control(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# autonomy-source and simulated-source
+# ---------------------------------------------------------------------------
+
+# The two guards whose content is an *absence*, and the token class each rejects.
+#
+# `DG-AUT` and `DG-SIM` are the two Gates whose guard is not a symbol holding a value, because the
+# thing being guarded does not exist: nothing under `aerora/` declares an autonomy-source type, and
+# `AeroraTelemetrySource` carries no simulated/real axis at all -- its only enumeration is
+# `Attribution`, whose members are about which component sent a message. Requirement 11 criterion 9
+# and Requirement 15 criteria 8 and 15 are therefore satisfied today by nothing existing, and
+# Requirement 15 criterion 14 asks for exactly this: reject a change that *introduces* a
+# discriminator.
+#
+# So these are recorded as `check`-kind guards and held here, the way the static MAVLink-identifier
+# check is. The alternative was to record a symbol with a value neither has, or to record the Gates
+# as resting on review alone, which would say no guard holds them when one does.
+#
+# Matched on a declared *name*, not on a mention: the planned fact group is named in prose in
+# `AeroraFactGroupBase.h` and in `Telemetry/README.md`, and both must stay readable. Comments are
+# blanked and the pattern requires a declaration keyword, so a sentence naming the subject is not
+# the subject.
+AUTONOMY_SUBJECT: Final = "an autonomy-source type, enumerator or accessor"
+SIMULATED_SUBJECT: Final = "a simulated-source field, enumerator or accessor"
+
+_AUTONOMY_DECLARATION: Final = re.compile(
+    r"\b(?:class|struct|enum|using|typedef)\s+(?:class\s+|struct\s+)?(?P<name>\w*Autonomy\w*)\b"
+    r"|\b(?P<member>autonomySource\w*|_autonomySource\w*)\b"
+)
+_SIMULATED_DECLARATION: Final = re.compile(
+    r"\b(?:class|struct|enum|using|typedef)\s+(?:class\s+|struct\s+)?(?P<name>\w*Simulated\w*)\b"
+    r"|\b(?P<member>isSimulated\w*|simulatedSource\w*|_simulated\w*)\b"
+)
+
+
+def _absent_symbol(
+    premises: Premises,
+    check: str,
+    gates: tuple[str, ...],
+    pattern: re.Pattern[str],
+    subject: str,
+) -> list[Finding]:
+    """No declaration matching *pattern* stands under the overlay source tree.
+
+    The shape ``payload-command-sink`` has, over a subject that has no declaration to read a value
+    from. A tree that could not be walked and a file that could not be read are failures rather than
+    absences, for the reason they are there: a run that searched nothing is indistinguishable from a
+    run that found nothing.
+    """
+    tree = _source_tree(premises.root)
+    findings = _unsearched(tree, check, gates, subject)
+    for path, text in tree.sources:
+        code = _code(text)
+        findings.extend(
+            Finding(
+                check,
+                gates,
+                f"{path}: declares {declared['name'] or declared['member']} at line "
+                f"{_line_of(code, declared.start())}, and the register holds no accepted "
+                f"Closure_Record for the Gate. The guard this Gate records is that nothing "
+                f"declares {subject}, so the declaration is the thing it rejects. A name written "
+                f"into a comment is not a declaration and is not reported",
+            )
+            for declared in pattern.finditer(code)
+        )
+    return findings
+
+
+def check_autonomy_source(premises: Premises) -> list[Finding]:
+    """No autonomy-source symbol stands under the overlay source tree while `DG-AUT` is open.
+
+    Requirement 11 criterion 9 requires the station to report the autonomy source status as
+    `UNKNOWN` while the Gate is open, and criterion 17 rejects a change introducing a proposal
+    schema element, a lifecycle state, a transition or an autonomy source transport. Nothing in the
+    tree implements a reporter for that status, and that is the correct state -- `Telemetry/README.md`
+    records `aeroraAutonomy` as `CONTRACT-ONLY` and says so. So the guard is the absence, and this
+    rule is what holds it.
+    """
+    gates, findings = _standing(premises, AUTONOMY_SOURCE)
+    if findings or not gates:
+        return findings
+    return _absent_symbol(premises, AUTONOMY_SOURCE, gates, _AUTONOMY_DECLARATION, AUTONOMY_SUBJECT)
+
+
+def check_simulated_source(premises: Premises) -> list[Finding]:
+    """No simulated-source field stands on a reported value while `DG-SIM` is open.
+
+    Requirement 15 criterion 14 rejects a change introducing a simulated-source discriminator or a
+    simulated-source flag on a reported value, and criterion 15 requires the classification to read
+    `UNKNOWN` rather than "not simulated" while the Gate is open. The defect criterion 4 records is
+    why: the only QML-reachable discriminator upstream compares `LinkConfiguration.linkType` against
+    `TypeMock`, which is declared inside `#ifdef QT_DEBUG`, so a release build would report every
+    simulated link as not simulated. An Aerora field added before the Gate closes would inherit that
+    question, so the guard is that none exists.
+    """
+    gates, findings = _standing(premises, SIMULATED_SOURCE)
+    if findings or not gates:
+        return findings
+    return _absent_symbol(
+        premises, SIMULATED_SOURCE, gates, _SIMULATED_DECLARATION, SIMULATED_SUBJECT
+    )
+
+
+# ---------------------------------------------------------------------------
 # contract-surface
 # ---------------------------------------------------------------------------
 
@@ -2416,6 +2688,8 @@ _CHECKS: Final = (
     check_freshness_threshold,
     check_payload_command_sink,
     check_actionable_control,
+    check_autonomy_source,
+    check_simulated_source,
     check_contract_surface,
 )
 

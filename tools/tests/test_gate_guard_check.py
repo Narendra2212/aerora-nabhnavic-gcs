@@ -86,6 +86,7 @@ from analyzers.gate_guard_check import (
     ACTION_SEAM,
     ACTIONABLE_CONTROL,
     ADR_016_PAIR,
+    AUTONOMY_SOURCE,
     CONSTANT_KIND,
     CONTRACT_SURFACE,
     CORE_HEADER,
@@ -107,6 +108,7 @@ from analyzers.gate_guard_check import (
     POPULATED_FILE_TIER,
     REGISTRY_KEY_KIND,
     REPORTED,
+    SIMULATED_SOURCE,
     SOURCE_TREE,
     THRESHOLD_SETTER,
     UNASSIGNED,
@@ -117,12 +119,15 @@ from analyzers.gate_guard_check import (
     check_action_seam,
     check_actionable_control,
     check_adr_016_pair,
+    check_autonomy_source,
     check_contract_surface,
     check_freshness_threshold,
+    check_guard_assertion,
     check_guard_value,
     check_mavlink_identifier,
     check_payload_command_sink,
     check_populated_file_override,
+    check_simulated_source,
     main,
     premise_findings,
     review,
@@ -130,8 +135,10 @@ from analyzers.gate_guard_check import (
 from common.analyzer import AnalyzerBase
 from common.file_traversal import find_cpp_files
 from common.gate_register import (
+    CHECK_GUARD,
     GATE_IDS,
     NO_GATE,
+    PREDICATE_GUARD,
     ActionableControlSite,
     ContractSurfaceElement,
     Disagreement,
@@ -156,6 +163,7 @@ from validate_gate_register import (
 from ._helpers import REPO_ROOT, TOOLS_DIR
 from .test_validate_gate_register import (
     ACTUATOR_PATH_GUARD,
+    ASSERTION_REMEDY,
     BASELINE_GUARD_GATES,
     BASELINE_PART,
     EXCEPTION_CONTROL,
@@ -382,14 +390,16 @@ def _pair_sources(root: Path, *, friend: bool, defined: bool) -> Path:
 # The four absent subjects
 # ---------------------------------------------------------------------------
 
-# How many Gate-conditional rules the run's summary counts -- the four absence rules and
-# `actionable-control` -- and the two Gates the rest of this file does not already carry. Spelled
-# here rather than imported from the analyzer: a test that read the rule's own table of Gates, or
-# its own count of itself, would agree with it by construction. The other two Gates are `ROLE_GATE`
-# and `PAYLOAD_GATE`, which the data half's fixtures already name.
-CONDITIONAL_RULES = 5
+# How many Gate-conditional rules the run's summary counts -- the four absence rules,
+# `actionable-control`, and the two rules holding a guard whose content is an absence -- and the
+# Gates the rest of this file does not already carry. Spelled here rather than imported from the
+# analyzer: a test that read the rule's own table of Gates, or its own count of itself, would agree
+# with it by construction. `ROLE_GATE` and `PAYLOAD_GATE` the data half's fixtures already name.
+CONDITIONAL_RULES = 7
 VIDEO_GATE = "DG-VID"
 FRESHNESS_GATE = "DG-FRS"
+AUTONOMY_GATE = "DG-AUT"
+SIMULATION_GATE = "DG-SIM"
 
 # Where the fixture tree carries each subject, under the tree the four rules walk. Fixture names,
 # because no rule reads a recorded path for any of them: the two allow-list rules find the
@@ -2576,6 +2586,15 @@ def _over(register: GateRegister, root: Path) -> Premises:
     return replace(_premises(register), root=root)
 
 
+def _premises_at(register: GateRegister, root: Path) -> Premises:
+    """Premises over *register*, rooted at *root*.
+
+    The same shape `_over` has, named for the general case because the guard-kind and absent-subject
+    cases below read source trees rather than QML documents.
+    """
+    return replace(_premises(register), root=root)
+
+
 def test_actionable_control_accepts_the_qml_documents_the_recorded_posture_matches(
     tmp_path: Path,
 ) -> None:
@@ -3308,3 +3327,350 @@ def test_contract_surface_reads_the_real_source_tree_and_qualifies_every_symbol(
         "AeroraMissionObserver",
     ):
         assert (REGISTRY_KEY_KIND, f"{module}::kServiceName") in symbols
+
+
+# ---------------------------------------------------------------------------
+# The three guard kinds
+#
+# Named with the `guard` token, so `-k guard` runs them beside the two value rules they change.
+#
+# Requirement 4 criterion 5 names nine guards in three shapes and does not distinguish them. Six are
+# `static constexpr` values, two are functions holding no literal at all, and the ninth is a check
+# rather than a symbol. These cases are what stops the register being forced to record a value the
+# source does not hold: a `predicate` pins the expression a reviewer read, and a `check` is held by a
+# rule whose existence is resolved rather than trusted.
+# ---------------------------------------------------------------------------
+
+# The expression a predicate guard pins, in the shape the two real ones have: a body that delegates
+# or derives rather than returning a literal. A fixture expression, because the real two are
+# `AeroraCommandAuthorizer::instance()->isFullyConfigured()` and `!_fleetIdentity.isEmpty()` and
+# recording either here would make this file a second place they are written.
+PREDICATE_EXPRESSION = "return aFixtureDelegate()->isFullyConfigured();"
+ANOTHER_EXPRESSION = "return aFixtureDelegate()->isSomethingElse();"
+
+
+def _predicate(register: GateRegister, symbol: str, expression: str) -> GateRegister:
+    """*register* with *symbol* recorded as a predicate pinning *expression*."""
+    return _with_guard(
+        register,
+        symbol,
+        kind=PREDICATE_GUARD,
+        recorded_value=expression,
+        declared_in=SOLO_DECLARATION,
+        asserted_in=[SOLO_SITE],
+    )
+
+
+def _defines(symbol: str, body: str) -> str:
+    """A definition of *symbol* whose body is *body*, with the expression named in a comment too.
+
+    The comment matters: a predicate is pinned by text, so a rule that read comments would pass on a
+    file that only *described* the expression it no longer carries.
+    """
+    return (
+        "#pragma once\n\n"
+        f"// A fixture predicate. Its reviewed expression is {PREDICATE_EXPRESSION}\n"
+        f"bool {_member(symbol)}()\n"
+        "{\n"
+        f"    {body}\n"
+        "}\n"
+    )
+
+
+def test_guard_value_accepts_a_predicate_whose_declaration_carries_its_expression(
+    tmp_path: Path,
+) -> None:
+    """A predicate guard holds no literal, so what is pinned is the expression a reviewer read."""
+    register = _predicate(_register(), REPLAY_GUARD, PREDICATE_EXPRESSION)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, _defines(REPLAY_GUARD, PREDICATE_EXPRESSION))
+
+    assert check_guard_value(_premises_at(register, root)) == []
+
+
+def test_guard_value_rejects_a_predicate_guard_whose_expression_changed(tmp_path: Path) -> None:
+    """A change to the expression has not been reviewed, so it is rejected naming both.
+
+    This is the case that would otherwise be unreachable. `AeroraCorePlugin::isAuthorizationEnforced()`
+    delegates to the authorizer singleton, so recording it as a literal `false` would compare a
+    delegation against the word "false" and reject a correct tree on every run.
+    """
+    register = _predicate(_register(), REPLAY_GUARD, PREDICATE_EXPRESSION)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, _defines(REPLAY_GUARD, ANOTHER_EXPRESSION))
+
+    (finding,) = check_guard_value(_premises_at(register, root))
+
+    assert finding.check == GUARD_VALUE
+    assert finding.gates == (MISSION_GATE,)
+    assert finding.blocking
+    assert PREDICATE_EXPRESSION in finding.message
+    assert "holds no literal" in finding.message
+
+
+def test_guard_value_rejects_a_predicate_guard_whose_symbol_was_withdrawn(tmp_path: Path) -> None:
+    """ "Not found" is not "unchanged" for a predicate either."""
+    register = _predicate(_register(), REPLAY_GUARD, PREDICATE_EXPRESSION)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, DECLARES_NOTHING)
+
+    findings = check_guard_value(_premises_at(register, root))
+    (finding,) = [f for f in findings if f.check == GUARD_VALUE]
+
+    assert finding.blocking
+    assert "declares no symbol of that name" in finding.message
+
+
+def test_guard_value_reads_a_predicate_expression_past_a_comment_quoting_it(
+    tmp_path: Path,
+) -> None:
+    """Comments are blanked first, so a file that only describes the expression does not pass.
+
+    The fixture's comment carries the recorded expression verbatim, so a rule reading raw text would
+    find it and pass over a body that no longer holds it.
+    """
+    register = _predicate(_register(), REPLAY_GUARD, PREDICATE_EXPRESSION)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, _defines(REPLAY_GUARD, ANOTHER_EXPRESSION))
+
+    declared = (root / SOLO_DECLARATION).read_text(encoding="utf-8")
+
+    assert declared.count(PREDICATE_EXPRESSION) == 1
+    assert check_guard_value(_premises_at(register, root)) != []
+
+
+def test_guard_value_and_guard_assertion_skip_a_guard_held_by_a_rule(tmp_path: Path) -> None:
+    """A check-kind guard has no declaration and no assertion site, so neither rule reads it.
+
+    The baseline registry carries exactly one: Requirement 4 criterion 5's ninth guard. Selected on
+    the recorded kind rather than by naming it, which is what stops the next guard of this shape
+    being a second name in an exclusion list.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+
+    held_by_a_rule = [guard for guard in register.guards if guard.kind == CHECK_GUARD]
+    premises = _premises_at(register, root)
+
+    assert [guard.symbol for guard in held_by_a_rule] == [MAVLINK_IDENTIFIER_GUARD]
+    assert held_by_a_rule[0].asserted_in == []
+    assert check_guard_value(premises) == []
+    assert check_guard_assertion(premises) == []
+
+
+def test_guard_value_rejects_a_guard_held_by_a_rule_that_does_not_exist(tmp_path: Path) -> None:
+    """A guard held by a rule is only held if the rule exists.
+
+    Recording a name that resolves to nothing would leave the guard unenforced while reading as
+    covered, which is the failure mode the whole module is written against.
+    """
+    register = _with_guard(
+        _register(),
+        REPLAY_GUARD,
+        kind=CHECK_GUARD,
+        recorded_value="a-rule-this-module-does-not-carry",
+        asserted_in=[],
+    )
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_guard_value(_premises_at(register, root))
+
+    assert finding.check == GUARD_VALUE
+    assert finding.blocking
+    assert "carries no rule of that name" in finding.message
+    assert "reading as covered" in finding.message
+
+
+def test_guard_assertion_reports_a_guard_the_register_records_as_asserted_nowhere(
+    tmp_path: Path,
+) -> None:
+    """Two of the nine are asserted by nothing today, and the register says so with its remedy.
+
+    An empty list read as satisfied would hide it; read as a blocking failure it would reject a
+    correct register on every run. So the absence is recorded, prints every run, and does not block.
+    """
+    register = _with_guard(
+        _register(),
+        REPLAY_GUARD,
+        asserted_in=[],
+        asserted_nowhere=True,
+        remedy=ASSERTION_REMEDY,
+    )
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_guard_assertion(_premises_at(register, root))
+
+    assert finding.check == GUARD_ASSERTION
+    assert finding.gates == (MISSION_GATE,)
+    assert not finding.blocking
+    assert ASSERTION_REMEDY in finding.message
+    assert "no suite asserts this guard" in finding.message
+
+
+def test_guard_assertion_blocks_on_an_empty_site_list_recording_no_absence(
+    tmp_path: Path,
+) -> None:
+    """Without the explicit record it blocks, which keeps the recorded absence from being a default.
+
+    The schema requires `assertedNowhere` and a remedy together, so this state is reachable only
+    through a model. That is what makes the recorded absence a decision rather than an omission.
+    """
+    register = _with_guard(
+        _register(), REPLAY_GUARD, asserted_in=[], asserted_nowhere=None, remedy=None
+    )
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_guard_assertion(_premises_at(register, root))
+
+    assert finding.blocking
+    assert "does not record that none exists" in finding.message
+
+
+# ---------------------------------------------------------------------------
+# autonomy-source and simulated-source
+#
+# The two guards whose content is an absence. `-k autonomy` and `-k simulated` reach them.
+#
+# Both exist because the thing guarded does not: nothing under `aerora/` declares an autonomy-source
+# type, and `AeroraTelemetrySource` carries no simulated/real axis at all. So the real-tree cases are
+# the sharpest evidence here, and the fixture cases assert that a declaration is rejected while a
+# name written into prose is not.
+# ---------------------------------------------------------------------------
+
+# Where a rejecting case writes the declaration it asserts over.
+ABSENT_SUBJECT_SOURCE = f"{SOURCE_TREE}/Telemetry/AFixtureAbsentSubject.h"
+
+
+def _naming_in_prose(subject: str) -> str:
+    """A header naming *subject* in a comment and declaring nothing.
+
+    The real tree does exactly this: `AeroraFactGroupBase.h:19` lists `aeroraAutonomy` as one of six
+    planned fact groups and `Telemetry/README.md` records it as CONTRACT-ONLY. Both must stay
+    readable, so a rule that matched a mention would reject the tree it protects.
+    """
+    return f"#pragma once\n\n// A fixture header naming {subject} in prose and declaring nothing.\n"
+
+
+@pytest.mark.parametrize(
+    ("check", "gate", "declaration", "declared"),
+    [
+        (
+            AUTONOMY_SOURCE,
+            AUTONOMY_GATE,
+            "class AFixtureAutonomySource\n{\n};\n",
+            "AFixtureAutonomySource",
+        ),
+        (
+            AUTONOMY_SOURCE,
+            AUTONOMY_GATE,
+            "struct AFixtureAutonomyState\n{\n};\n",
+            "AFixtureAutonomyState",
+        ),
+        (
+            SIMULATED_SOURCE,
+            SIMULATION_GATE,
+            "class AFixtureSimulatedFlag\n{\n};\n",
+            "AFixtureSimulatedFlag",
+        ),
+        (
+            SIMULATED_SOURCE,
+            SIMULATION_GATE,
+            "enum class AFixtureSimulatedKind\n{\n};\n",
+            "AFixtureSimulatedKind",
+        ),
+    ],
+)
+def test_the_absent_subject_rules_reject_a_declaration_naming_the_gate(
+    tmp_path: Path, check: str, gate: str, declaration: str, declared: str
+) -> None:
+    """The guard is that nothing declares the subject, so a declaration is the thing it rejects."""
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / ABSENT_SUBJECT_SOURCE, f"#pragma once\n\n{declaration}")
+
+    rule = check_autonomy_source if check == AUTONOMY_SOURCE else check_simulated_source
+    (finding,) = rule(_premises_at(register, root))
+
+    assert finding.check == check
+    assert finding.gates == (gate,)
+    assert finding.blocking
+    assert declared in finding.message
+    assert ABSENT_SUBJECT_SOURCE in finding.message
+
+
+@pytest.mark.parametrize("check", [AUTONOMY_SOURCE, SIMULATED_SOURCE])
+def test_the_absent_subject_rules_read_a_name_in_prose_as_not_a_declaration(
+    tmp_path: Path, check: str
+) -> None:
+    """`aeroraAutonomy` is named in two real documents as a planned group, and both must stay."""
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    subject = "aeroraAutonomy and a simulated source" if check == AUTONOMY_SOURCE else "isSimulated"
+    _write(root / ABSENT_SUBJECT_SOURCE, _naming_in_prose(subject))
+
+    rule = check_autonomy_source if check == AUTONOMY_SOURCE else check_simulated_source
+
+    assert subject in (root / ABSENT_SUBJECT_SOURCE).read_text(encoding="utf-8")
+    assert rule(_premises_at(register, root)) == []
+
+
+@pytest.mark.parametrize(
+    ("check", "gate"), [(AUTONOMY_SOURCE, AUTONOMY_GATE), (SIMULATED_SOURCE, SIMULATION_GATE)]
+)
+def test_the_absent_subject_rules_stand_down_once_the_gate_records_an_accepted_closure(
+    tmp_path: Path, check: str, gate: str
+) -> None:
+    """Once the Gate holds an accepted Closure_Record, the subject is what an owner signed for."""
+    premises = _closing(tmp_path / "repo", gate)
+    _write(
+        premises.root / ABSENT_SUBJECT_SOURCE,
+        "#pragma once\n\nclass AFixtureAutonomySimulated\n{\n};\n",
+    )
+
+    rule = check_autonomy_source if check == AUTONOMY_SOURCE else check_simulated_source
+
+    assert not premises.derived.gate_open[gate].is_open
+    assert rule(premises) == []
+
+
+@pytest.mark.parametrize("check", [AUTONOMY_SOURCE, SIMULATED_SOURCE])
+def test_the_absent_subject_rules_reject_a_source_tree_they_could_not_walk(
+    tmp_path: Path, check: str
+) -> None:
+    """A run that searched nothing must not read as a run that found nothing."""
+    premises = replace(_premises(_register()), root=tmp_path / "repo")
+
+    rule = check_autonomy_source if check == AUTONOMY_SOURCE else check_simulated_source
+    (finding,) = rule(premises)
+
+    assert finding.check == check
+    assert finding.blocking
+    assert finding.message.startswith(f"{SOURCE_TREE}/ is not a directory")
+
+
+def test_autonomy_source_reads_the_real_tree_and_finds_no_declaration() -> None:
+    """The evidence for DG-AUT's guard, which is that nothing in the repository declares one.
+
+    The planned fact group is named in prose in two places and both are asserted present, so the
+    pass is evidence that a mention is not a declaration rather than that the rule looked nowhere.
+    """
+    planned = (REPO_ROOT / SOURCE_TREE / "Telemetry" / "AeroraFactGroupBase.h").read_text(
+        encoding="utf-8"
+    )
+
+    assert "aeroraAutonomy" in planned
+    assert check_autonomy_source(_premises(_register())) == []
+
+
+def test_simulated_source_reads_the_real_tree_and_finds_no_declaration() -> None:
+    """The evidence for DG-SIM's guard: `AeroraTelemetrySource` carries no simulated axis.
+
+    Its only enumeration is `Attribution`, whose members are about which component sent a message.
+    Asserted present so the pass is evidence the rule read the file that would carry the flag.
+    """
+    source = (REPO_ROOT / SOURCE_TREE / "Telemetry" / "AeroraTelemetrySource.h").read_text(
+        encoding="utf-8"
+    )
+
+    assert "enum Attribution" in source
+    assert check_simulated_source(_premises(_register())) == []

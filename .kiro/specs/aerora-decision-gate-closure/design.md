@@ -408,6 +408,8 @@ auto-fix here, because the only thing to "fix" would be a recorded value a revie
 | `freshness-threshold` | `kDefinedThresholdCount` holds its recorded literal and no `setThreshold(` call site exists in `aerora/src/**` | 8.13, 8.16 |
 | `payload-command-sink` | No implementation of `AeroraPayloadCommandSink` exists in `aerora/src/**` | 10.18 |
 | `actionable-control` | The actionable controls the Aerora QML documents declare are exactly the controls the read-only posture records — the single exception, plus each recorded site with the handler it was reviewed under | 5.1, 5.2, 5.11 |
+| `autonomy-source` | No autonomy-source type, enumerator or accessor is declared in `aerora/src/**` while `DG-AUT` is `OPEN` | 11.9, 11.17 |
+| `simulated-source` | No simulated-source field, enumerator or accessor is declared in `aerora/src/**` while `DG-SIM` is `OPEN` | 15.8, 15.14, 15.15 |
 | `contract-surface` | The enumerators, declared constants and registry string keys in `aerora/src/**` match the recorded contract surface | 3.12, 4.2 (approximation — see below) |
 
 The `mavlink-identifier` allow-list is recorded **by site, never by identifier.** Each entry is a file
@@ -419,6 +421,50 @@ stop Contract_Values entering the repository the thing that carries them. The ch
 the allow-listed files, takes the identifiers it finds there as the current baseline, and fails on an
 identifier appearing in any file the register does not allow-list — naming the file and `DG-MIS`. That
 makes it a ratchet rather than a cliff without the register holding a single identifier of its own.
+
+#### A guard has one of three shapes, and the register records which
+
+Requirement 4 criterion 5 names nine guards without distinguishing them, and the first draft of this
+design read all nine the same way — a symbol, a declaring file, and a literal to compare. Checked
+against the tree, that holds for six of them and fails for the rest, so the register records a
+`kind`:
+
+| `kind` | What is pinned | Which guards |
+| --- | --- | --- |
+| `literal` | The declaring source carries the recorded value as an initialiser or as the literal its body returns | The six `static constexpr` guards, plus `AeroraAuditSink::isDurable()` and `isTamperEvident()`, whose bodies are `return false` |
+| `predicate` | The declaring source carries the recorded *expression a reviewer read* | `AeroraCorePlugin::isAuthorizationEnforced()`, which delegates to the authorizer singleton; `AeroraVehicleIdentity::fleetIdentityKnown()`, which derives from an uninitialised member; `AeroraCommandAuthorizer::lostAuditRecordCount()`, a runtime accumulator; and `AeroraTelemetryState::ObservedFreshnessUnevaluated`, an enum member with no initialiser |
+| `check` | A rule in `gate_guard_check.py` holds it, and nothing declares it | The static MAVLink-identifier check of criterion 5, plus `DG-AUT`'s and `DG-SIM`'s guards, whose content is an *absence* |
+
+The alternative was to record a value the source does not hold. `isAuthorizationEnforced()` recorded
+as `false` would compare a delegation against the word "false" and reject a correct tree on every
+run; `ObservedFreshnessUnevaluated` has no initialiser at all and its ordinal would shift silently if
+a member were inserted above it. A `predicate` rejects a change to the behaviour — which is what the
+guard is — without claiming a value that is absent. A recorded `disagreement` stays confined to a
+`literal`, because it pins an observed value against a recorded one and there is nothing for the two
+to differ on otherwise.
+
+**Two Gates' guards are an absence, and that is why `check` is a kind rather than a special case.**
+Nothing under `aerora/` declares an autonomy-source type — `Telemetry/README.md` records
+`aeroraAutonomy` as `CONTRACT-ONLY` and states that no concrete group is implemented — and
+`AeroraTelemetrySource` carries no simulated/real axis at all; its only enumeration is `Attribution`,
+whose members are about which component sent a message. Requirement 15 criterion 14 asks for exactly
+what follows: reject a change that *introduces* a discriminator. So `autonomy-source` and
+`simulated-source` hold those absences the way `payload-command-sink` holds its own, and the registry
+names each by the rule that holds it. Recording the two Gates as resting on review alone would have
+said no guard holds them when one does.
+
+`_registry()` selects on the kind rather than naming the exceptions. It excluded one symbol when one
+guard had this shape; reading the kind is what stops the next one being a second name in that
+expression.
+
+**A guard nothing asserts is recorded, not inferred.** Nothing under `aerora/test/**` names
+`AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()` or
+`AeroraCorePlugin::isAuthorizationEnforced()`. An empty `assertedIn` read as satisfied would hide
+that; read as a blocking failure it would reject a correct register on every run. So the absence
+carries `assertedNowhere` and a `remedy`, prints on every run and does not block — the same
+discipline `holdsNoGateOpen` and `restsOnReviewAlone` already apply. What criterion 9 rejects is a
+site being *removed*, which a recorded absence keeps distinguishable from a register that never had
+one.
 
 #### How a closing Gate relaxes a guard check
 

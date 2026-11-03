@@ -60,7 +60,9 @@ import pytest
 from common.gate_register import (
     ABSENT,
     ACCEPTED_PART_STATE,
+    CHECK_GUARD,
     INVENTORY_COLUMNS,
+    LITERAL_GUARD,
     ActionableControlSite,
     Amendment,
     BlockingEntry,
@@ -409,6 +411,10 @@ GUARD_DECLARATION = "aerora/src/AFixtureGuard.h"
 GUARD_ASSERTION = f"{TEST_TREE}/AFixtureGuardTest.cc"
 FIXTURE_GUARD_VALUE = "a fixture literal"
 
+# What the fixture records as closing an assertion gap. A fixture string: which task closes the real
+# two is task 11.3's to state, and writing it here would be this file deciding it.
+ASSERTION_REMEDY = "a fixture remedy that adds the assertion"
+
 # The contract-surface kind and no-Gate marker the baseline records its entries under. Spelled here
 # rather than imported from the analyzer, so the fixture states the vocabulary independently of the
 # rule that reads it.
@@ -426,12 +432,27 @@ def _guard(
     holds_open: Sequence[str] | None = None,
     permitted_to_change_by: Sequence[str] | None = None,
     recorded_value: str | None = None,
+    kind: str = LITERAL_GUARD,
+    asserted_in: Sequence[str] | None = None,
+    remedy: str | None = None,
 ) -> Guard:
     """One registry entry, permitted to change by the `whole` part of each Gate it holds open.
 
     The recorded value defaults to the one criterion 5 names, which is what keeps the baseline both
     pinned and agreeing: every baseline part is unaccepted, so no guard is free and every recorded
     value is read.
+
+    *kind* defaults to `literal`, which is the shape six of the nine have and the only shape a
+    recorded disagreement means anything on. A test wanting a `predicate` says so.
+
+    The one guard criterion 5 names as a *check* rather than as a symbol takes the `check` kind
+    without being asked, because nothing declares it and nothing asserts it: its recorded value is
+    the name of the rule that holds it, and the source half resolves that name. Defaulted here
+    rather than at every call site, so a registry built by listing the nine gets the right shape.
+
+    An empty *asserted_in* records `assertedNowhere` and the *remedy* beside it, because the schema
+    requires both together: an empty list read as satisfied would be indistinguishable from a
+    register whose sites were deleted.
     """
     gates = BASELINE_GUARD_GATES.get(symbol, ()) if holds_open is None else tuple(holds_open)
     permitting = (
@@ -439,11 +460,22 @@ def _guard(
         if permitted_to_change_by is None
         else list(permitted_to_change_by)
     )
+    held_by_a_rule = symbol == MAVLINK_IDENTIFIER_GUARD
+    sites = (
+        [] if held_by_a_rule else [GUARD_ASSERTION] if asserted_in is None else list(asserted_in)
+    )
     return Guard(
         symbol=symbol,
+        kind=CHECK_GUARD if held_by_a_rule else kind,
         declared_in=GUARD_DECLARATION,
-        recorded_value=recorded_value or MECHANICAL_GUARDS.get(symbol) or FIXTURE_GUARD_VALUE,
-        asserted_in=[GUARD_ASSERTION],
+        recorded_value=(
+            MAVLINK_IDENTIFIER_GUARD
+            if held_by_a_rule
+            else recorded_value or MECHANICAL_GUARDS.get(symbol) or FIXTURE_GUARD_VALUE
+        ),
+        asserted_in=sites,
+        asserted_nowhere=None if sites else True,
+        remedy=(remedy or ASSERTION_REMEDY) if not sites else None,
         holds_open=list(gates),
         holds_no_gate_open=None if gates else True,
         permitted_to_change_by=permitting,
