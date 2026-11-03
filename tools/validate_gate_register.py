@@ -107,6 +107,7 @@ DELIVERED_OUTSIDE: Final = "delivered-outside"
 INVENTORY_COVERAGE: Final = "inventory-coverage"
 ENTRY_CLASSIFICATION: Final = "entry-classification"
 RECLASSIFICATIONS: Final = "reclassifications"
+CONTENT_EXCLUSION: Final = "content-exclusion"
 CLOSURE_COMPLETENESS: Final = "closure-completeness"
 CLOSURE_SIGNATURES: Final = "closure-signatures"
 ENTRY_COMMIT: Final = "closure-entry-commit"
@@ -1618,6 +1619,41 @@ def _part_settlement(
     return findings
 
 
+def check_content_exclusion(premises: Premises) -> list[Finding]:
+    """A Gate's Decision_Content and its excluded Acceptance_Criteria name no item in common.
+
+    Requirement 2 criterion 6 records a condition a released screen satisfies once built as an
+    Acceptance_Criterion *excluded from* the Gate's Decision_Content, and Requirement 13 criterion
+    15 is the instance written as a repair: an Acceptance_Criterion recorded as Decision_Content is
+    removed from it. Requirement 1 criterion 9 does the same for an element Verified_Infrastructure
+    already supplies. An item recorded on both lists is a Gate that both settles it and declares
+    that it does not, so the dossier answers its own question twice -- and every rule downstream
+    reads whichever list it happens to read: `closure-completeness` would demand a settled entry for
+    it while the exclusion says no owner signs one.
+
+    One finding per collision, naming the item, the part that records it as Decision_Content and the
+    Gate. The repair is to one of the two lists and a reviewer has to see which part of which Gate
+    carries it, so a finding naming the Gate alone would leave a multi-part dossier to be searched.
+    """
+    findings: list[Finding] = []
+    for dossier in premises.register.gates:
+        excluded = {criterion.id for criterion in dossier.excluded_acceptance_criteria}
+        for part in dossier.parts:
+            reference = part_reference(dossier.id, part.id)
+            findings.extend(
+                Finding(
+                    CONTENT_EXCLUSION,
+                    f"{reference}: the part records {element.name!r} as Decision_Content, and "
+                    f"{dossier.id} records an Acceptance_Criterion of that identifier as excluded "
+                    f"from the Gate's Decision_Content. An item cannot be both settled by the Gate "
+                    f"and declared outside it, so one of the two records is the repair",
+                )
+                for element in part.elements
+                if element.name in excluded
+            )
+    return findings
+
+
 def check_closure_completeness(premises: Premises) -> list[Finding]:
     """Every Decision_Content element a part records is settled by the record that settles the part.
 
@@ -3078,6 +3114,7 @@ _CHECKS: Final = (
     check_inventory_coverage,
     check_entry_classification,
     check_reclassifications,
+    check_content_exclusion,
     check_closure_completeness,
     check_closure_signatures,
     check_closure_entry_commit,

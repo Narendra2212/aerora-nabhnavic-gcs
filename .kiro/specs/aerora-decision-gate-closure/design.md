@@ -378,6 +378,7 @@ The `lint` dependency group already carries `jsonschema>=4.23`, so no new runtim
 | `inventory-coverage` | Every inventory row appears once in the register's screen list; every register screen ID is an inventory row | 1.7 |
 | `entry-classification` | The ID tokens in each inventory "Blocked by" cell equal the register's classified-entry set for that screen | 2.1, 2.10 |
 | `reclassifications` | The five recorded misreads are present with their reclassification, and the retained-Gate statement holds | 2.7, 2.11 |
+| `content-exclusion` | No Decision_Content element of a Gate shares an identifier with an entry in that Gate's excluded Acceptance_Criteria, with the part and the Gate named | 1.9, 2.6, 6.16, 13.15 |
 | `closure-completeness` | Every Decision_Content element the dossier records has a settled entry in the accepted record, by `settlementShape` | 3.3, 3.11, 7.12, 8.11, 9.11, 10.12, 11.12, 12.12, 13.10 |
 | `closure-signatures` | Owner sets match in both directions; `signOffDate` present; trailer set matches | 3.1, 3.4, 14.11, 15.18 |
 | `closure-entry-commit` | `entryCommit` equals the git add-commit of the record file | 3.1 |

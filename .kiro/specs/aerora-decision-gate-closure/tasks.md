@@ -285,27 +285,27 @@ Constraints every task inherits:
     - _Requirements: 3.9_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k observation`
 
-  - [ ]* 4.5 Write property test for recorded against derived Release_Sets
+  - [x]* 4.5 Write property test for recorded against derived Release_Sets
     - **Property 4: A recorded Release_Set equals the set derived from the classifications**
     - **Validates: Requirements 1.2, 1.12, 6.6, 7.8, 8.6, 9.7, 10.8, 11.7, 12.7, 13.6, 14.7, 15.7**
 
-  - [ ]* 4.6 Write property test for the undelivered partition
+  - [x]* 4.6 Write property test for the undelivered partition
     - **Property 5: The Release_Sets and the Released-with-no-Gate set partition the undelivered screens**
     - **Validates: Requirements 1.6, 2.8**
 
-  - [ ]* 4.7 Write property test for delivered-screen exclusion
+  - [x]* 4.7 Write property test for delivered-screen exclusion
     - **Property 6: No Release_Set contains a Delivered_Screen**
     - **Validates: Requirements 1.7, 1.11, 10.9, 13.14**
 
-  - [ ]* 4.8 Write property test for inventory and register entry agreement
+  - [x]* 4.8 Write property test for inventory and register entry agreement
     - **Property 10: The inventory's blocking-entry tokens and the register's classified entries agree**
     - **Validates: Requirements 2.1, 2.10**
 
-  - [ ]* 4.9 Write property test for the `VERIFIED` observation requirement
+  - [x]* 4.9 Write property test for the `VERIFIED` observation requirement
     - **Property 27: A `VERIFIED` status requires a recorded observation of a registered test**
     - **Validates: Requirements 3.9**
 
-  - [ ]* 4.10 Write schema-rejection fixture tests
+  - [x]* 4.10 Write schema-rejection fixture tests
     - Nine Gates, eleven Gates, a duplicate Gate identifier, two read-only exceptions, and an
       exception naming a screen other than `SCR-HLP-03`
     - Each asserts the schema rejects the document, which is what makes "it cannot silently become
@@ -356,50 +356,50 @@ Constraints every task inherits:
     - _Requirements: 3.2, 3.5, 3.7, 3.11, 7.15, 8.5, 8.14, 9.14, 10.15, 11.15, 12.17, 15.13_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k "status or verdict or amendment"`
 
-  - [ ]* 5.5 Write property test for the entry commit round trip
+  - [x]* 5.5 Write property test for the entry commit round trip
     - **Property 12: A Closure_Record's entry commit round-trips against git history**
     - **Validates: Requirements 3.1**
     - The pure half — a commit recorded exactly when the state is accepted — runs at the full
       iteration count. The half that resolves an add-commit needs a temporary repository per example;
       declare its reduced count on that test rather than lowering the property silently
 
-  - [ ]* 5.6 Write property test for signature set equality
+  - [x]* 5.6 Write property test for signature set equality
     - **Property 13: A part is accepted only when its signature set equals its recorded owner set**
     - **Validates: Requirements 3.4, 14.11**
 
-  - [ ]* 5.7 Write property test for the empty owner set
+  - [x]* 5.7 Write property test for the empty owner set
     - **Property 14: A part recording no owner is a named failure, not a vacuous pass**
     - **Validates: Requirements 15.17, 15.18**
 
-  - [ ]* 5.8 Write property test for Sign_Off_Condition totality
+  - [x]* 5.8 Write property test for Sign_Off_Condition totality
     - **Property 15: Every Sign_Off_Condition of an accepted part carries a verdict and a reviewer**
     - **Validates: Requirements 3.2, 3.5**
 
-  - [ ]* 5.9 Write property test for the `single` settlement shape
+  - [x]* 5.9 Write property test for the `single` settlement shape
     - **Property 16: A `single`-shaped element is settled by exactly one entry carrying every required attribute**
     - **Validates: Requirements 3.3, 3.11, 6.11, 6.13, 6.18, 7.12, 10.12, 11.12, 11.13, 12.14, 13.10, 15.10**
 
-  - [ ]* 5.10 Write property test for the `keyed` settlement shape
+  - [x]* 5.10 Write property test for the `keyed` settlement shape
     - **Property 17: A `keyed`-shaped element is settled by exactly one entry per key**
     - **Validates: Requirements 8.3, 8.10, 8.11, 12.5, 12.12, 12.13**
 
-  - [ ]* 5.11 Write property test for the `mapping` settlement shape
+  - [x]* 5.11 Write property test for the `mapping` settlement shape
     - **Property 18: A `mapping`-shaped element is settled only by a relation total in both directions**
     - **Validates: Requirements 9.4, 9.5, 9.11**
 
-  - [ ]* 5.12 Write property test for the excluded source
+  - [x]* 5.12 Write property test for the excluded source
     - **Property 19: An element whose declared source is the excluded source is rejected**
     - **Validates: Requirements 13.4, 13.9, 15.10**
 
-  - [ ]* 5.13 Write property test for lifecycle state and transition resolution
+  - [x]* 5.13 Write property test for lifecycle state and transition resolution
     - **Property 20: A lifecycle state or transition resolves only against defined members**
     - **Validates: Requirements 11.5, 11.11, 11.12**
 
-  - [ ]* 5.14 Write property test for amendment scope
+  - [x]* 5.14 Write property test for amendment scope
     - **Property 21: An amendment settles its own key and retains every acceptance already recorded**
     - **Validates: Requirements 3.11, 8.5, 8.14**
 
-  - [ ]* 5.15 Write property test for Decision_Content and excluded Acceptance_Criterion disjointness
+  - [x]* 5.15 Write property test for Decision_Content and excluded Acceptance_Criterion disjointness
     - **Property 22: A Decision_Content element and an excluded Acceptance_Criterion are never the same item**
     - **Validates: Requirements 1.9, 2.6, 6.16, 13.15**
 
@@ -422,7 +422,7 @@ Constraints every task inherits:
     - _Requirements: 5.8, 9.16_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k forbidden`
 
-  - [ ]* 6.3 Write property test for the guard mapping and the permission rule
+  - [x]* 6.3 Write property test for the guard mapping and the permission rule
     - **Property 26: Every guard carries a Gate mapping, and a guard is free exactly when every part permitting it has permitted it**
     - **Validates: Requirements 4.5, 4.6, 4.8, 6.17, 9.17, 10.18**
 

@@ -26,6 +26,11 @@ Requirements 2.1, 2.7, 2.10 and 2.11: the register's classified entries and the 
 statement holds. The inventory's declared totals agree with its own rows, which is the only check
 here with evidence outside a fixture and is tested against the real inventory as well.
 
+Requirements 1.9, 2.6, 6.16 and 13.15: a Gate's Decision_Content and its excluded
+Acceptance_Criteria name no item in common. The two lists are read together nowhere else -- the
+settlement rules demand an entry for every recorded element and never look at the exclusions -- so
+an item on both is a Gate asking for a signature on something it has declared outside itself.
+
 Requirements 4.5, 4.6 and 4.8: the registry covers the nine guards Requirement 4 criterion 5 names,
 each Gate records the guards that hold it visible or records that it rests on the Gate_Review alone,
 every change permission resolves to a part that exists, and a guard is free exactly when every part
@@ -65,6 +70,7 @@ from common.gate_register import (
     GATE_CLASSIFICATION,
     INVENTORY_COLUMNS,
     LITERAL_GUARD,
+    OWNER_LABELS,
     PREDICATE_GUARD,
     ActionableControlSite,
     Amendment,
@@ -72,6 +78,7 @@ from common.gate_register import (
     ClosureRecord,
     ContractSurfaceElement,
     DecisionContentElement,
+    ExcludedAcceptanceCriterion,
     ForbiddenUntil,
     GateDossier,
     GatePart,
@@ -104,6 +111,8 @@ from common.gate_register import (
 )
 from common.git import AddCommit, run_git
 from common.markdown import md_table
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from validate_gate_register import (
     ACCEPTED_RECORD_STATE,
     CLOSED_STATUS,
@@ -111,6 +120,7 @@ from validate_gate_register import (
     CLOSURE_COMPLETENESS,
     CLOSURE_RECORD_SCHEMA_PATH,
     CLOSURE_SIGNATURES,
+    CONTENT_EXCLUSION,
     DELIVERED_OUTSIDE,
     ENTRY_CLASSIFICATION,
     ENTRY_COMMIT,
@@ -161,6 +171,7 @@ from validate_gate_register import (
     check_closure_completeness,
     check_closure_entry_commit,
     check_closure_signatures,
+    check_content_exclusion,
     check_delivered_outside,
     check_entry_classification,
     check_forbidden_until,
@@ -182,6 +193,7 @@ from validate_gate_register import (
 )
 
 from ._helpers import REPO_ROOT
+from ._strategies import MAX_EXAMPLES, sign_off_conditions
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -4386,3 +4398,1152 @@ def test_the_real_register_records_the_two_gate_screens_and_no_others() -> None:
     carried = {screen: gates for screen, gates in two_gate.items() if len(gates) > 1}
 
     assert carried == {screen: sorted(gates) for screen, gates in TWO_GATE_SCREENS.items()}
+
+
+# ---------------------------------------------------------------------------
+# Properties
+#
+# Quantified over generated *mutations of the agreeing baseline* rather than over registers drawn
+# from nothing. That is deliberate and it is the stronger test here. Every check in this file is a
+# predicate relating two documents, so a register drawn freely disagrees with its inventory on a
+# dozen axes at once and a finding proves nothing about which rule caught it. Mutating one axis of a
+# register that agrees on all of them isolates the rule: the baseline produces no finding from any
+# check, so every finding a property sees is one the mutation caused.
+#
+# Each is two-sided. Where the mutation is the identity the check must stay silent, and where it is
+# not the check must name exactly what moved — a check that reported everything would pass the
+# second half and fail the first.
+# ---------------------------------------------------------------------------
+
+_UNDELIVERED_SCREENS = tuple(
+    sorted(record.id for record in _baseline_screens() if record.id not in DELIVERED_SCREENS)
+)
+_DELIVERED_SCREENS = tuple(sorted(DELIVERED_SCREENS))
+_GATES_WITH_A_RELEASE_SET = tuple(
+    sorted(gate for gate, screens in _recorded_release_sets(_baseline_screens()).items() if screens)
+)
+_RELEASED_SCREENS = tuple(
+    sorted(frozenset().union(*_recorded_release_sets(_baseline_screens()).values()))
+)
+
+
+# Property 4: A recorded Release_Set equals the set derived from the classifications.
+# Validates: Requirements 1.2, 1.12, 6.6, 7.8, 8.6, 9.7, 10.8, 11.7, 12.7, 13.6, 14.7, 15.7.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_GATES_WITH_A_RELEASE_SET), st.booleans())
+def test_a_recorded_release_set_equals_the_derived_set(gate: str, drop: bool) -> None:
+    """Recorded and derived, compared — which is the pattern the whole register is built on.
+
+    Requirement 1 criterion 2 requires the Release_Set to be *recorded*, and Requirement 2 derives
+    it from the classifications. Recording alone leaves nothing to check against; deriving alone
+    leaves nothing for an owner to sign. So both exist and the check compares them, and this is the
+    property that the comparison is an equality rather than a containment either way.
+    """
+    recorded = _recorded_release_sets(_baseline_screens())
+    held = sorted(recorded[gate])[0]
+    if drop:
+        recorded[gate] = [screen for screen in recorded[gate] if screen != held]
+    else:
+        recorded[UNUSED_GATE] = [*recorded.get(UNUSED_GATE, []), held]
+
+    findings = check_release_set_derivation(_premises(_register(release_sets=recorded)))
+    messages = _messages(findings, RELEASE_SET_DERIVATION)
+
+    assert messages, "a Release_Set that disagrees with the classifications must be reported"
+    assert any(held in message for message in messages)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_GATES_WITH_A_RELEASE_SET))
+def test_an_unmutated_release_set_produces_no_finding(gate: str) -> None:
+    """The other side: reordering a recorded Release_Set is not a disagreement.
+
+    A Release_Set is a *set*, so the check must not be reading it as a sequence. Without this the
+    property above would pass against an implementation that compared lists.
+    """
+    recorded = _recorded_release_sets(_baseline_screens())
+    recorded[gate] = list(reversed(recorded[gate]))
+
+    assert check_release_set_derivation(_premises(_register(release_sets=recorded))) == []
+
+
+# Property 5: The Release_Sets and the Released-with-no-Gate set partition the undelivered screens.
+# Validates: Requirements 1.6, 2.8.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_RELEASED_SCREENS))
+def test_the_release_sets_and_the_no_gate_set_partition_the_undelivered_screens(
+    screen: str,
+) -> None:
+    """A partition: every undelivered screen in exactly one branch, and none in both.
+
+    Withdrawing a screen leaves it undelivered and in neither branch, which is the half that
+    matters: a screen in no branch is a screen nobody accounted for, and an incomplete Release_Set
+    reads as progress rather than as an omission.
+
+    It is withdrawn from *every* Release_Set, because the partition is the two-part one Requirement
+    1 criterion 6 states and the union of the ten is one of its branches. A Two_Gate_Screen dropped
+    from one Gate's set is still in the other's, so it is still accounted for -- which is the
+    behaviour the property wants and the reason the mutation cannot be per-Gate. That the Gate whose
+    set lost it must carry it is the derivation's finding, asserted under Property 4.
+    """
+    recorded = {
+        gate: [held for held in screens if held != screen]
+        for gate, screens in _recorded_release_sets(_baseline_screens()).items()
+    }
+
+    messages = _messages(check_partition(_premises(_register(release_sets=recorded))), PARTITION)
+
+    assert any(
+        f"{screen} is undelivered, appears in no Release_Set" in message for message in messages
+    )
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_RELEASED_SCREENS))
+def test_the_partition_reports_a_screen_recorded_under_both_branches(screen: str) -> None:
+    """And none in both, which is the other way a partition fails.
+
+    Reclassifying every entry of a released screen puts it in the no-Gate branch while its
+    Release_Set still carries it, so it is accounted for twice. Quantified over the released
+    screens rather than the undelivered ones: Requirement 2 criterion 8's five are in the no-Gate
+    branch already and in no Release_Set, so reclassifying one of those is the identity.
+    """
+    held = next(record for record in _baseline_screens() if record.id == screen)
+    screens = _with_screen(
+        _baseline_screens(),
+        screen,
+        blocking_entries=[
+            replace(entry, classification=ACCEPTANCE_CRITERION_CLASSIFICATION, gate=None)
+            for entry in held.blocking_entries
+        ],
+    )
+    recorded = _recorded_release_sets(_baseline_screens())
+
+    messages = _messages(
+        check_partition(_premises(_register(screens=screens, release_sets=recorded))), PARTITION
+    )
+
+    assert any(
+        f"{screen} is recorded in the Release_Set of" in message
+        and "under both branches of Requirement 1 criterion 6" in message
+        for message in messages
+    )
+
+
+# Property 6: No Release_Set contains a Delivered_Screen.
+# Validates: Requirements 1.7, 1.11, 10.9, 13.14.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_GATES_WITH_A_RELEASE_SET), st.sampled_from(_DELIVERED_SCREENS))
+def test_no_release_set_contains_a_delivered_screen(gate: str, delivered: str) -> None:
+    """Releasing a screen says its remaining work may start, so a delivered screen has none.
+
+    Requirement 13 criterion 14 is the sharpest instance: the fleet identifier field of
+    `SCR-VEH-02` is content a Delivered_Screen displays, and the screen stays *outside* the
+    `DG-FLT` Release_Set. Recording it inside would say the delivered screen is waiting to be built.
+    """
+    recorded = _recorded_release_sets(_baseline_screens())
+    recorded[gate] = [*recorded[gate], delivered]
+
+    messages = _messages(
+        check_delivered_outside(_premises(_register(release_sets=recorded))), DELIVERED_OUTSIDE
+    )
+
+    assert any(delivered in message for message in messages)
+
+
+# Property 10: The inventory's blocking-entry tokens and the register's classified entries agree.
+# Validates: Requirements 2.1, 2.10.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_UNDELIVERED_SCREENS), st.booleans())
+def test_the_inventory_tokens_and_the_classified_entries_agree(screen: str, drop: bool) -> None:
+    """Set equality over one screen's cell, in both directions and entry by entry.
+
+    A cell that gained an entry and lost another is two findings rather than one mismatch, which is
+    what makes the report actionable: the two have different repairs.
+    """
+    screens = _baseline_screens()
+    record = next(item for item in screens if item.id == screen)
+    if not record.blocking_entries:
+        return
+
+    if drop:
+        mutated = _with_screen(screens, screen, blocking_entries=record.blocking_entries[1:])
+        expected = record.blocking_entries[0].id
+    else:
+        added = replace(record.blocking_entries[0], id="P7-ZZZ-999")
+        mutated = _with_screen(screens, screen, blocking_entries=[*record.blocking_entries, added])
+        expected = "P7-ZZZ-999"
+
+    register = _register(screens=mutated, release_sets=_recorded_release_sets(screens))
+    premises = _premises(register, rows=_baseline_rows(register), blocked=_blocked_by(_register()))
+    messages = _messages(check_entry_classification(premises), ENTRY_CLASSIFICATION)
+
+    assert any(expected in message for message in messages)
+
+
+# Property 27: A `VERIFIED` status requires a recorded observation of a registered test.
+# Validates: Requirements 3.9.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_DELIVERED_SCREENS))
+def test_a_verified_status_requires_a_recorded_observation(screen: str) -> None:
+    """A `VERIFIED` row with no observation is a claim with nothing behind it.
+
+    The status is the inventory's and the observation is the register's, so the two have to be read
+    together: a row claiming `VERIFIED` is claiming a test navigated to the screen and drew it, and
+    the register is where that test is named.
+    """
+    rows = _baseline_rows(_register())
+    if rows.get(screen) != VERIFIED_STATUS:
+        return
+
+    screens = _with_screen(_baseline_screens(), screen, observation=None)
+    register = _register(screens=screens, release_sets=_recorded_release_sets(_baseline_screens()))
+
+    messages = _messages(
+        check_verified_observation(_premises(register, rows=rows)), VERIFIED_OBSERVATION
+    )
+
+    assert any(screen in message for message in messages)
+
+
+# Property 13: A part is accepted only when its signature set equals its recorded owner set.
+# Validates: Requirements 3.4, 14.11.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.lists(st.sampled_from(sorted(OWNER_LABELS)), min_size=2, max_size=3, unique=True),
+    st.booleans(),
+)
+def test_a_part_is_accepted_only_when_its_signatures_equal_its_owners(
+    labels: list[str], unrecognised: bool
+) -> None:
+    """Set equality in both directions, reported as two different findings.
+
+    An omitted owner is a signature not yet collected; an unrecognised signatory is a signature
+    from a party the dossier does not record as an owner of that part. Collapsing them would report
+    that the two sets differ and leave the reviewer to work out which repair that calls for. The
+    owner set stays non-empty in both branches, because an empty one is Property 14's finding and
+    would otherwise arrive here as a second message.
+    """
+    held, *rest = labels
+    if unrecognised:
+        premises = _signing(owners=rest, signers=[*rest, held])
+        expected = f"carries a signature from {held}"
+    else:
+        premises = _signing(owners=labels, signers=rest)
+        expected = f"carries no signature from {held}"
+
+    (message,) = _signature_messages(premises)
+
+    assert expected in message
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(sorted(OWNER_LABELS)), min_size=1, max_size=3, unique=True))
+def test_an_owner_set_signed_in_any_order_produces_no_finding(labels: list[str]) -> None:
+    """The other side: a signature set is a *set*, so the order the rows are written in is not it.
+
+    Without this the property above would pass against an implementation that compared sequences,
+    and a record whose rows a reviewer reordered would read as unsigned.
+    """
+    assert _signature_messages(_signing(owners=labels, signers=list(reversed(labels)))) == []
+
+
+# Property 14: A part recording no owner is a named failure, not a vacuous pass.
+# Validates: Requirements 15.17, 15.18.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(sorted(OWNER_LABELS)), max_size=3, unique=True))
+def test_a_part_recording_no_owner_is_a_named_failure(signatories: list[str]) -> None:
+    """Requirement 15 criterion 18: a part recording no owner is *named*, not passed over.
+
+    This is the case an "every recorded owner has signed" implementation gets wrong, and gets it
+    wrong silently: over an empty owner set that quantifier is vacuously true, so the part reads as
+    fully signed by nobody. Quantifying over the signature set is what makes the point -- no set of
+    signatures, the empty one included, settles a part nobody is authorised to sign.
+    """
+    messages = _signature_messages(_signing(owners=(), signers=signatories))
+
+    assert any("records no owner authorised to sign the part" in message for message in messages)
+    assert any(
+        "nobody is authorised to sign it rather than anybody being" in message
+        for message in messages
+    )
+
+
+# Property 15: Every Sign_Off_Condition of an accepted part carries a verdict and a reviewer.
+# Validates: Requirements 3.2, 3.5.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.lists(sign_off_conditions(), min_size=1, max_size=3, unique_by=lambda item: item.id),
+    st.booleans(),
+)
+def test_every_sign_off_condition_of_an_accepted_part_carries_a_verdict(
+    conditions: list[SignOffCondition], answered: bool
+) -> None:
+    """Totality, which is all a check can establish here: the verdict itself is the reviewer's.
+
+    So the rule is that a verdict and a reviewer are *recorded* for each condition the dossier
+    records. An unanswered condition is not satisfied by going unmentioned, and the identity of the
+    conditions is what the property quantifies over -- the check has to answer for the conditions a
+    dossier records rather than for the two the fixture happens to name.
+    """
+    recorded = [_verdict(item.id) for item in conditions]
+    if answered:
+        assert _verdict_messages(_reviewed(conditions, recorded)) == []
+        return
+
+    held = conditions[0]
+    messages = _verdict_messages(_reviewed(conditions, recorded[1:]))
+
+    assert any(repr(held.id) in message for message in messages)
+    assert any("not satisfied by going unmentioned" in message for message in messages)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(sign_off_conditions(), min_size=1, max_size=3, unique_by=lambda item: item.id))
+def test_every_verdict_of_an_accepted_part_names_a_reviewer(
+    conditions: list[SignOffCondition],
+) -> None:
+    """And a reviewer, which is the half that keeps the verdict attributable.
+
+    A verdict nobody is recorded as having reached attributes a judgement to the record instead of
+    to a person, and the record is not who Requirement 3 criterion 2 asks.
+    """
+    held = conditions[0]
+    recorded = [
+        _verdict(item.id, reviewer=" " if item is held else FIXTURE_REVIEWER) for item in conditions
+    ]
+
+    messages = _verdict_messages(_reviewed(conditions, recorded))
+
+    assert any(
+        f"the verdict on the Sign_Off_Condition {held.id!r} names no reviewer" in message
+        for message in messages
+    )
+
+
+# Property 16: A `single`-shaped element is settled by exactly one entry carrying every required
+# attribute.
+# Validates: Requirements 3.3, 3.11, 6.11, 6.13, 6.18, 7.12, 10.12, 11.12, 11.13, 12.14, 13.10,
+# 15.10.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.integers(min_value=0, max_value=3))
+def test_a_single_shaped_element_is_settled_by_exactly_one_entry(count: int) -> None:
+    """Exactly one, which is two bounds rather than one.
+
+    Zero entries is the omission Requirement 3 criterion 3 names. More than one is a record
+    carrying that many answers for one element with nothing to choose between them, and a rule
+    written as "at least one" would accept it.
+    """
+    entries = [
+        _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES), source=FIXTURE_SOURCE)
+        for _ in range(count)
+    ]
+    messages = _settlement_messages(_settlement(settled=_resettled(FIXTURE_ELEMENT, *entries)))
+
+    if count == 1:
+        assert messages == []
+    elif count == 0:
+        assert any("settles it with no entry" in message for message in messages)
+    else:
+        assert any(f"settles it with {count} entries" in message for message in messages)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(FIXTURE_ATTRIBUTES), max_size=2, unique=True))
+def test_a_single_shaped_entry_carries_every_required_attribute(carried: list[str]) -> None:
+    """One finding per omitted attribute, and the attributes carried are not read beyond their names.
+
+    The count is asserted as well as the membership. A reviewer repairs attributes one at a time, so
+    a single finding reporting that some were missing would have to be read back against the element
+    to find out which.
+    """
+    entry = _settled_entry(value=_carrying(*carried), source=FIXTURE_SOURCE)
+    messages = _settlement_messages(_settlement(settled=_resettled(FIXTURE_ELEMENT, entry)))
+    omitted = [attribute for attribute in FIXTURE_ATTRIBUTES if attribute not in carried]
+
+    assert len(messages) == len(omitted)
+    for attribute in omitted:
+        assert any(repr(attribute) in message for message in messages)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(FIXTURE_ATTRIBUTES), max_size=2, unique=True))
+def test_an_exception_entry_is_asked_for_no_attribute(carried: list[str]) -> None:
+    """The recorded pass: an exception settles the element as an exception rather than by a value.
+
+    Without this the property above would be a rule that no recorded exception could satisfy, and
+    an element an owner signed off as not applying would read as an element nobody settled.
+    """
+    entry = _settled_entry(value=_carrying(*carried), source=FIXTURE_SOURCE, exception=True)
+
+    assert _settlement_messages(_settlement(settled=_resettled(FIXTURE_ELEMENT, entry))) == []
+
+
+# Property 17: A `keyed`-shaped element is settled by exactly one entry per key.
+# Validates: Requirements 8.3, 8.10, 8.11, 12.5, 12.12, 12.13.
+_KEYS_AND_ONE_OUTSIDE = (*FIXTURE_KEYS, UNSETTLED_KEY)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(_KEYS_AND_ONE_OUTSIDE), max_size=4))
+def test_a_keyed_shaped_element_is_settled_by_exactly_one_entry_per_key(keys: list[str]) -> None:
+    """Per key, in both directions, with a missing key and a duplicated key reported separately.
+
+    The three repairs are different and the property asserts each as its own finding: a key nobody
+    settled needs an entry, a key settled twice needs one of the two removed, and an entry under a
+    key the key set does not carry is usually a mistyped key rather than a key that went missing.
+
+    The key set is the `keySource` element's settled keys, so drawing the entries' keys cannot move
+    it. One key outside that set is drawn, because the direction that reads entries against the set
+    is otherwise unreachable.
+    """
+    entries = [
+        _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES), source=FIXTURE_SOURCE)
+        for key in keys
+    ]
+    messages = _settlement_messages(
+        _settlement(settled=_resettled(FIXTURE_KEYED_ELEMENT, *entries))
+    )
+
+    for key in FIXTURE_KEYS:
+        settling = keys.count(key)
+        if settling == 0:
+            assert any(
+                f"the key {key!r} of the element {FIXTURE_KEYED_ELEMENT!r} is settled by no entry"
+                in message
+                for message in messages
+            )
+        elif settling > 1:
+            assert any(
+                f"is settled by {settling} entries" in message and repr(key) in message
+                for message in messages
+            )
+    if UNSETTLED_KEY in keys:
+        assert any(
+            f"the record settles the key {UNSETTLED_KEY!r}" in message
+            and "does not carry that key" in message
+            for message in messages
+        )
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.lists(st.sampled_from(FIXTURE_KEYS), min_size=2, max_size=2, unique=True))
+def test_a_keyed_element_settling_each_key_once_produces_no_finding(keys: list[str]) -> None:
+    """The other side, over every order the two keys can be written in.
+
+    A per-key rule reading the entries positionally would pass the property above and fail this,
+    because the key set is sorted and the entries are not.
+    """
+    entries = [
+        _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES), source=FIXTURE_SOURCE)
+        for key in keys
+    ]
+
+    assert (
+        _settlement_messages(_settlement(settled=_resettled(FIXTURE_KEYED_ELEMENT, *entries))) == []
+    )
+
+
+# Property 18: A `mapping`-shaped element is settled only by a relation total in both directions.
+# Validates: Requirements 9.4, 9.5, 9.11.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.dictionaries(
+        st.sampled_from(FIXTURE_MEMBERS),
+        st.lists(st.sampled_from(FIXTURE_KEYS), max_size=2, unique=True),
+        min_size=1,
+    )
+)
+def test_a_mapping_shaped_element_is_settled_only_by_a_relation_total_both_ways(
+    relation: dict[str, list[str]],
+) -> None:
+    """Total in *both* directions, and the finding names the unmapped member with its own set.
+
+    "Unmapped" says nothing without saying which side was being exhausted, which is why the two
+    directions are asserted against two different messages: a member of the keys the record settles
+    that relates to nothing, and a member of the second set that nothing relates to. A relation
+    total one way is the shape Requirement 9 criteria 4 and 5 read together and the one a single
+    direction would pass.
+    """
+    entries = [
+        _settled_entry(key=member, value=sorted(related)) for member, related in relation.items()
+    ]
+    messages = _settlement_messages(
+        _settlement(settled=_resettled(FIXTURE_MAPPED_ELEMENT, *entries))
+    )
+    related = {key for keys in relation.values() for key in keys}
+
+    for member, keys in relation.items():
+        if not keys:
+            assert any(
+                f"the member {member!r} of the keys the record settles relates to no member"
+                in message
+                for message in messages
+            )
+    for key in FIXTURE_KEYS:
+        if key not in related:
+            assert any(
+                f"the member {key!r} of the key set of the keySource" in message
+                and "is related to by no member" in message
+                for message in messages
+            )
+    if all(relation.values()) and related == set(FIXTURE_KEYS):
+        assert messages == []
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(FIXTURE_MEMBERS))
+def test_a_mapping_relation_naming_a_member_the_second_set_lacks_is_reported(member: str) -> None:
+    """The third direction: an endpoint that resolves against nothing.
+
+    A relation can be total both ways and still name a member of neither set, which is the mistyped
+    endpoint rather than the missing one. The other member keeps the whole second set, so the two
+    totality directions stay satisfied and the only finding is this one.
+    """
+    first, second = FIXTURE_MEMBERS
+    other = second if member == first else first
+    entries = [
+        _settled_entry(key=member, value=[UNSETTLED_KEY]),
+        _settled_entry(key=other, value=sorted(FIXTURE_KEYS)),
+    ]
+
+    messages = _settlement_messages(
+        _settlement(settled=_resettled(FIXTURE_MAPPED_ELEMENT, *entries))
+    )
+
+    assert any(
+        f"relates a key of the element {FIXTURE_MAPPED_ELEMENT!r} to {UNSETTLED_KEY!r}" in message
+        and "does not carry that member" in message
+        for message in messages
+    )
+
+
+# Property 19: An element whose declared source is the excluded source is rejected.
+# Validates: Requirements 13.4, 13.9, 15.10.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from([None, FIXTURE_SOURCE, EXCLUDED_SOURCE]), st.booleans())
+def test_an_entry_traced_to_the_excluded_source_is_rejected(
+    source: str | None, excluding: bool
+) -> None:
+    """The exclusion is a recorded constraint on the element, not a judgement per record.
+
+    Which is what the second axis is for: the same entry is accepted where the element records no
+    exclusion and rejected where it records this one, so what the rule reads is the pair rather than
+    the source alone. Every other declared source is accepted -- an element the Gate excludes one
+    source for is not an element with one permitted source.
+    """
+    element = _content(
+        FIXTURE_ELEMENT,
+        SINGLE_SHAPE,
+        required=FIXTURE_ATTRIBUTES,
+        excluded_source=EXCLUDED_SOURCE if excluding else None,
+    )
+    entry = _settled_entry(value=_carrying(*FIXTURE_ATTRIBUTES), source=source)
+    messages = _settlement_messages(
+        _settlement(
+            settled=_resettled(FIXTURE_ELEMENT, entry),
+            elements=_recontented(FIXTURE_ELEMENT, element),
+        )
+    )
+
+    if excluding and source == EXCLUDED_SOURCE:
+        assert any(
+            f"is settled by an entry traced to {EXCLUDED_SOURCE!r}" in message
+            and "may not be derived from" in message
+            for message in messages
+        )
+    else:
+        assert messages == []
+
+
+# Property 20: A lifecycle state or transition resolves only against defined members.
+# Validates: Requirements 11.5, 11.11, 11.12.
+#
+# Requirement 11's lifecycle is two recorded elements and no rule of its own: the states are a
+# `keyed` element whose key set is the class vocabulary it maps to, and the permitted transitions
+# are a `mapping` element whose endpoints resolve against the states. So the property is that an
+# endpoint is accepted exactly when the element it names as its key source settles it, asserted
+# over both shapes at once -- which is the statement that makes criteria 11 and 12 consequences of
+# the generic rules rather than a per-Gate branch.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.sampled_from([*FIXTURE_KEYS, UNSETTLED_KEY]), st.sampled_from([KEYED_SHAPE, MAPPING_SHAPE])
+)
+def test_a_lifecycle_member_resolves_only_against_the_members_its_key_source_defines(
+    member: str, shape: str
+) -> None:
+    """One endpoint, read against the defined set, under each of the two shapes that carry one.
+
+    A state that maps to no class and a transition whose endpoint no record defines are the same
+    defect read at two different arities, and the finding names the member either way. The member
+    drawn is fictional, like every key in this fixture: a real lifecycle state name would be the
+    Contract_Value this register exists to withhold.
+    """
+    defined = member in FIXTURE_KEYS
+    if shape == KEYED_SHAPE:
+        entries = [
+            _settled_entry(key=key, value=_carrying(*FIXTURE_ATTRIBUTES))
+            for key in {*FIXTURE_KEYS, member}
+        ]
+        element = FIXTURE_KEYED_ELEMENT
+        undefined = f"the record settles the key {member!r}"
+    else:
+        entries = [
+            _settled_entry(key=FIXTURE_MEMBERS[0], value=sorted({*FIXTURE_KEYS, member})),
+            _settled_entry(key=FIXTURE_MEMBERS[1], value=FIXTURE_KEYS[0]),
+        ]
+        element = FIXTURE_MAPPED_ELEMENT
+        undefined = f"relates a key of the element {element!r} to {member!r}"
+
+    messages = _settlement_messages(_settlement(settled=_resettled(element, *entries)))
+
+    if defined:
+        assert messages == []
+    else:
+        assert any(undefined in message for message in messages)
+
+
+# Property 21: An amendment settles its own key and retains every acceptance already recorded.
+# Validates: Requirements 3.11, 8.5, 8.14.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(FIXTURE_MEMBERS), st.booleans())
+def test_an_amendment_settles_its_own_key_and_retains_every_recorded_acceptance(
+    key: str, signed: bool
+) -> None:
+    """Scope, which is the whole of this rule: the amendment answers for its key and nothing wider.
+
+    The signed case has to leave *every* check silent, because what Requirement 3 criterion 11
+    retains is the accepted status of the elements the record already settles -- so the evidence is
+    the whole run rather than the amendment rule alone. The unsigned case has to name the amended
+    key and no other, which is the half that fails if an amendment's signatures are read against
+    the record's own rows.
+    """
+    amendment = _amendment(key, signers=(SIGNING_OWNER,) if signed else ())
+    premises = _amended(amendment)
+
+    if signed:
+        assert run_checks(premises) == []
+        return
+
+    messages = _amendment_messages(premises)
+    other = next(member for member in FIXTURE_MEMBERS if member != key)
+    assert messages, "an amendment omitting a recorded owner's signature must be reported"
+    assert all(repr(key) in message for message in messages)
+    assert all(repr(other) not in message for message in messages)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from([AMENDED_KEY, UNAMENDED_KEY]), st.sampled_from([FIXTURE_DATE, ""]))
+def test_an_amendment_carries_a_sign_off_date_of_its_own(key: str, date: str) -> None:
+    """The date is the amendment's, not the record's, which is Requirement 8 criterion 14 verbatim.
+
+    The record's own date stays set in both branches, so an implementation falling back to it would
+    pass the empty case. What a reviewer needs to know is when *this key* was signed off: the
+    record's date is the one its part was signed off on and says nothing about an amendment made
+    after it.
+    """
+    premises = _amended(_amendment(key, sign_off_date=date))
+    messages = _amendment_messages(premises)
+
+    if date:
+        assert messages == []
+    else:
+        assert any(repr(key) in message and "sign-off date" in message for message in messages)
+
+
+# Property 26: Every guard carries a Gate mapping, and a guard is free exactly when every part
+# permitting it has permitted it.
+# Validates: Requirements 4.5, 4.6, 4.8, 6.17, 9.17, 10.18.
+_TWO_GATE_GUARD = ACTUATOR_PATH_GUARD
+_GATES_HOLDING_THE_TWO_GATE_GUARD = BASELINE_GUARD_GATES[_TWO_GATE_GUARD]
+_GATES_WITH_GUARDS = tuple(
+    sorted({gate for gates in BASELINE_GUARD_GATES.values() for gate in gates})
+)
+_GATES_WITHOUT_GUARDS = tuple(
+    sorted(set(FIXTURE_GATES) - {gate for gates in BASELINE_GUARD_GATES.values() for gate in gates})
+)
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sets(st.sampled_from(_GATES_HOLDING_THE_TWO_GATE_GUARD)), st.booleans())
+def test_a_guard_is_free_exactly_when_every_part_permitting_it_has_permitted_it(
+    accepted: set[str], permits: bool
+) -> None:
+    """A conjunction over the permitting parts, which is the only reading that is safe either way.
+
+    The guard drawn holds two Gates open, so its permission set has two parts and the three ways
+    the conjunction can fail are all reachable: neither part accepted, one accepted, and both
+    accepted with a verdict withheld. An implementation reading the permission as a disjunction
+    would free the guard as soon as one owner signed, and one of the two decisions it protects
+    would stop being protected without anybody deciding that.
+
+    Nothing here evaluates the verdict. A withheld verdict leaves the guard pinned and that is a
+    record an owner signed, so the register stays consistent in every branch and `guard-registry`
+    reports nothing: what the check establishes is that the verdict was reached, not that it was
+    the right one.
+    """
+    premises = _accepting(
+        _register(), {gate: _permissions(gate, permits=permits) for gate in sorted(accepted)}
+    )
+    every = set(accepted) == set(_GATES_HOLDING_THE_TWO_GATE_GUARD)
+
+    assert _freedom(premises)[_TWO_GATE_GUARD].is_free == (every and permits)
+    assert check_guard_registry(premises) == []
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_GATES_WITH_GUARDS), st.integers(min_value=0, max_value=6))
+def test_an_accepted_part_carries_a_verdict_for_every_guard_mapped_to_it(
+    gate: str, choose: int
+) -> None:
+    """Totality at acceptance, which is the one thing no owner can be protected from by a verdict.
+
+    An acceptance that left a guard mapped to the part unanswered would free nothing and say
+    nothing, and the guard would read as pinned for a reason nobody recorded. So the omission is a
+    finding naming the guard, and the guard stays pinned -- which is the safe reading of a verdict
+    that was never reached.
+    """
+    mapped = sorted(symbol for symbol, gates in BASELINE_GUARD_GATES.items() if gate in gates)
+    held = mapped[choose % len(mapped)]
+    verdicts = [verdict for verdict in _permissions(gate) if verdict.symbol != held]
+    premises = _accepting(_register(), {gate: verdicts})
+
+    messages = _guard_messages(premises)
+
+    assert any(repr(held) in message and "carries no verdict" in message for message in messages)
+    assert not _freedom(premises)[held].is_free
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(sorted(BASELINE_GUARD_GATES)), st.booleans())
+def test_every_change_permission_resolves_to_a_part_the_register_records(
+    symbol: str, resolving: bool
+) -> None:
+    """A permission nothing can accept is a guard no signature could ever free.
+
+    Which is why it is a finding rather than a guard that stays pinned quietly: a mistyped part
+    reference reads exactly like a decision nobody has reached yet, and the two have very different
+    repairs.
+    """
+    reference = part_reference(UNUSED_GATE, BASELINE_PART if resolving else UNRECORDED_PART)
+    register = _with_guard(_register(), symbol, permitted_to_change_by=[reference])
+    premises = _premises(register)
+
+    messages = _guard_messages(premises)
+
+    assert not _freedom(premises)[symbol].is_free
+    if resolving:
+        assert messages == []
+    else:
+        assert any(
+            f"{symbol}: the registry records {reference} as permitted to change the guard"
+            in message
+            for message in messages
+        )
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(_GATES_WITHOUT_GUARDS), st.booleans())
+def test_a_gate_recording_no_guard_records_that_it_rests_on_the_review_alone(
+    gate: str, explicit: bool
+) -> None:
+    """Requirement 4 criterion 8's absence is recorded rather than read off an empty list.
+
+    An empty guard list means two different things -- a Gate nothing mechanical holds visible, and a
+    Gate whose guards nobody has written down yet -- and only one of them is a decision. The flag is
+    what tells them apart, so a Gate that records neither is a finding even though its list is the
+    same list either way.
+    """
+    register = _with_gate(_register(), gate, rests_on_review_alone=True if explicit else None)
+
+    messages = _guard_messages(_premises(register))
+
+    if explicit:
+        assert messages == []
+    else:
+        assert any(
+            f"{gate}: the Gate_Dossier records no guard and does not record" in message
+            for message in messages
+        )
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(st.sampled_from(sorted(BASELINE_GUARD_GATES)), st.booleans())
+def test_every_guard_records_the_gates_it_holds_open_or_that_no_gate_rests_on_it(
+    symbol: str, explicit: bool
+) -> None:
+    """The same obligation read from the registry's end, because it is one relation with two ends.
+
+    A registry entry recording an empty ``holdsOpen`` is the guard-side counterpart of a dossier
+    recording an empty guard list, and it is recorded the same way. The Gates that recorded this
+    symbol are emptied alongside it, so what the property reads is the absence rather than the
+    disagreement the two ends would otherwise be in.
+    """
+    register = _register()
+    for gate in BASELINE_GUARD_GATES[symbol]:
+        dossier = next(item for item in register.gates if item.id == gate)
+        kept = [guard for guard in dossier.guards if guard != symbol]
+        register = _with_gate(
+            register,
+            gate,
+            guards=kept,
+            rests_on_review_alone=None if kept else True,
+        )
+    register = _with_guard(
+        register,
+        symbol,
+        holds_open=[],
+        holds_no_gate_open=True if explicit else None,
+        permitted_to_change_by=[],
+    )
+
+    messages = _guard_messages(_premises(register))
+
+    if explicit:
+        assert messages == []
+    else:
+        assert any(
+            f"{symbol}: the registry records no Gate the guard holds open" in message
+            for message in messages
+        )
+
+
+# Property 12: A Closure_Record's entry commit round-trips against git history.
+# Validates: Requirements 3.1.
+#
+# Two halves at two iteration counts. The pure half reads a resolution the premises carry and runs
+# at the full count; the half below it resolves a real add-commit and needs a repository per
+# example, so its count is declared on the test with the reason rather than lowering the property.
+_ANOTHER_COMMIT = "1" * 40
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.sampled_from([ACCEPTED_RECORD_STATE, "submitted"]),
+    st.sampled_from([None, FIXTURE_COMMIT, _ANOTHER_COMMIT]),
+)
+def test_a_record_carries_a_commit_exactly_when_it_is_accepted(
+    state: str, recorded: str | None
+) -> None:
+    """Exactly when, in both directions, because each direction fails differently.
+
+    An accepted record carrying the wrong commit says it entered the repository somewhere it did
+    not. A record the register says is not in yet carrying any commit at all is a file claiming to
+    contain the hash of the commit that adds it, which no file can.
+    """
+    part = _gate_part(SETTLED_PART, _elements(), state=state)
+    record = replace(_closure_record(_settled_elements(), state=state), entry_commit=recorded)
+    premises = _premises(
+        _settling_register(part),
+        closures=_closures(
+            record, add_commit=_resolved() if state == ACCEPTED_RECORD_STATE else None
+        ),
+    )
+
+    messages = _messages(check_closure_entry_commit(premises), ENTRY_COMMIT)
+
+    if state != ACCEPTED_RECORD_STATE:
+        if recorded is None:
+            assert messages == []
+        else:
+            assert any("a file cannot contain the commit that adds it" in m for m in messages)
+    elif recorded == FIXTURE_COMMIT:
+        assert messages == []
+    else:
+        assert any(
+            f"the commit that adds that path is {FIXTURE_COMMIT}" in message for message in messages
+        )
+
+
+# One repository per example, each a `git init` and two to four commits, so this half runs at a
+# reduced count. Ten covers the search space below -- three later-commit counts by two drift
+# branches -- and the reduction is stated here rather than applied to the property.
+_REPOSITORY_EXAMPLES = 10
+
+
+@settings(max_examples=_REPOSITORY_EXAMPLES, deadline=None)
+@given(st.integers(min_value=0, max_value=2), st.booleans())
+def test_an_accepted_record_resolves_against_the_commit_that_added_it(
+    tmp_path_factory: pytest.TempPathFactory, later: int, drift: bool
+) -> None:
+    """The add-commit, not the tip, however much history is laid on top of it.
+
+    This is the half a fixture resolution cannot establish. The record is written, committed, and
+    then has its own ``entryCommit`` written back -- which is the order an owner records it in, and
+    it leaves at least one later commit touching the record itself. A resolution reading the last
+    commit that touched the path, or `HEAD`, would agree with the register on a repository with no
+    history after the record and start disagreeing the moment anybody amended it.
+    """
+    root = tmp_path_factory.mktemp("entry-commit")
+    _signed_repository(root, SIGNING_OWNER)
+    path = root / _record_path(UNUSED_GATE, SETTLED_PART)
+    if drift:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document["entryCommit"] = _ANOTHER_COMMIT
+        _write(path, json.dumps(document, indent=2))
+    _git(root, "add", "--all")
+    recording = _git_commit(root, "Record the entry commit", SIGNING_OWNER)
+    for index in range(later):
+        _write(root / f"a-fixture-file-{index}.txt", f"{index}\n")
+        _git(root, "add", "--all")
+        _git_commit(root, f"A later commit {index}", SIGNING_OWNER)
+
+    premises = load_premises(root)
+
+    assert not isinstance(premises, list), premises
+    adding = _git(
+        root,
+        "log",
+        "--diff-filter=A",
+        "--format=%H",
+        "--",
+        _record_path(UNUSED_GATE, SETTLED_PART),
+    )
+    assert adding != recording, "the commit that adds the record is not the one that recorded it"
+    messages = _messages(check_closure_entry_commit(premises), ENTRY_COMMIT)
+    if drift:
+        assert any(f"the commit that adds that path is {adding}" in m for m in messages)
+    else:
+        assert messages == []
+
+
+# ---------------------------------------------------------------------------
+# What the schema makes unrepresentable
+#
+# Five documents the schema rejects, which is what makes "the ten Gates cannot silently become
+# eleven" and "there is one read-only exception" properties of the format rather than things a
+# reviewer has to notice. Each goes through `load_premises`, because the schema is only a gate if it
+# is applied where the document is read.
+# ---------------------------------------------------------------------------
+
+
+def _rejected(root: Path) -> list[str]:
+    """Load premises from *root*, assert the schema rejected the register, and return the pointers.
+
+    The pointer rather than the message, because what each case below is evidence of is that the
+    schema addresses the part of the document that is wrong: a rejection pointing at the document
+    root tells a reviewer only that something is.
+    """
+    findings = _findings(load_premises(root))
+    assert {finding.check for finding in findings} == {SCHEMA}
+    return [finding.message for finding in findings]
+
+
+def _register_document(register: GateRegister) -> dict[str, object]:
+    return dump_gate_register(register)
+
+
+def _schema_tree(tmp_path: Path, document: object) -> Path:
+    """A repository carrying *document* as the register and an inventory agreeing with the baseline.
+
+    The inventory is the baseline's, because every case here is rejected before any check reads it
+    and an inventory written per case would be evidence of nothing.
+    """
+    register = _register()
+    return _repository(
+        tmp_path,
+        register=document,
+        inventory=_inventory_text(_baseline_rows(register), _blocked_by(register)),
+    )
+
+
+def test_the_schema_rejects_a_register_recording_nine_gates(tmp_path: Path) -> None:
+    """Requirement 1 criterion 1 records ten, so a tenth that goes missing is not a smaller register.
+
+    A Gate dropped from the register is every decision it held becoming unrecorded at once, and the
+    checks that read the Gate set would then agree with a document that had stopped asking.
+    """
+    document = _register_document(_register())
+    gates = document["gates"]
+    assert isinstance(gates, list)
+    document["gates"] = [dossier for dossier in gates if dossier["id"] != UNUSED_GATE]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/gates" in message for message in messages)
+    assert any("minItems" in message or "too short" in message for message in messages)
+
+
+def test_the_schema_rejects_a_register_recording_eleven_gates(tmp_path: Path) -> None:
+    """And an eleventh cannot be added either, which is the direction that matters more.
+
+    Ten is the bound a reviewer signs once. An eleventh Gate is a decision nobody agreed to split
+    out, and the `maxItems` bound is what stops it being added in a commit that reads as additive.
+    """
+    document = _register_document(_register())
+    gates = document["gates"]
+    assert isinstance(gates, list)
+    eleventh = {**gates[0], "status": OPEN_STATUS, "guards": []}
+    document["gates"] = [*gates, eleventh]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/gates" in message for message in messages)
+
+
+def test_the_schema_rejects_a_register_recording_one_gate_identifier_twice(
+    tmp_path: Path,
+) -> None:
+    """Ten dossiers is not ten Gates if two of them are the same Gate.
+
+    `uniqueItems` does not catch this: two dossiers for one identifier differ in everything else,
+    and the register would carry ten items, nine Gates and two answers for one of them. The
+    per-identifier `contains` bounds are what reject it, and they reject it from both ends -- the
+    doubled identifier and the one that went missing.
+    """
+    document = _register_document(_register())
+    gates = document["gates"]
+    assert isinstance(gates, list)
+    document["gates"] = [
+        {**dossier, "id": SINGLE_GATE} if dossier["id"] == UNUSED_GATE else dossier
+        for dossier in gates
+    ]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/gates" in message for message in messages)
+
+
+def test_the_schema_rejects_a_second_read_only_exception(tmp_path: Path) -> None:
+    """Requirement 5 criterion 11 records one exception, and a second cannot be written down.
+
+    This is the bound the whole read-only posture rests on. Every other list in the posture can
+    grow -- a `FORBIDDEN-UNTIL` row holds one more thing back, a recorded seam the same -- and this
+    is the one list where growth would let something through, so it is the one the schema pins.
+    """
+    document = _register_document(_register())
+    read_only = document["readOnly"]
+    assert isinstance(read_only, dict)
+    exceptions = read_only["exceptions"]
+    assert isinstance(exceptions, list)
+    read_only["exceptions"] = [
+        *exceptions,
+        {**exceptions[0], "control": f"another{EXCEPTION_CONTROL}"},
+    ]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/readOnly/exceptions" in message for message in messages)
+
+
+def test_the_schema_rejects_a_read_only_exception_on_another_screen(tmp_path: Path) -> None:
+    """The one exception is pinned to the one screen the criterion records it on.
+
+    Without the `const` the single exception could be moved rather than added to, which is the same
+    weakening in one step instead of two: one control somewhere else would be excepted and the
+    count a reviewer checks would still read one.
+    """
+    document = _register_document(_register())
+    read_only = document["readOnly"]
+    assert isinstance(read_only, dict)
+    exceptions = read_only["exceptions"]
+    assert isinstance(exceptions, list)
+    read_only["exceptions"] = [{**exceptions[0], "screen": SINGLE_GATE_SCREEN}]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/readOnly/exceptions/0/screen" in message for message in messages)
+    assert any(EXCEPTION_SCREEN in message for message in messages)
+
+
+# ---------------------------------------------------------------------------
+# content-exclusion
+#
+# Requirement 2 criterion 6 records a condition a released screen satisfies once built as an
+# Acceptance_Criterion *excluded from* the Gate's Decision_Content, and Requirement 13 criterion 15
+# writes the collision as a repair rather than as a state the register may hold. The two lists
+# therefore have to be disjoint, and nothing else reads them together: `closure-completeness`
+# demands a settled entry for every Decision_Content element and never looks at the exclusions, so
+# an item on both lists is a Gate asking for a signature on something it has declared outside
+# itself.
+# ---------------------------------------------------------------------------
+
+
+def _excluding(*criteria: str) -> GateRegister:
+    """The baseline with UNUSED_GATE's dossier recording *criteria* as excluded, and one part.
+
+    The part is `open` and names no Closure_Record, because this rule reads the two lists the
+    dossier carries and nothing a record settles: a collision is wrong before any owner signs, and
+    building a settlement to show it would make the finding look like a settlement's.
+    """
+    part = replace(_gate_part(SETTLED_PART, _elements(), state="open"), closure_record=None)
+    register = _settling_register(part)
+    return _with_gate(
+        register,
+        UNUSED_GATE,
+        excluded_acceptance_criteria=[
+            ExcludedAcceptanceCriterion(id=item, screen=None, requirement=None) for item in criteria
+        ],
+    )
+
+
+def _exclusion_messages(premises: Premises) -> list[str]:
+    return _messages(check_content_exclusion(premises), CONTENT_EXCLUSION)
+
+
+def test_content_exclusion_accepts_two_lists_naming_no_item_in_common() -> None:
+    """The accepting case, and the evidence that recording an exclusion disturbs no other check."""
+    assert run_checks(_premises(_excluding(UNRECORDED_ELEMENT))) == []
+
+
+def test_content_exclusion_names_the_item_the_part_and_the_gate() -> None:
+    """Three things, because the repair is to one of two lists on one part of one Gate.
+
+    A finding naming the Gate alone would leave a reviewer to search a four-part dossier for the
+    part that records it.
+    """
+    (message,) = _exclusion_messages(_premises(_excluding(FIXTURE_ELEMENT)))
+
+    assert message.startswith(f"{UNUSED_GATE}:{SETTLED_PART}: ")
+    assert f"records {FIXTURE_ELEMENT!r} as Decision_Content" in message
+    assert (
+        f"{UNUSED_GATE} records an Acceptance_Criterion of that identifier as excluded" in message
+    )
+    assert "one of the two records is the repair" in message
+
+
+def test_content_exclusion_names_each_colliding_item_separately() -> None:
+    """Two items on both lists are two repairs, and a reviewer makes them one at a time."""
+    messages = _exclusion_messages(
+        _premises(_excluding(FIXTURE_ELEMENT, FIXTURE_KEYED_ELEMENT, UNRECORDED_ELEMENT))
+    )
+
+    assert len(messages) == 2
+    for element in (FIXTURE_ELEMENT, FIXTURE_KEYED_ELEMENT):
+        assert any(repr(element) in message for message in messages)
+
+
+def test_content_exclusion_reads_the_real_register_and_finds_no_collision() -> None:
+    """The register as it stands, which is the only evidence the rule agrees with the document."""
+    assert check_content_exclusion(_premises(_real_register())) == []
+
+
+# Property 22: A Decision_Content element and an excluded Acceptance_Criterion are never the same
+# item.
+# Validates: Requirements 1.9, 2.6, 6.16, 13.15.
+_FIXTURE_ELEMENT_NAMES = tuple(sorted(element.name for element in _elements()))
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.lists(
+        st.sampled_from([*_FIXTURE_ELEMENT_NAMES, UNRECORDED_ELEMENT]), max_size=3, unique=True
+    )
+)
+def test_a_decision_content_element_is_never_an_excluded_acceptance_criterion(
+    excluded: list[str],
+) -> None:
+    """Disjointness, asserted as a set equation rather than as a case list.
+
+    The exclusions drawn mix names the part records with one it does not, so both halves are
+    exercised at once: every drawn name the part records must be reported, and the one it does not
+    must not be. A rule that reported every exclusion would pass a one-sided test, and it would
+    reject the Gates whose whole purpose is to record what they do not settle.
+    """
+    messages = _exclusion_messages(_premises(_excluding(*excluded)))
+    colliding = [name for name in excluded if name in _FIXTURE_ELEMENT_NAMES]
+
+    assert len(messages) == len(colliding)
+    for name in colliding:
+        assert any(repr(name) in message for message in messages)
+    assert all(UNRECORDED_ELEMENT not in message for message in messages)
