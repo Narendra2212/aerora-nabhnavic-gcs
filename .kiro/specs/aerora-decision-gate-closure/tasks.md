@@ -504,7 +504,7 @@ Constraints every task inherits:
     - _Requirements: 5.1, 5.2, 5.11_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k qml`
 
-  - [ ] 7.7 Implement `contract-surface`
+  - [x] 7.7 Implement `contract-surface`
     - Compare the enumerators, declared constants and registry string-literal keys under
       `aerora/src/**` against the recorded inventory, in both directions: present in source and absent
       from the inventory fails as unassigned Decision_Content naming the symbol; mapped to an `OPEN`
@@ -513,6 +513,22 @@ Constraints every task inherits:
     - Record the limitation in the module's own docstring: this establishes that the surface did not
       change, not that no value was invented, and it cannot classify. A reviewer classifies once, in
       the register
+    - Three `kind` values, which the schema leaves open and this rule fixes: `enumerator`,
+      `constant` and `registryKey`. A registry key is the one shape the real sites share and no log
+      message has — a `constexpr` char-pointer declaration whose initialiser is a string literal.
+      The 145 `QStringLiteral` occurrences under `aerora/src/**` are messages at their call site,
+      not named declarations, so they are not keys and are not reported
+    - **Symbols are qualified by enclosing class, struct and namespace.** Four constants in the tree
+      are called `kServiceName`, in `AeroraTelemetrySet`, `AeroraPayloadModel`, `AeroraPowerModel`
+      and `AeroraMissionObserver`. An unqualified inventory could not tell them apart, and an
+      unqualified extractor would report one element and three removals against a correct inventory
+    - Only a *scoped* enum's name qualifies its enumerators; an unscoped enum's members land in the
+      enclosing scope, which is what C++ does and so what the inventory records
+    - **Not Gate-conditional.** The other five rules read one Gate and stand down when it closes;
+      this one reads the Gate each element maps to, so a closing Gate frees its own elements and
+      nothing else
+    - The surface measures **162 elements** today: 121 enumerators, 23 registry keys, 18 constants,
+      with no two sharing a kind and symbol. That is the inventory task 9.4 has to record
     - _Requirements: 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k contract_surface`
 
@@ -573,6 +589,9 @@ Constraints every task inherits:
       reports the one disagreement with its owner and remedies, and exits zero
 
   - [ ] 9.4 Write the `readOnly` block and the contract-surface inventory
+    - The surface is **162 elements** as task 7.7 measures it — 121 enumerators, 23 registry keys,
+      18 constants — each mapped to `none` with a reason unless it is genuinely an open Gate's
+      Decision_Content, in which case recording it is the finding rather than the clearance
     - `readOnly`: `DG-ROL`, the single `SCR-HLP-03` clipboard exception with its file, control
       `objectName` and reason, the `forbiddenUntil` rows, and both pre-approved undeclared seams
     - `actionableControlSites`: `aeroraHub_vehicleConfigButton` on `SCR-SHL-01`, with

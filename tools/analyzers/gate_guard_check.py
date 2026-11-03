@@ -51,6 +51,15 @@ permission on the same registry entry, through the freedom derivation, because R
 criterion 18 records exactly that as the condition under which the core edit's authorisation lets
 the guard move. Both files are read as characters and neither is written.
 
+**``contract-surface`` answers a decidable question in place of an undecidable one, and says so.**
+"Reject a change that introduces a Contract_Value" cannot be checked: no rule can look at a new
+enumerator and know whether it is a value some Gate settles. So it compares the enumerators,
+declared constants and registry string-literal keys under ``aerora/src/**`` against the inventory
+the register records, in both directions, and a reviewer classifies each element once. It
+establishes that the surface did not change -- not that no value was invented -- and it cannot
+classify. It is also the one rule here that is not conditional on a single Gate: it reads the Gate
+*each element maps to*, so a closing Gate frees its own elements and nothing else.
+
 **``actionable-control`` compares two sets rather than asserting an absence.** Requirement 5
 criterion 1 forbids a control whose activation *reaches* a forbidden path, which no text rule can
 decide, so the rule decides a control by its type and the register carries the judgement: the
@@ -108,7 +117,13 @@ ensure_tools_dir(__file__)
 
 from common.analyzer import AnalysisResult, AnalyzerBase
 from common.file_traversal import DEFAULT_SKIP_DIRS, find_cpp_files, should_skip_path
-from common.gate_register import GATE_IDS, GateRegisterError, guard_freedom, part_reference
+from common.gate_register import (
+    GATE_IDS,
+    NO_GATE,
+    GateRegisterError,
+    guard_freedom,
+    part_reference,
+)
 from validate_gate_register import (
     FACT_GROUP_REGISTRAR_GUARD,
     GUARD_REGISTRY,
@@ -157,6 +172,7 @@ ACTION_SEAM: Final = "action-seam"
 FRESHNESS_THRESHOLD: Final = "freshness-threshold"
 PAYLOAD_COMMAND_SINK: Final = "payload-command-sink"
 ACTIONABLE_CONTROL: Final = "actionable-control"
+CONTRACT_SURFACE: Final = "contract-surface"
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -2101,6 +2117,290 @@ def check_actionable_control(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# contract-surface
+# ---------------------------------------------------------------------------
+
+# The three element categories the design records, which are the `kind` values the register carries.
+# The schema leaves `kind` a free string, so these are the vocabulary: a recorded element whose kind
+# is none of them matches nothing in source and is reported as a removal, which is the right answer
+# for a kind nothing extracts.
+ENUMERATOR_KIND: Final = "enumerator"
+CONSTANT_KIND: Final = "constant"
+REGISTRY_KEY_KIND: Final = "registryKey"
+
+# A class, struct or namespace body, which is what qualifies a symbol. Four constants in this tree
+# are called `kServiceName` and they are four different elements, so an unqualified inventory could
+# not tell them apart and a rule reading one would report three removals.
+_SCOPE: Final = re.compile(
+    r"\b(?:class|struct|namespace)\s+([A-Za-z_]\w*)(?:\s+final)?\s*(?::[^{;]*?)?\{"
+)
+
+# The `enum` keyword immediately before a scope match, which is how `enum class X {` is kept from
+# reading as a class body. Written as a search over the preceding text rather than as a lookbehind,
+# because the keyword and the name are separated by a run of whitespace of no fixed width.
+_ENUM_PREFIX: Final = re.compile(r"\benum\s+$")
+
+# An enum body, scoped or unscoped. The name is optional because an unscoped anonymous enum is legal
+# and its enumerators land in the enclosing scope, which is where this then qualifies them.
+_ENUM: Final = re.compile(
+    r"\benum\s+(?:class|struct)\s+([A-Za-z_]\w*)[^{;]*?\{|\benum\s+([A-Za-z_]\w*)?\s*(?::[^{;]*)?\{"
+)
+
+# A `constexpr` or `static constexpr` declaration with an initialiser. The declarator may carry no
+# parenthesis, which is what keeps a `constexpr` *function* out: a function's parameter list falls
+# between the keyword and the `=` or brace, and a value's initialiser falls after it.
+_CONSTANT: Final = re.compile(
+    r"\b(?:static\s+)?constexpr\b([^;{}()=]*?)\b([A-Za-z_]\w*)\s*(?:=|\{)"
+)
+
+# An enumerator, once its `= value` tail is taken off. Anything else in a comma-separated enum body
+# -- a trailing comma's empty tail, an initialiser naming another enumerator -- is not a declaration.
+_ENUMERATOR: Final = re.compile(r"[A-Za-z_]\w*\Z")
+
+# How far past a declaration's `=` the initialiser is looked for. A declaration and its literal sit
+# on one line or wrap once, and reading to end of file would let an unrelated literal downstream
+# decide a constant's kind.
+_INITIALISER_WINDOW: Final = 120
+
+
+@dataclass(frozen=True)
+class _Element:
+    """One contract-surface element as source declares it: its kind, its name, and where."""
+
+    kind: str
+    symbol: str
+    file: str
+    line: int
+
+
+def _scopes(scanned: str) -> list[tuple[int, int, str]]:
+    """Every named class, struct or namespace body in *scanned*, as a span and a name."""
+    found: list[tuple[int, int, str]] = []
+    for scope in _SCOPE.finditer(scanned):
+        if _ENUM_PREFIX.search(scanned[: scope.start()]):
+            continue
+        closing = _balanced(scanned, scope.end() - 1)
+        found.append((scope.end(), len(scanned) if closing is None else closing, scope.group(1)))
+    return found
+
+
+def _qualified(scopes: Sequence[tuple[int, int, str]], offset: int, *names: str) -> str:
+    """*names* qualified by every scope of *scopes* enclosing *offset*, innermost last.
+
+    A file-scope or anonymous-namespace element qualifies to its bare name, which is the name C++
+    gives it. Two files declaring the same bare name are two elements one inventory entry cannot
+    tell apart, so :func:`_surface` reports that rather than merging them.
+    """
+    enclosing = [name for start, end, name in scopes if start <= offset < end]
+    return "::".join([*enclosing, *(name for name in names if name)])
+
+
+def _surface(tree: _SourceTree) -> tuple[list[_Element], list[_Element]]:
+    """Every contract-surface element the tree declares, and those declared more than once.
+
+    An element is identified by its kind and its qualified symbol, which is what the register
+    records. A second declaration of the same pair is returned separately because the inventory has
+    one entry for it: reporting it as a collision is honest, where silently merging would let a
+    second declaration of a recorded symbol enter unnoticed.
+    """
+    found: dict[tuple[str, str], _Element] = {}
+    collisions: list[_Element] = []
+
+    def record(element: _Element) -> None:
+        key = (element.kind, element.symbol)
+        if key in found:
+            collisions.append(element)
+            return
+        found[key] = element
+
+    for path, text in tree.sources:
+        code = _code(text)
+        scanned = _without_strings(code)
+        scopes = _scopes(scanned)
+        for enum in _ENUM.finditer(scanned):
+            # Only a *scoped* enum's name qualifies its enumerators. An unscoped enum's members land
+            # in the enclosing scope -- `AFixtureHolder::UnscopedOnly`, not
+            # `AFixtureHolder::Unscoped::UnscopedOnly` -- which is what C++ does and therefore what
+            # an inventory recording C++ qualified names has to record. Group one is the scoped
+            # alternative's name; group two is the unscoped alternative's and is a scope of nothing.
+            name = enum.group(1) or ""
+            closing = _balanced(scanned, enum.end() - 1)
+            body = scanned[enum.end() : len(scanned) if closing is None else closing]
+            line = _line_of(code, enum.start())
+            for item in body.split(","):
+                declared = _ENUMERATOR.search(item.split("=")[0].strip())
+                if declared is None:
+                    continue
+                symbol = _qualified(scopes, enum.start(), name, declared.group())
+                record(_Element(ENUMERATOR_KIND, symbol, path, line))
+        for constant in _CONSTANT.finditer(scanned):
+            declarator, name = constant.group(1), constant.group(2)
+            # A char-pointer constant whose initialiser is a string literal is a registry key, which
+            # is read off the text that kept its literals. That is the one shape the five real key
+            # sites share and the shape no log string has: a message is a `QStringLiteral` at its
+            # call site, never a named `constexpr` declaration.
+            initialiser = code[constant.end() :][:_INITIALISER_WINDOW].lstrip()
+            key = "*" in declarator and initialiser.startswith('"')
+            record(
+                _Element(
+                    REGISTRY_KEY_KIND if key else CONSTANT_KIND,
+                    _qualified(scopes, constant.start(), name),
+                    path,
+                    _line_of(code, constant.start()),
+                )
+            )
+    return list(found.values()), collisions
+
+
+def check_contract_surface(premises: Premises) -> list[Finding]:
+    """The contract surface in source and in the register agree in both directions.
+
+    **What this honestly does, and what it does not.** "Reject a change that introduces a
+    Contract_Value" is Requirement 3 criterion 12, Requirement 4 criterion 2 and one criterion per
+    Gate, and as written it is undecidable: no checker can look at a new enumerator or a new registry
+    key and know whether it is an Aerora value some Gate settles or an identifier with no contract
+    behind it. So this rule answers the decidable question instead -- *did the surface change* -- and
+    a reviewer classifies each element once, in the register.
+
+    Three limitations, stated rather than papered over:
+
+    * it establishes that the surface did not change, **not** that no value was invented;
+    * it cannot see a *value* moving inside an element it already knows, because the register
+      records a symbol and a kind and no literal;
+    * it cannot classify. An element arriving unmapped is reported as unassigned Decision_Content
+      for an owner to map; the rule has no opinion on which Gate.
+
+    That is the move `AeroraUiSafetyTest` makes for the QML-reachable method set: it cannot judge
+    whether a new method is safe, so it fails on *any* change and makes a human record the judgement
+    once. "Not looked at" fails rather than passes.
+
+    **Three findings, which are the three ways the two sets can disagree.** An element in source and
+    absent from the inventory fails naming the symbol, with no Gate named because none is recorded --
+    that is Requirement 4 criterion 2's "name the element as unassigned Decision_Content", and it
+    renders as :data:`UNASSIGNED`. An element mapped to a Gate the derivation reports `OPEN` fails
+    naming both, because an element of a Gate's Decision_Content standing in source is the value the
+    Gate exists to withhold. An element in the inventory and absent from source fails as a removal,
+    so the surface cannot shrink silently either.
+
+    **This rule is not Gate-conditional.** The other five read one Gate's openness and stand down
+    when it closes; this one reads the Gate *each element maps to*, so it runs whatever the register
+    records and a closing Gate frees its own elements and nothing else.
+
+    Symbols are qualified by their enclosing class, struct and namespace scopes. Four constants in
+    this tree are called `kServiceName`, so an unqualified inventory could not tell them apart and a
+    rule reading one of them would report the other three as removals.
+    """
+    openness = premises.derived.gate_open
+    tree = _source_tree(premises.root)
+    subject = "a contract-surface element"
+    if not tree.walked:
+        return [
+            Finding(
+                CONTRACT_SURFACE,
+                GATE_IDS,
+                f"{SOURCE_TREE}/ is not a directory this rule could walk, so no file was searched "
+                f"for {subject}. A run that searched nothing is a failure rather than a pass: an "
+                f"inventory compared against nothing reports every element as removed",
+            )
+        ]
+
+    findings = [
+        Finding(
+            CONTRACT_SURFACE,
+            GATE_IDS,
+            f"{path}: the file {reason}, so it was searched for {subject} nowhere. A file under "
+            f"{SOURCE_TREE}/ that this rule cannot read is a failure rather than a pass",
+        )
+        for path, reason in tree.unreadable
+    ]
+
+    declared, collisions = _surface(tree)
+    findings.extend(
+        Finding(
+            CONTRACT_SURFACE,
+            (),
+            f"{element.file}: declares {element.kind} {element.symbol} at line {element.line}, "
+            f"which is already declared elsewhere under {SOURCE_TREE}/. The register records one "
+            f"entry per kind and symbol, so two declarations of one pair are two elements the "
+            f"inventory cannot tell apart. Qualify one of them, or record them as distinct symbols",
+        )
+        for element in collisions
+    )
+
+    recorded = {
+        (element.kind, element.symbol): element for element in premises.register.contract_surface
+    }
+    present = {(element.kind, element.symbol): element for element in declared}
+
+    for key, element in sorted(present.items()):
+        mapped = recorded.get(key)
+        if mapped is None:
+            findings.append(
+                Finding(
+                    CONTRACT_SURFACE,
+                    (),
+                    f"{element.file}: declares {element.kind} {element.symbol} at line "
+                    f"{element.line}, and the register's contract surface records no entry for it. "
+                    f"Requirement 4 criterion 2 names such an element as unassigned "
+                    f"Decision_Content: a reviewer maps it to the Gate whose Decision_Content would "
+                    f"record it, or to {NO_GATE} with the reason no Gate does. This rule cannot "
+                    f"classify it and does not guess",
+                )
+            )
+            continue
+        if mapped.gate == NO_GATE:
+            if not mapped.reason:
+                findings.append(
+                    Finding(
+                        CONTRACT_SURFACE,
+                        (),
+                        f"the register maps {mapped.kind} {mapped.symbol} to {NO_GATE} and records "
+                        f"no reason. The schema requires one beside it, so a register carrying none "
+                        f"has not passed the schema: an element mapped to no Gate without a reason "
+                        f"is an element nobody classified rather than one somebody cleared",
+                    )
+                )
+            continue
+        if mapped.gate not in openness:
+            findings.append(
+                Finding(
+                    CONTRACT_SURFACE,
+                    (mapped.gate,),
+                    f"the register maps {mapped.kind} {mapped.symbol} to a Gate it records no "
+                    f"Gate_Dossier for, so whether that Gate is open could not be derived and the "
+                    f'element was checked against nothing: "not found" is not "closed"',
+                )
+            )
+            continue
+        if openness[mapped.gate].is_open:
+            findings.append(
+                Finding(
+                    CONTRACT_SURFACE,
+                    (mapped.gate,),
+                    f"{element.file}: declares {element.kind} {element.symbol} at line "
+                    f"{element.line}, and the register maps it to a Gate holding no accepted "
+                    f"Closure_Record. An element of a Gate's Decision_Content standing in source is "
+                    f"the value the Gate exists to withhold, so it waits on the signature rather "
+                    f"than on a review of this file",
+                )
+            )
+
+    findings.extend(
+        Finding(
+            CONTRACT_SURFACE,
+            () if mapped.gate == NO_GATE else (mapped.gate,),
+            f"the register's contract surface records {mapped.kind} {mapped.symbol}, and no file "
+            f"under {SOURCE_TREE}/ declares it. A recorded element the tree no longer carries is a "
+            f"removal rather than a satisfied entry, so the surface cannot shrink silently either: "
+            f"withdraw the entry in the change that withdraws the declaration",
+        )
+        for key, mapped in sorted(recorded.items())
+        if key not in present
+    )
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 
@@ -2116,6 +2416,7 @@ _CHECKS: Final = (
     check_freshness_threshold,
     check_payload_command_sink,
     check_actionable_control,
+    check_contract_surface,
 )
 
 
@@ -2146,7 +2447,10 @@ def _established(premises: Premises, files: int) -> str:
     The recorded control surface is stated beside them, because `actionable-control` compares two
     sets and a run that found none on either side is a different answer from a run over a register
     recording none: the first is a tree with no control in it, the second is a register that has
-    stopped accounting for one.
+    stopped accounting for one. The contract surface is stated on both sides for the same reason,
+    and because its two numbers are the one measurement that says the ratchet is loaded: an
+    inventory compared against an extractor that has stopped extracting reports every element as
+    removed, and the pair of counts is where that is visible.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
@@ -2155,6 +2459,8 @@ def _established(premises: Premises, files: int) -> str:
     in_force = _in_force(premises)
     read_only = premises.register.read_only
     controls = len(read_only.exceptions) + len(read_only.actionable_control_sites)
+    declared, _ = _surface(_source_tree(premises.root))
+    surface = len(declared)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
@@ -2164,8 +2470,9 @@ def _established(premises: Premises, files: int) -> str:
         f"{len(baseline.identifiers)} identifiers; {in_force} of the "
         f"{len(CONDITIONAL_GATES)} Gate-conditional rules in force over {SOURCE_TREE}/ and "
         f"{len(CONDITIONAL_GATES) - in_force} standing down on a Gate the derivation records "
-        f"closed, with {controls} actionable controls recorded; no rule read a file because it was "
-        f"among the {files} selected source files\n"
+        f"closed, with {controls} actionable controls recorded; {surface} contract-surface elements "
+        f"declared under {SOURCE_TREE}/ against {len(premises.register.contract_surface)} recorded; "
+        f"no rule read a file because it was among the {files} selected source files\n"
     )
 
 

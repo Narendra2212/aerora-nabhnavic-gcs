@@ -65,6 +65,7 @@ from common.gate_register import (
     Amendment,
     BlockingEntry,
     ClosureRecord,
+    ContractSurfaceElement,
     DecisionContentElement,
     ForbiddenUntil,
     GateDossier,
@@ -408,6 +409,12 @@ GUARD_DECLARATION = "aerora/src/AFixtureGuard.h"
 GUARD_ASSERTION = f"{TEST_TREE}/AFixtureGuardTest.cc"
 FIXTURE_GUARD_VALUE = "a fixture literal"
 
+# The contract-surface kind and no-Gate marker the baseline records its entries under. Spelled here
+# rather than imported from the analyzer, so the fixture states the vocabulary independently of the
+# rule that reads it.
+SURFACE_CONSTANT_KIND = "constant"
+NO_SURFACE_GATE = "none"
+
 # A guard outside the nine, which the registry may carry: criterion 5 covers "at least" the nine,
 # and each Gate's own named guard is one more.
 FIXTURE_GUARD = "AFixtureNamespace::kAFixtureGuard"
@@ -554,8 +561,38 @@ def _register(
         # this file writes no overlay source for one to point at. A test that wants a site writes
         # the file and records it with `_with_allow_list`.
         mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
-        contract_surface=[],
+        contract_surface=_baseline_surface(registry),
     )
+
+
+def _baseline_surface(guards: Sequence[Guard]) -> list[ContractSurfaceElement]:
+    """The contract surface the guard fixture header declares, which is one constant per guard.
+
+    Derived from the registry rather than written out, because the fixture header is derived from it
+    too: `_declares` in test_gate_guard_check.py writes `inline constexpr auto <member> = <value>;`
+    for every guard the register records as a value, so a test adding a guard gets its surface entry
+    without touching this.
+
+    The two guards recorded as calls are left out because the fixture writes each as a function
+    definition, which is not a declared constant, and `mavlink-identifier` is left out because no
+    file declares it at all. That is the same filter `_guard_sources` applies, stated from the other
+    side.
+
+    Every entry maps to no Gate, which is what the real inventory will record for infrastructure:
+    an entry mapped to a Gate would make the baseline fail, because every fixture Gate is open and
+    an element of an open Gate's Decision_Content standing in source is the finding the rule exists
+    to report.
+    """
+    return [
+        ContractSurfaceElement(
+            symbol=guard.symbol.rpartition("::")[2],
+            kind=SURFACE_CONSTANT_KIND,
+            gate=NO_SURFACE_GATE,
+            reason="a fixture reason",
+        )
+        for guard in guards
+        if guard.symbol != MAVLINK_IDENTIFIER_GUARD and not guard.symbol.endswith("()")
+    ]
 
 
 def _blocked_by(register: GateRegister) -> dict[str, str]:

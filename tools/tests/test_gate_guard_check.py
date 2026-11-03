@@ -77,6 +77,7 @@ import io
 import re
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -85,8 +86,11 @@ from analyzers.gate_guard_check import (
     ACTION_SEAM,
     ACTIONABLE_CONTROL,
     ADR_016_PAIR,
+    CONSTANT_KIND,
+    CONTRACT_SURFACE,
     CORE_HEADER,
     CUSTOM_DEFINITIONS,
+    ENUMERATOR_KIND,
     FRESHNESS_THRESHOLD,
     FRIEND_DECLARATION,
     FRIENDSHIP_DEFINITION,
@@ -101,15 +105,19 @@ from analyzers.gate_guard_check import (
     PAYLOAD_COMMAND_SINK_TYPE,
     POPULATED_FILE_OVERRIDE,
     POPULATED_FILE_TIER,
+    REGISTRY_KEY_KIND,
     REPORTED,
     SOURCE_TREE,
     THRESHOLD_SETTER,
     UNASSIGNED,
     Finding,
     GateGuardCheckAnalyzer,
+    _source_tree,
+    _surface,
     check_action_seam,
     check_actionable_control,
     check_adr_016_pair,
+    check_contract_surface,
     check_freshness_threshold,
     check_guard_value,
     check_mavlink_identifier,
@@ -123,7 +131,9 @@ from common.analyzer import AnalyzerBase
 from common.file_traversal import find_cpp_files
 from common.gate_register import (
     GATE_IDS,
+    NO_GATE,
     ActionableControlSite,
+    ContractSurfaceElement,
     Disagreement,
     MavlinkIdentifierSite,
     dump_gate_register,
@@ -743,6 +753,25 @@ def _recorded(register: GateRegister, symbol: str) -> Guard:
     return guard
 
 
+def _resurfaced(register: GateRegister, *, drops: str = "", adds: str = "") -> GateRegister:
+    """*register* with the surface entry for *drops* withdrawn and one for *adds* recorded.
+
+    A guard's declaration *is* a contract-surface element, so a test that removes or renames one
+    changes two things at once. Moving the inventory with it is what the real change would do, and
+    it keeps each case below asserting the one finding it is about rather than that finding plus a
+    correct report of the surface it moved.
+    """
+    withdrawn = _member(drops)
+    kept = [element for element in register.contract_surface if element.symbol != withdrawn]
+    if adds:
+        kept.append(
+            ContractSurfaceElement(
+                symbol=adds, kind=CONSTANT_KIND, gate=NO_GATE, reason="a fixture reason"
+            )
+        )
+    return replace(register, contract_surface=kept)
+
+
 def _sources(root: Path) -> Path:
     """A directory laid out so that the expansion of it is observable.
 
@@ -773,7 +802,12 @@ def _review(root: Path) -> AnalysisResult:
 
 
 def _established(
-    register: GateRegister, *, files: int = 0, baseline: int = 0, in_force: int = CONDITIONAL_RULES
+    register: GateRegister,
+    *,
+    files: int = 0,
+    baseline: int = 0,
+    in_force: int = CONDITIONAL_RULES,
+    surface: int | None = None,
 ) -> str:
     """The summary line a run ends with, spelled out rather than matched loosely.
 
@@ -795,12 +829,18 @@ def _established(
     nothing: a run in which five rules stood down must not read as a run in which five rules found
     nothing. The recorded control count rides with them for the same reason, because
     `actionable-control` compares two sets and an empty register is not an empty tree.
+
+    *surface* is how many contract-surface elements the tree declares, which defaults to however
+    many *register* records because the baseline agrees in both directions. A test that writes a
+    declaration says so, which is what makes the two numbers a measurement of the tree against the
+    register rather than one number restated.
     """
     guards = [guard for guard in register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
     sites = sum(len(guard.asserted_in) for guard in guards)
     allow_listed = len(register.mavlink_identifiers.allow_list)
     read_only = register.read_only
     controls = len(read_only.exceptions) + len(read_only.actionable_control_sites)
+    declared = len(register.contract_surface) if surface is None else surface
     return (
         f"{REGISTER_PATH} records {len(register.guards)} guards over {len(register.gates)} "
         f"Gate_Dossiers; {len(guards)} guard values and {sites} assertion sites compared against "
@@ -809,8 +849,9 @@ def _established(
         f"allow-listed sites holding {baseline} identifiers; {in_force} of the "
         f"{CONDITIONAL_RULES} Gate-conditional rules in force over {SOURCE_TREE}/ and "
         f"{CONDITIONAL_RULES - in_force} standing down on a Gate the derivation records closed, "
-        f"with {controls} actionable controls recorded; no rule read a file because it was among "
-        f"the {files} selected source files\n"
+        f"with {controls} actionable controls recorded; {declared} contract-surface elements "
+        f"declared under {SOURCE_TREE}/ against {len(register.contract_surface)} recorded; "
+        f"no rule read a file because it was among the {files} selected source files\n"
     )
 
 
@@ -821,10 +862,11 @@ def _lines(
     files: int = 0,
     baseline: int = 0,
     in_force: int = CONDITIONAL_RULES,
+    surface: int | None = None,
 ) -> list[str]:
     """The finding lines *result* printed, with the summary the run ends with taken off."""
     return result.output.removesuffix(
-        _established(register, files=files, baseline=baseline, in_force=in_force)
+        _established(register, files=files, baseline=baseline, in_force=in_force, surface=surface)
     ).splitlines()
 
 
@@ -1076,7 +1118,7 @@ def test_guard_value_names_the_guard_both_values_and_every_gate_it_holds_open(
 
 def test_guard_value_names_a_declaring_file_the_tree_does_not_carry(tmp_path: Path) -> None:
     """A declaration this check cannot read is a failure rather than a pass."""
-    register = _alone(_register(), REPLAY_GUARD)
+    register = _resurfaced(_alone(_register(), REPLAY_GUARD), drops=REPLAY_GUARD)
     root = _tree(tmp_path / "repo", register)
     (root / SOLO_DECLARATION).unlink()
 
@@ -1092,7 +1134,7 @@ def test_guard_value_names_a_declaring_file_the_tree_does_not_carry(tmp_path: Pa
 
 def test_guard_value_names_a_declaration_absent_from_a_file_that_exists(tmp_path: Path) -> None:
     """The file the register names is readable and declares no symbol of that name."""
-    register = _alone(_register(), REPLAY_GUARD)
+    register = _resurfaced(_alone(_register(), REPLAY_GUARD), drops=REPLAY_GUARD)
     root = _tree(tmp_path / "repo", register)
     _write(root / SOLO_DECLARATION, DECLARES_NOTHING)
 
@@ -1115,7 +1157,9 @@ def test_guard_value_rejects_a_renamed_guard_whose_declaration_keeps_the_recorde
     renamed guard stops being guarded, so the fixture keeps the literal and renames the symbol and
     the run has to fail anyway.
     """
-    register = _alone(_register(), REPLAY_GUARD)
+    register = _resurfaced(
+        _alone(_register(), REPLAY_GUARD), drops=REPLAY_GUARD, adds=RENAMED_GUARD
+    )
     recorded = _recorded(register, REPLAY_GUARD).recorded_value
     root = _tree(tmp_path / "repo", register)
     _write(root / SOLO_DECLARATION, _declares(RENAMED_GUARD, recorded))
@@ -2878,3 +2922,389 @@ def test_actionable_control_reads_the_real_qml_tree_and_finds_exactly_two_contro
     assert REAL_SITE_HANDLER in before[REAL_SITE_DOCUMENT]
     assert check_actionable_control(_premises(register)) == []
     assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read} == before
+
+
+# ---------------------------------------------------------------------------
+# contract-surface
+#
+# Named with the `contract_surface` token, which is the selector this group reaches under:
+# `-k contract_surface` runs it and nothing else.
+#
+# Two halves, tested differently, because they fail differently.
+#
+# The **comparison** half is the three ways the two sets disagree. The baseline register records the
+# surface the guard fixture header declares -- derived from the registry, which is where the header
+# itself comes from -- so a test asserting a finding rewrites one side and nothing else moves.
+#
+# The **extraction** half is tested against symbols written out by hand, because deriving the
+# expectation with the rule's own extractor would agree with it by construction. Those cases write a
+# source file whose declarations are known, record nothing for them, and assert the exact qualified
+# symbols the rule reports as unassigned. That is what fails the day the scope prefix stops being
+# applied, or a `constexpr` function starts reading as a constant.
+# ---------------------------------------------------------------------------
+
+# Where the extraction cases write the declarations they assert over: a file the baseline does not
+# carry, so the surface under review is the agreeing one plus the elements the test wrote.
+SURFACE_SOURCE = f"{SOURCE_TREE}/AFixtureSurface.h"
+
+# One recorded element the baseline does not carry, for the cases about a recorded entry rather than
+# a declared one.
+UNDECLARED_SYMBOL = "AFixtureNamespace::kAFixtureUndeclared"
+
+
+def _surface_header(*body: str) -> str:
+    """A header declaring *body*, with the namesakes the extraction must not read as declarations.
+
+    The comment names an enumerator and a constant in prose and the `constexpr` function is a
+    function, so a rule that read comments or counted every `constexpr` would find three elements
+    here that are not declarations.
+    """
+    return "\n".join(
+        [
+            "#pragma once",
+            "",
+            "// A fixture header. It mentions kAFixtureMentioned and AFixtureMentioned::Member in",
+            "// prose, and neither is a declaration.",
+            "",
+            "constexpr int aFixtureFunction(int value) { return value; }",
+            "",
+            *body,
+            "",
+        ]
+    )
+
+
+def _element(
+    symbol: str, kind: str, gate: str = NO_GATE, reason: str | None = "why"
+) -> ContractSurfaceElement:
+    """One recorded contract-surface entry."""
+    return ContractSurfaceElement(symbol=symbol, kind=kind, gate=gate, reason=reason)
+
+
+def _with_surface(register: GateRegister, *elements: ContractSurfaceElement) -> GateRegister:
+    """*register* with *elements* added to the surface the baseline already records."""
+    return replace(register, contract_surface=[*register.contract_surface, *elements])
+
+
+def _unassigned(findings: Sequence[Finding]) -> list[str]:
+    """The symbols *findings* reports as unassigned Decision_Content, in report order."""
+    return [
+        finding.message.split(" at line")[0].split("declares ")[1]
+        for finding in findings
+        if "records no entry for it" in finding.message
+    ]
+
+
+def test_contract_surface_accepts_the_baseline_the_register_records(tmp_path: Path) -> None:
+    """The recorded surface and the declared surface agree, so the whole run passes.
+
+    The recorded count is asserted non-zero first: a baseline recording nothing would pass this by
+    comparing two empty sets, which is the one way this rule can look clean while checking nothing.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    assert len(register.contract_surface) == 6
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_contract_surface_names_an_element_no_inventory_entry_records(tmp_path: Path) -> None:
+    """Requirement 4 criterion 2: name the element as unassigned Decision_Content.
+
+    The finding names no Gate, because none is recorded, so it renders as `UNASSIGNED`. That is the
+    one case `Finding`'s empty-tuple contract admits, and the rule declines to guess a mapping.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header("constexpr int kAFixtureAdded = 1;"))
+
+    (finding,) = check_contract_surface(_over(register, root))
+
+    assert finding.check == CONTRACT_SURFACE
+    assert finding.gates == ()
+    assert UNASSIGNED in str(finding)
+    assert finding.blocking
+    assert f"declares {CONSTANT_KIND} kAFixtureAdded" in finding.message
+    assert "cannot classify it and does not guess" in finding.message
+
+
+def test_contract_surface_names_an_element_mapped_to_an_open_gate(tmp_path: Path) -> None:
+    """An element of an open Gate's Decision_Content standing in source is the withheld value.
+
+    This is the rejection the rule exists for, and it is the one that needs the Gate named: the
+    element waits on a signature rather than on a review of the file it stands in.
+    """
+    register = _with_surface(
+        _register(), _element("kAFixtureAdded", CONSTANT_KIND, ROLE_GATE, None)
+    )
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header("constexpr int kAFixtureAdded = 1;"))
+
+    premises = _over(register, root)
+    (finding,) = check_contract_surface(premises)
+
+    assert premises.derived.gate_open[ROLE_GATE].is_open
+    assert finding.check == CONTRACT_SURFACE
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert "kAFixtureAdded" in finding.message
+    assert "waits on the signature" in finding.message
+
+
+def test_contract_surface_accepts_an_element_whose_gate_records_an_accepted_closure(
+    tmp_path: Path,
+) -> None:
+    """A closing Gate frees its own elements, which is why this rule is not Gate-conditional.
+
+    The other five rules stand down wholesale when their one Gate closes. This one reads the Gate
+    each element maps to, so the same run reports nothing for an element of the closed Gate and
+    still rejects one mapped to an open Gate.
+    """
+    register = _with_surface(
+        _register(),
+        _element("kAFixtureClosed", CONSTANT_KIND, ROLE_GATE, None),
+        _element("kAFixtureOpen", CONSTANT_KIND, PAYLOAD_GATE, None),
+    )
+    premises = _accepting(register, {ROLE_GATE: _permissions(ROLE_GATE)})
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / SURFACE_SOURCE,
+        _surface_header("constexpr int kAFixtureClosed = 1;", "constexpr int kAFixtureOpen = 2;"),
+    )
+
+    (finding,) = check_contract_surface(replace(premises, root=root))
+
+    assert not premises.derived.gate_open[ROLE_GATE].is_open
+    assert premises.derived.gate_open[PAYLOAD_GATE].is_open
+    assert finding.gates == (PAYLOAD_GATE,)
+    assert "kAFixtureOpen" in finding.message
+
+
+def test_contract_surface_names_a_recorded_element_the_tree_no_longer_declares(
+    tmp_path: Path,
+) -> None:
+    """The surface cannot shrink silently either, so a removal is a finding.
+
+    A recorded entry nothing declares tells a reviewer the surface still carries an element it does
+    not, which is the same defect as an unrecorded declaration read from the other side.
+    """
+    register = _with_surface(_register(), _element(UNDECLARED_SYMBOL, CONSTANT_KIND))
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_contract_surface(_over(register, root))
+
+    assert finding.check == CONTRACT_SURFACE
+    assert finding.gates == ()
+    assert finding.blocking
+    assert UNDECLARED_SYMBOL in finding.message
+    assert "is a removal rather than a satisfied entry" in finding.message
+
+
+def test_contract_surface_names_a_removal_of_an_element_mapped_to_a_gate(tmp_path: Path) -> None:
+    """A removal names the Gate when one is mapped, so the reader knows which decision it touched."""
+    register = _with_surface(
+        _register(), _element(UNDECLARED_SYMBOL, CONSTANT_KIND, ROLE_GATE, None)
+    )
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_contract_surface(_over(register, root))
+
+    assert finding.gates == (ROLE_GATE,)
+    assert "is a removal rather than a satisfied entry" in finding.message
+
+
+def test_contract_surface_rejects_an_element_mapped_to_no_gate_with_no_reason(
+    tmp_path: Path,
+) -> None:
+    """The schema requires a reason beside `none`, so a model carrying none has bypassed it.
+
+    An element mapped to no Gate without a reason is an element nobody classified rather than one
+    somebody cleared, which is the distinction the whole inventory turns on.
+    """
+    register = _with_surface(_register(), _element("kAFixtureAdded", CONSTANT_KIND, reason=None))
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header("constexpr int kAFixtureAdded = 1;"))
+
+    (finding,) = check_contract_surface(_over(register, root))
+
+    assert finding.check == CONTRACT_SURFACE
+    assert finding.blocking
+    assert "records no reason" in finding.message
+    assert "nobody classified" in finding.message
+
+
+def test_contract_surface_rejects_an_element_mapped_to_a_gate_with_no_dossier(
+    tmp_path: Path,
+) -> None:
+    """A mapping that resolves to no Gate_Dossier is a failure rather than a pass.
+
+    Unreachable through a document and reached here by taking the Gate out of the derivation: the
+    schema makes `gate` an enum of the ten identifiers and requires a dossier for each, so only a
+    register handed over as a model can carry a mapping that resolves to nothing. That is the state
+    this branch is the second line for, the way `guard-value` re-checks a handed-on row the schema
+    already requires.
+    """
+    register = _with_surface(_register(), _element("kAFixtureAdded", CONSTANT_KIND, SINGLE_GATE))
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header("constexpr int kAFixtureAdded = 1;"))
+    premises = _over(register, root)
+    unresolvable = {
+        gate: openness
+        for gate, openness in premises.derived.gate_open.items()
+        if gate != SINGLE_GATE
+    }
+
+    findings = check_contract_surface(
+        replace(premises, derived=replace(premises.derived, gate_open=unresolvable))
+    )
+    (finding,) = [f for f in findings if "records no Gate_Dossier for" in f.message]
+
+    assert finding.gates == (SINGLE_GATE,)
+    assert finding.blocking
+
+
+def test_contract_surface_extracts_enumerators_qualified_through_class_and_enum(
+    tmp_path: Path,
+) -> None:
+    """The symbols are written out here, because deriving them would agree with the rule.
+
+    A scoped enum's name is a scope of its own and an unscoped enum's members land in the enclosing
+    scope, which is what C++ does and what the inventory has to record: four constants in the real
+    tree are called `kServiceName`, so an unqualified symbol could not tell two elements apart.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / SURFACE_SOURCE,
+        _surface_header(
+            "class AFixtureHolder",
+            "{",
+            "    enum class Scoped { ScopedFirst, ScopedSecond = 3 };",
+            "    enum Unscoped { UnscopedOnly };",
+            "};",
+        ),
+    )
+
+    findings = check_contract_surface(_over(register, root))
+
+    assert _unassigned(findings) == [
+        f"{ENUMERATOR_KIND} AFixtureHolder::Scoped::ScopedFirst",
+        f"{ENUMERATOR_KIND} AFixtureHolder::Scoped::ScopedSecond",
+        f"{ENUMERATOR_KIND} AFixtureHolder::UnscopedOnly",
+    ]
+
+
+def test_contract_surface_tells_a_registry_key_from_a_declared_constant(tmp_path: Path) -> None:
+    """A char-pointer constant initialised with a string literal is a key; nothing else is.
+
+    That is the one shape the real key sites share and the shape no log message has: a message is a
+    `QStringLiteral` at its call site, never a named `constexpr` declaration. So the 145
+    `QStringLiteral` occurrences under the overlay are not keys and are not reported.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / SURFACE_SOURCE,
+        _surface_header(
+            'constexpr const char *kAFixtureKey = "aFixtureService";',
+            "constexpr int kAFixtureCount = 7;",
+            'constexpr auto kAFixtureMessage = QStringLiteral("not a declaration of a key");',
+        ),
+    )
+
+    findings = check_contract_surface(_over(register, root))
+
+    assert _unassigned(findings) == [
+        f"{CONSTANT_KIND} kAFixtureCount",
+        f"{CONSTANT_KIND} kAFixtureMessage",
+        f"{REGISTRY_KEY_KIND} kAFixtureKey",
+    ]
+
+
+def test_contract_surface_reads_a_constexpr_function_as_not_a_constant(tmp_path: Path) -> None:
+    """A function's parameter list falls between the keyword and the brace, so it is not a value.
+
+    The fixture header declares one in every case above, and this is the case that asserts it was
+    never counted: a rule matching every `constexpr` would report it in all of them.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header())
+
+    declared = (root / SURFACE_SOURCE).read_text(encoding="utf-8")
+
+    assert "constexpr int aFixtureFunction" in declared
+    assert "kAFixtureMentioned" in declared
+    assert check_contract_surface(_over(register, root)) == []
+
+
+def test_contract_surface_rejects_one_kind_and_symbol_declared_twice(tmp_path: Path) -> None:
+    """The register records one entry per kind and symbol, so two declarations are a collision.
+
+    Reported rather than merged: merging would let a second declaration of a recorded symbol enter
+    unnoticed, which is the opposite of what a surface ratchet is for.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SURFACE_SOURCE, _surface_header("constexpr int kAFixtureTwice = 1;"))
+    _write(
+        root / f"{SOURCE_TREE}/AFixtureSurfaceAgain.h",
+        _surface_header("constexpr int kAFixtureTwice = 2;"),
+    )
+
+    findings = check_contract_surface(_over(register, root))
+    (collision,) = [f for f in findings if "already declared elsewhere" in f.message]
+
+    assert collision.check == CONTRACT_SURFACE
+    assert collision.gates == ()
+    assert collision.blocking
+    assert "kAFixtureTwice" in collision.message
+
+
+def test_contract_surface_rejects_a_source_tree_it_could_not_walk(tmp_path: Path) -> None:
+    """An inventory compared against nothing reports every element as removed, so this fails.
+
+    It names all ten Gates, because a surface that could not be read leaves every Gate's
+    Decision_Content unchecked rather than one Gate's.
+    """
+    premises = replace(_premises(_register()), root=tmp_path / "repo")
+
+    (finding,) = check_contract_surface(premises)
+
+    assert finding.check == CONTRACT_SURFACE
+    assert finding.gates == GATE_IDS
+    assert finding.blocking
+    assert finding.message.startswith(f"{SOURCE_TREE}/ is not a directory")
+    assert "reports every element as removed" in finding.message
+
+
+def test_contract_surface_reads_the_real_source_tree_and_qualifies_every_symbol() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    The repository declares four constants called `kServiceName`, in four modules, and they are four
+    elements. This asserts the rule separates them by scope, because an unqualified extractor would
+    report one element and three removals against a correct inventory -- and it would do so while
+    looking like it was working.
+
+    The element count is asserted as a measurement rather than a target. It is what task 9.4 has to
+    record, and a change that moved it is a change to the contract surface, which is exactly what
+    this rule exists to make visible.
+    """
+    declared, collisions = _surface(_source_tree(REPO_ROOT))
+    symbols = {(element.kind, element.symbol) for element in declared}
+    kinds = Counter(element.kind for element in declared)
+
+    assert collisions == []
+    assert len(declared) == 162
+    assert kinds == {ENUMERATOR_KIND: 121, REGISTRY_KEY_KIND: 23, CONSTANT_KIND: 18}
+    for module in (
+        "AeroraTelemetrySet",
+        "AeroraPayloadModel",
+        "AeroraPowerModel",
+        "AeroraMissionObserver",
+    ):
+        assert (REGISTRY_KEY_KIND, f"{module}::kServiceName") in symbols
