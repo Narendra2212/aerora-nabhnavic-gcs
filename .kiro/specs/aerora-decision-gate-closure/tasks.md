@@ -419,7 +419,7 @@ Constraints every task inherits:
     - **Property 26: Every guard carries a Gate mapping, and a guard is free exactly when every part permitting it has permitted it**
     - **Validates: Requirements 4.5, 4.6, 4.8, 6.17, 9.17, 10.18**
 
-- [ ] 7. `tools/analyzers/gate_guard_check.py` — the source half
+- [x] 7. `tools/analyzers/gate_guard_check.py` — the source half
 
   - [x] 7.1 Create the analyzer shell
     - `AnalyzerBase` subclass in `tools/analyzers/`, following `tools/analyzers/vehicle_null_check.py`:
@@ -547,10 +547,16 @@ Constraints every task inherits:
       a third value fails naming all three
     - _Requirements: 4.6, 4.7, 4.9, 5.1, 5.2, 5.4, 6.14, 8.13, 8.16, 10.18, 14.13_
 
-- [ ] 8. Checkpoint — both checkers prove themselves on this host
+- [x] 8. Checkpoint — both checkers prove themselves on this host
   - Run both test files, both direct script invocations, and the lint and type-check commands. This
     is the last point before a hook can gate a commit, and the only evidence available without CI
   - Ensure all tests pass, ask the user if questions arise.
+  - **Passed.** 356 tests across the three files; `ruff check` and `pyright==1.1.411` clean on all
+    six modules; `check-jsonschema --check-metaschema` ok on both schemas. Both entry points exit 1
+    naming `gate-register.json` as the premise they cannot establish, which is the error contract
+    rather than a failure — the register is task 9's output, and an unresolved premise is a failure,
+    never a pass. That is the last local evidence available: task 10 wires the hooks and task 11 is
+    CI-only.
 
 - [ ] 9. Populate the Gate_Register and scaffold the closures directory
 
