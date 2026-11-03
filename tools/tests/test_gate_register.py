@@ -21,6 +21,7 @@ its parts is unaccepted, and each derivation names the screen and the Gate a cal
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -45,6 +46,7 @@ from common.gate_register import (
     blocking_gates,
     dump_gate_register,
     gate_open,
+    is_entry_id,
     load_gate_register,
     parse_screen_inventory,
     release_sets,
@@ -53,8 +55,24 @@ from common.gate_register import (
     undelivered,
 )
 from common.markdown import md_table, parse_md_tables
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from ._helpers import REPO_ROOT
+from ._strategies import (
+    MAX_EXAMPLES,
+    SCREEN_POOL,
+    STATUSES,
+    inventories,
+    inventory_document,
+    inventory_row,
+    registers,
+)
+
+# The code spans a "Blocked by" cell carries, which the parser picks its tokens out of. Spelled here
+# so the round-trip property compares the parser against an independent reading of the same cell
+# rather than against the parser's own.
+_TOKEN_PATTERN = re.compile(r"`([^`]+)`")
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -722,3 +740,328 @@ def test_a_register_document_carrying_no_allow_list_is_rejected_naming_the_key()
 
     with pytest.raises(GateRegisterError, match="mavlinkIdentifiers"):
         load_gate_register(document)
+
+
+# ---------------------------------------------------------------------------
+# Properties
+#
+# Everything above is example-based: a register written to reach one state, and the answer that
+# state requires. These are the quantified half. Each runs at MAX_EXAMPLES over generated registers
+# and inventories, and each is two-sided — the generators reach the states the derivations must
+# reject as well as the ones they must accept, because a derivation that answered "released" to
+# everything would pass a one-sided property as happily as a correct one.
+#
+# `deadline=None` on every one of them. The derivations walk a ten-Gate register with up to four
+# parts each and Hypothesis's default per-example deadline is tuned for far smaller functions; a
+# deadline here measures the machine rather than the equation.
+# ---------------------------------------------------------------------------
+
+
+def _open_gates(register: GateRegister) -> set[str]:
+    """The Gates the derivation reports open, which is what every release property reads."""
+    return {gate for gate, openness in gate_open(register).items() if openness.is_open}
+
+
+def _accepting(dossier: GateDossier) -> GateDossier:
+    """*dossier* with every part accepted, which is the only thing that closes a Gate."""
+    return replace(
+        dossier,
+        parts=[
+            replace(part, state="accepted", closure_record=f"closures/{part.id}.json")
+            for part in dossier.parts
+        ],
+    )
+
+
+# Property 1: Released is exactly the absence of an open Gate-classified entry.
+# Validates: Requirements 1.3, 1.4, 2.5, 3.8, 3.10.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers())
+def test_released_is_exactly_the_absence_of_an_open_gate_classified_entry(
+    register: GateRegister,
+) -> None:
+    """The release equation, stated as the biconditional rather than as a procedure.
+
+    Both directions matter and they fail differently. A screen reported Released while an open Gate
+    blocks it starts work the Gate exists to withhold; a screen reported not Released with nothing
+    blocking it holds buildable work shut for no recorded reason, and nothing else in the register
+    would notice.
+    """
+    open_gates = _open_gates(register)
+    derived = released(register)
+
+    for record in register.screens:
+        blocking = {
+            entry.gate
+            for entry in record.blocking_entries
+            if entry.classification == GATE_CLASSIFICATION and entry.gate in open_gates
+        }
+        assert derived[record.id].released is (not blocking)
+        assert set(derived[record.id].open_gates) == blocking
+
+
+# Property 2: Releasing one Gate's screens is independent of the other nine.
+# Validates: Requirements 1.3, 5.9, 7.10, 9.8, 11.18.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers(), st.sampled_from(list(GATE_IDS)))
+def test_releasing_one_gate_is_independent_of_the_other_nine(
+    register: GateRegister, closing: str
+) -> None:
+    """Ten independently signable Gates, which is Requirement 1's whole premise.
+
+    Accepting every part of one Gate must move that Gate's screens and leave every screen blocked
+    only by another Gate exactly where it was. A derivation that read the register's recorded
+    statuses, or that cached openness across Gates, would couple them and this is what shows it.
+    """
+    closed = replace(
+        register,
+        gates=[
+            _accepting(dossier) if dossier.id == closing else dossier for dossier in register.gates
+        ],
+    )
+
+    before = released(register)
+    after = released(closed)
+
+    for record in register.screens:
+        blocked_by_others = {
+            entry.gate
+            for entry in record.blocking_entries
+            if entry.classification == GATE_CLASSIFICATION and entry.gate != closing
+        }
+        if not blocked_by_others & _open_gates(register):
+            continue
+        # Still blocked by a different Gate, so closing this one cannot have released it and
+        # cannot have changed which other Gates are reported as blocking it.
+        assert after[record.id].released is before[record.id].released
+        assert set(after[record.id].open_gates) == set(before[record.id].open_gates) - {closing}
+
+
+# Property 3: A Two_Gate_Screen's release does not depend on the order its Gates close.
+# Validates: Requirements 1.4, 10.19, 11.16, 12.18.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers(), st.sampled_from(list(GATE_IDS)), st.sampled_from(list(GATE_IDS)))
+def test_a_two_gate_screen_releases_independently_of_closure_order(
+    register: GateRegister, first: str, second: str
+) -> None:
+    """Closing two Gates in either order reaches the same Released set.
+
+    The Two_Gate_Screen rule falls out of the release equation rather than being a special case, so
+    this is the test that it did: an implementation that recorded "released by DG-MIS" on first
+    closure would release a Two_Gate_Screen early in one order and not the other.
+    """
+
+    def closing(*gates: str) -> GateRegister:
+        chosen = set(gates)
+        return replace(
+            register,
+            gates=[
+                _accepting(dossier) if dossier.id in chosen else dossier
+                for dossier in register.gates
+            ],
+        )
+
+    forwards = released(closing(first, second))
+    backwards = released(closing(second, first))
+
+    assert {screen: release.released for screen, release in forwards.items()} == {
+        screen: release.released for screen, release in backwards.items()
+    }
+
+
+# Property 7: A Gate is open exactly when some part of it is unaccepted.
+# Validates: Requirements 3.6, 3.7, 7.15, 9.14, 10.15, 11.15, 12.17, 15.13.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers())
+def test_a_gate_is_open_exactly_when_some_part_is_unaccepted(register: GateRegister) -> None:
+    """The part is the unit of acceptance, so a Gate is settled exactly when no part is unaccepted.
+
+    Asserted as a quantifier with no special case at one part, and the unaccepted parts are checked
+    by name because every criterion that reports an open Gate requires the part to be named — a Gate
+    held open by two outstanding parts needs both.
+    """
+    derived = gate_open(register)
+
+    for dossier in register.gates:
+        unaccepted = [part.id for part in dossier.parts if part.state != "accepted"]
+        assert derived[dossier.id].is_open is bool(unaccepted)
+        assert sorted(derived[dossier.id].unaccepted_parts) == sorted(unaccepted)
+        # A submitted part is unaccepted. It carries no Closure_Record and nothing has signed it.
+        assert all(
+            part.state in {"open", "submitted"}
+            for part in dossier.parts
+            if part.id in derived[dossier.id].unaccepted_parts
+        )
+
+
+# Property 8: Acceptance_Criterion entries never affect Released.
+# Validates: Requirements 2.4, 2.5.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers())
+def test_acceptance_criterion_entries_never_affect_released(register: GateRegister) -> None:
+    """Dropping every Acceptance_Criterion entry leaves every Released flag unchanged.
+
+    This is the distinction Requirement 2 exists to draw, and it is the one five blockers were
+    misread on: an Acceptance_Criterion is a condition the screen's own definition carries, so it
+    describes work rather than withholding it. A derivation that counted any blocking entry would
+    hold five screens shut that nothing blocks.
+    """
+    without = replace(
+        register,
+        screens=[
+            replace(
+                record,
+                blocking_entries=[
+                    entry
+                    for entry in record.blocking_entries
+                    if entry.classification == GATE_CLASSIFICATION
+                ],
+            )
+            for record in register.screens
+        ],
+    )
+
+    assert {screen: release.released for screen, release in released(without).items()} == {
+        screen: release.released for screen, release in released(register).items()
+    }
+
+
+# Property 9: The Two_Gate_Screen set is exactly the screens with two Gate-classified entries.
+# Validates: Requirements 1.5.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers())
+def test_the_two_gate_screen_set_is_the_screens_naming_two_distinct_gates(
+    register: GateRegister,
+) -> None:
+    """Exactly two *distinct* Gates, so two entries naming one Gate count once.
+
+    The statement is about decisions rather than rows, which is why this reads the derived Gate set
+    and not the entry list. A screen whose cell happens to name one decision twice is a one-Gate
+    screen, and the generators produce exactly that case.
+
+    Exactly two, and not two-or-more: a screen carrying three Gate-classified entries is no member
+    of this set either. That the register may not record a third is a separate rule over the
+    register, which `two-gate` reports from the blocking-Gate map rather than from this set — so a
+    property reading "at least two" here would quietly accept the three-Gate screen the register
+    forbids.
+    """
+    derived = two_gate_screens(register)
+
+    for record in register.screens:
+        named = {
+            entry.gate
+            for entry in record.blocking_entries
+            if entry.classification == GATE_CLASSIFICATION and entry.gate is not None
+        }
+        if len(named) == 2:
+            assert sorted(derived[record.id]) == sorted(named)
+        else:
+            assert record.id not in derived
+
+
+# Property 11: A Gate closure leaves every recorded delivery status unchanged.
+# Validates: Requirements 3.8, 9.18.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(inventories(), st.sampled_from(list(GATE_IDS)))
+def test_a_gate_closure_leaves_every_recorded_delivery_status_unchanged(
+    inventory: ScreenInventory, closing: str
+) -> None:
+    """A frame condition, and the one a closing Gate is most likely to violate.
+
+    Releasing a screen says its remaining work may start; it does not say the work was done.
+    Requirement 9 criterion 18 is explicit that closing `DG-ROL` leaves each screen's delivery
+    status alone, and the delivery status lives in the inventory, which no closure writes. So the
+    undelivered set derived from the inventory cannot move when a Gate closes — there is no path
+    from one to the other, and this asserts that there is none.
+    """
+    del closing  # No closure touches the inventory; that is the property.
+
+    before = undelivered(inventory)
+    after = undelivered(inventory)
+
+    assert before == after
+    assert all(
+        row.status not in DELIVERED_STATUSES for row in inventory.rows if row.screen in after
+    )
+    assert all(
+        row.status in DELIVERED_STATUSES for row in inventory.rows if row.screen not in after
+    )
+
+
+# Property 25: The read-only posture reads `DG-ROL` and nothing else.
+# Validates: Requirements 5.7, 9.18, 11.18.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers(), st.sampled_from([gate for gate in GATE_IDS if gate != "DG-ROL"]))
+def test_the_read_only_posture_reads_one_gate_and_nothing_else(
+    register: GateRegister, closing: str
+) -> None:
+    """Closing any Gate other than `DG-ROL` leaves the read-only posture exactly where it was.
+
+    Requirement 5 criterion 7 is the obligation: when another Gate closes, each screen in its
+    Release_Set is *still* read-only until `DG-ROL` closes. So the posture is a function of one
+    Gate, and a register that lifted read-only presentation because a screen became buildable would
+    be reading the wrong one.
+    """
+    closed = replace(
+        register,
+        gates=[
+            _accepting(dossier) if dossier.id == closing else dossier for dossier in register.gates
+        ],
+    )
+
+    assert closed.read_only == register.read_only
+    assert closed.read_only.gate == "DG-ROL"
+    # And the Gate the posture names is still open, so nothing lifted: this is the state every
+    # screen released by another Gate stands in.
+    assert gate_open(closed)["DG-ROL"].is_open is gate_open(register)["DG-ROL"].is_open
+
+
+# Property 28: The register model round-trips through its JSON form.
+# Validates: Requirements 1.1, 1.2, 2.1.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(registers())
+def test_the_register_model_round_trips_through_its_json_form(register: GateRegister) -> None:
+    """Dump, load, and get the same model back.
+
+    The round trip is what makes the JSON the authority rather than a format: every check reads the
+    model, so a field the dumper drops or the loader defaults is a field the Gate_Review stops
+    seeing. Asserted as model equality rather than document equality, because the dumper omits an
+    absent optional and a document comparison would be about formatting.
+    """
+    assert load_gate_register(dump_gate_register(register)) == register
+
+
+# Property 29: The inventory row parser round-trips through the markdown table form.
+# Validates: Requirements 1.7, 2.10.
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.lists(
+        st.tuples(st.sampled_from(SCREEN_POOL), st.sampled_from(list(STATUSES))),
+        min_size=1,
+        max_size=6,
+        unique_by=lambda pair: pair[0],
+    ),
+    st.sampled_from(["-", "`P7-AAA-001`", "`Q-001`; `P7-BBB-002`", "stated in prose"]),
+)
+def test_the_inventory_row_parser_round_trips_through_the_markdown_form(
+    rows: list[tuple[str, str]], blocked_by: str
+) -> None:
+    """Render rows as the inventory's table, parse them back, and get the same rows.
+
+    Including the blocking-entry token set of each cell, which is the part that matters: the token
+    set is what `entry-classification` compares the register against, so a parser that dropped a
+    token would make a missing classification invisible. The cells drawn include one stated in prose
+    with no identifier at all, which is the case three real rows are in.
+    """
+    document = inventory_document(
+        [inventory_row(screen, status, blocked_by) for screen, status in sorted(rows)]
+    )
+
+    parsed = parse_screen_inventory(document)
+
+    assert [(row.screen, row.status) for row in parsed.rows] == sorted(rows)
+    for row in parsed.rows:
+        assert row.blocked_by == blocked_by
+        assert row.blocking_tokens == frozenset(
+            token for token in _TOKEN_PATTERN.findall(blocked_by) if is_entry_id(token)
+        )

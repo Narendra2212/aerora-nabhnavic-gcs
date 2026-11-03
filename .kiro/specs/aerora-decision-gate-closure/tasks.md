@@ -170,7 +170,7 @@ Constraints every task inherits:
     - _Requirements: 1.7, 2.1, 2.10_
     - **Local**: `uv run --quiet --with pytest python -m pytest -q tools/tests/test_gate_register.py -k inventory_rows`
 
-  - [ ]* 2.5 Write the Hypothesis strategies for register and inventory models
+  - [x]* 2.5 Write the Hypothesis strategies for register and inventory models
     - A composite strategy producing an inventory of screens with statuses from the status
       vocabulary, a register of ten Gates with one to four parts each, and blocking lists mixing both
       classifications
@@ -185,11 +185,11 @@ Constraints every task inherits:
     - _Requirements: 1.1, 1.2, 2.1_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py`
 
-  - [ ]* 2.6 Write property test for the register model's JSON round trip
+  - [x]* 2.6 Write property test for the register model's JSON round trip
     - **Property 28: The register model round-trips through its JSON form**
     - **Validates: Requirements 1.1, 1.2, 2.1**
 
-  - [ ]* 2.7 Write property test for the inventory row parser's round trip
+  - [x]* 2.7 Write property test for the inventory row parser's round trip
     - **Property 29: The inventory row parser round-trips through the markdown table form**
     - **Validates: Requirements 1.7, 2.10**
 
@@ -201,35 +201,35 @@ Constraints every task inherits:
     - _Requirements: 1.3, 1.4, 1.10, 1.12, 2.5, 3.7, 3.8, 3.10, 5.7_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py`
 
-  - [ ]* 2.9 Write property test for the release derivation
+  - [x]* 2.9 Write property test for the release derivation
     - **Property 1: Released is exactly the absence of an open Gate-classified entry**
     - **Validates: Requirements 1.3, 1.4, 2.5, 3.8, 3.10**
 
-  - [ ]* 2.10 Write property test for per-Gate independence
+  - [x]* 2.10 Write property test for per-Gate independence
     - **Property 2: Releasing one Gate's screens is independent of the other nine**
     - **Validates: Requirements 1.3, 5.9, 7.10, 9.8, 11.18**
 
-  - [ ]* 2.11 Write property test for Two_Gate_Screen closure order
+  - [x]* 2.11 Write property test for Two_Gate_Screen closure order
     - **Property 3: A Two_Gate_Screen's release does not depend on the order its Gates close**
     - **Validates: Requirements 1.4, 10.19, 11.16, 12.18**
 
-  - [ ]* 2.12 Write property test for the Gate-open derivation
+  - [x]* 2.12 Write property test for the Gate-open derivation
     - **Property 7: A Gate is open exactly when some part of it is unaccepted**
     - **Validates: Requirements 3.6, 3.7, 7.15, 9.14, 10.15, 11.15, 12.17, 15.13**
 
-  - [ ]* 2.13 Write property test for Acceptance_Criterion neutrality
+  - [x]* 2.13 Write property test for Acceptance_Criterion neutrality
     - **Property 8: Acceptance_Criterion entries never affect Released**
     - **Validates: Requirements 2.4, 2.5**
 
-  - [ ]* 2.14 Write property test for the Two_Gate_Screen set
+  - [x]* 2.14 Write property test for the Two_Gate_Screen set
     - **Property 9: The Two_Gate_Screen set is exactly the screens with two Gate-classified entries**
     - **Validates: Requirements 1.5**
 
-  - [ ]* 2.15 Write property test for the delivery-status frame condition
+  - [x]* 2.15 Write property test for the delivery-status frame condition
     - **Property 11: A Gate closure leaves every recorded delivery status unchanged**
     - **Validates: Requirements 3.8, 9.18**
 
-  - [ ]* 2.16 Write property test for the read-only posture's single input
+  - [x]* 2.16 Write property test for the read-only posture's single input
     - **Property 25: The read-only posture reads `DG-ROL` and nothing else**
     - **Validates: Requirements 5.7, 9.18, 11.18**
 
