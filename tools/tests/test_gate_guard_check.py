@@ -7,10 +7,10 @@ The shell: that it is an `AnalyzerBase` the dispatcher can run, that `fix` is ac
 nothing, that arguments and stdin reach the review as the file list a rule will read, that a
 directory is expanded by `find_cpp_files` rather than by something local to the analyzer, and that
 the register premise is established before anything else and reported as itself when it cannot be.
-The last of those is the behaviour the repository exercises today, because the register does not
-exist yet: task 9 writes it, and until it does, every run of the source half fails naming the path.
-That is the spec's governing rule rather than an interim inconvenience -- an unresolved premise is a
-failure, never a pass -- so it is asserted here as the shell's answer in that state.
+That last case is asserted over a tree laid out without a register rather than over the repository,
+which now carries one: the spec's governing rule is that an unresolved premise is a failure and
+never a pass, so the shell's answer in that state is worth pinning whether or not the real register
+is present.
 
 The rules: `guard-value`, which reads each recorded guard's declaration in its recorded `declaredIn`
 file; `guard-assertion`, which reads each recorded assertion site under `aerora/test/**`;

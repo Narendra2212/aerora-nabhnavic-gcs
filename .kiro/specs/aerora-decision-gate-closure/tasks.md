@@ -593,9 +593,21 @@ Constraints every task inherits:
     never a pass. That is the last local evidence available: task 10 wires the hooks and task 11 is
     CI-only.
 
-- [ ] 9. Populate the Gate_Register and scaffold the closures directory
+- [x] 9. Populate the Gate_Register and scaffold the closures directory
 
-  - [ ] 9.1 Write the ten Gate_Dossiers
+  **Committed as one change, because the register is one document.** 9.1 through 9.4 each write part
+  of `gate-register.json`, and any one of them alone leaves a document the schema rejects, so a
+  commit per sub-task would have left the gating hook of task 10 red in between. The sub-tasks were
+  authored in the plan's order and are recorded complete together.
+
+  **Five inventory rows were corrected to record a blocker the requirements state.** `SCR-MIS-05`,
+  `SCR-MIS-06` and `SCR-AIS-03` are Two_Gate_Screens whose "Blocked by" cells named one Gate's
+  blocker each; `SCR-MIS-09`'s cell was an em dash while its screen half waits on `DG-MIS`; and
+  `SCR-VID-01`'s cell omitted `P7-VID-004`, which the misread table below it records as that
+  screen's reclassified entry. Each correction is the same class as task 1.2's: the rows are the
+  evidence, and the column was under-recording them.
+
+  - [x] 9.1 Write the ten Gate_Dossiers
     - One dossier per Gate from Requirements 6 through 15: status, `implementingOwner`, a `rationale`
       reference (document plus anchor) rather than a copy of the narrative, `parts` with signing
       owners and Sign_Off_Conditions, `elements` with `settlementShape` and `requiredAttributes`,
@@ -608,7 +620,7 @@ Constraints every task inherits:
     - _Requirements: 1.1, 1.2, 1.8, 3.6, 4.1, 4.3, 4.10, 6.1, 6.2, 6.3, 6.4, 6.5, 6.9, 6.10, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.9, 7.10, 7.11, 8.1, 8.2, 8.3, 8.4, 8.7, 8.8, 8.9, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.10, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.10, 10.11, 10.20, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.9, 11.10, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.9, 12.10, 12.11, 13.1, 13.2, 13.3, 13.4, 13.5, 13.7, 13.8, 13.13, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.9, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.8, 15.9, 15.15, 15.17_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --schemafile .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json .kiro/specs/aerora-decision-gate-closure/gate-register.json`
 
-  - [ ] 9.2 Write the per-screen records and the blocking-entry classifications
+  - [x] 9.2 Write the per-screen records and the blocking-entry classifications
     - One record per inventory row, with `released`, `observation` and `blockingEntries`. The register
       restates no screen name, class, seam, owner or delivery status — it references screen IDs and
       adds the axes the inventory has no column for
@@ -618,7 +630,7 @@ Constraints every task inherits:
     - _Requirements: 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.7, 2.8, 2.11, 3.9, 14.15, 15.16_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [ ] 9.3 Write the guard registry, including the one recorded disagreement
+  - [x] 9.3 Write the guard registry, including the one recorded disagreement
     - **Unblocked by task 7.10**, which this task raised: seven of the fifteen guards cannot be
       recorded as symbol-plus-literal, so each entry now carries a `kind`. The shapes are settled;
       what remains is writing the fifteen entries
@@ -636,7 +648,7 @@ Constraints every task inherits:
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/ src/Vehicle/Vehicle.h`
       reports the one disagreement with its owner and remedies, and exits zero
 
-  - [ ] 9.4 Write the `readOnly` block and the contract-surface inventory
+  - [x] 9.4 Write the `readOnly` block and the contract-surface inventory
     - The surface is **162 elements** as task 7.7 measures it — 121 enumerators, 23 registry keys,
       18 constants — each mapped to `none` with a reason unless it is genuinely an open Gate's
       Decision_Content, in which case recording it is the finding rather than the clearance
@@ -654,7 +666,7 @@ Constraints every task inherits:
     - _Requirements: 3.12, 4.2, 5.1, 5.8, 5.11, 9.16_
     - **Local**: both direct script invocations pass
 
-  - [ ] 9.5 Scaffold `closures/` with its contract and no content
+  - [x] 9.5 Scaffold `closures/` with its contract and no content
     - A `closures/README.md` stating the one-file-per-part rule, the `<GATE>.<part>.json` naming, the
       `Gate-Signed-By:` trailer convention, and that `entryCommit` is derived from git and must be
       absent while a part is `submitted`

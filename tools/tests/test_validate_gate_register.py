@@ -483,8 +483,10 @@ def _guard(
         declared_expression=PREDICATE_EXPRESSION if shape == PREDICATE_GUARD else None,
         held_by=MAVLINK_IDENTIFIER_GUARD if shape == CHECK_GUARD else None,
         asserted_in=sites,
-        asserted_nowhere=None if sites else True,
-        remedy=(remedy or ASSERTION_REMEDY) if not sites else None,
+        # A check carries neither: it is asserted by the tests of the rule that holds it, which
+        # live outside the tree `assertedIn` describes, so its empty list records no gap.
+        asserted_nowhere=None if sites or held_by_a_rule else True,
+        remedy=None if sites or held_by_a_rule else (remedy or ASSERTION_REMEDY),
         holds_open=list(gates),
         holds_no_gate_open=None if gates else True,
         permitted_to_change_by=permitting,

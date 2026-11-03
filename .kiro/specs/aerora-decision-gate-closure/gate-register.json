@@ -1,0 +1,3242 @@
+{
+  "$schema": "./gate-register.schema.json",
+  "inventory": {
+    "path": ".kiro/specs/05-product-completion/03-gui-information-architecture-and-screens.md",
+    "authoritativeFor": [
+      "the screen set",
+      "each screen's delivery status",
+      "the text of each blocking entry",
+      "each screen's class",
+      "each screen's seam",
+      "each screen's owner"
+    ]
+  },
+  "gates": [
+    {
+      "id": "DG-MIS",
+      "status": "OPEN",
+      "implementingOwner": "Tab 5",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#mission-studio--9-screens"
+      },
+      "parts": [
+        {
+          "id": "mission-command-set",
+          "signingOwners": [
+            "Product"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "each mission command the Aerora mission set uses, with its issued MAVLink command identifier or its existing upstream command",
+              "settlementShape": "keyed",
+              "source": "Q-021",
+              "requiredAttributes": [
+                "commandIdentifierOrUpstreamCommand",
+                "stationMayEmit"
+              ],
+              "keySource": "the Aerora mission command set the Closure_Record enumerates"
+            },
+            {
+              "name": "the Aerora complex-item type name as complexMissionItemNames() reports it",
+              "settlementShape": "single",
+              "source": "Q-023"
+            },
+            {
+              "name": "the item's parameter set",
+              "settlementShape": "single",
+              "source": "Q-023"
+            },
+            {
+              "name": "the asset and obstruction geometry the scene editor edits expressed as item parameters",
+              "settlementShape": "single",
+              "source": "Q-023"
+            },
+            {
+              "name": "the plan-file representation",
+              "settlementShape": "single",
+              "source": "Q-023"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-MIS-SOC-01",
+              "requirement": "6.3",
+              "text": "every MAVLink identifier in the Closure_Record is traceable to an issued dialect or interface control document",
+              "verification": "review"
+            },
+            {
+              "id": "DG-MIS-SOC-02",
+              "requirement": "6.4",
+              "text": "the Closure_Record states, for each mission command, whether the station may emit the command",
+              "verification": "review"
+            },
+            {
+              "id": "DG-MIS-SOC-03",
+              "requirement": "6.5",
+              "text": "the Closure_Record defines both the mapVisualQML() and the geoMapVisualQML() representation of the Aerora item",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-MIS-01"
+        },
+        {
+          "screen": "SCR-MIS-02"
+        },
+        {
+          "screen": "SCR-MIS-03"
+        },
+        {
+          "screen": "SCR-MIS-04"
+        },
+        {
+          "screen": "SCR-MIS-05"
+        },
+        {
+          "screen": "SCR-MIS-06"
+        },
+        {
+          "screen": "SCR-MIS-07"
+        },
+        {
+          "screen": "SCR-MIS-08"
+        },
+        {
+          "screen": "SCR-MIS-09",
+          "part": "screen"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "the plan-file round-trip property that a written Aerora mission item read back produces an equivalent item",
+          "requirement": "6.9"
+        },
+        {
+          "id": "P7-CHK-002",
+          "screen": "SCR-MIS-07",
+          "requirement": "6.9"
+        },
+        {
+          "id": "P7-MIS-003",
+          "screen": "SCR-MIS-08",
+          "requirement": "6.9"
+        },
+        {
+          "id": "the implemented service half of SCR-MIS-09",
+          "screen": "SCR-MIS-09",
+          "requirement": "6.10"
+        }
+      ],
+      "guards": [
+        "kGcsPayloadStateReplayImplemented",
+        "mavlink-identifier"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-TLM",
+      "status": "OPEN",
+      "implementingOwner": "Tab 4",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#telemetry--3-screens"
+      },
+      "parts": [
+        {
+          "id": "dialect",
+          "signingOwners": [
+            "Firmware",
+            "Product"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "for each Aerora fact, the fact name, the unit, the value range, the enumeration members, the owning fact group among the six the telemetry interface control document names, the freshness class, and the inbound message that populates the fact",
+              "settlementShape": "keyed",
+              "source": "Q4-002",
+              "requiredAttributes": [
+                "factName",
+                "unit",
+                "valueRange",
+                "enumerationMembers",
+                "owningFactGroup",
+                "freshnessClass",
+                "inboundMessage"
+              ],
+              "keySource": "the Aerora fact set the Closure_Record enumerates"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-TLM-SOC-01",
+              "requirement": "7.5",
+              "text": "every fact in the Closure_Record carries all seven attributes of Requirement 7 criterion 1",
+              "verification": "review"
+            },
+            {
+              "id": "DG-TLM-SOC-02",
+              "requirement": "7.6",
+              "text": "the Closure_Record creates every Aerora fact group during vehicle construction, so the telemetry record's column header stays stable per R-027 and AERORA-GCS-REQ-022",
+              "verification": "review"
+            },
+            {
+              "id": "DG-TLM-SOC-03",
+              "requirement": "7.7",
+              "text": "the Closure_Record requires two vehicles of the Aerora firmware class to hold distinct fact-group instances, which is the R4-001 regression property",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "adr-016-core-edit",
+          "signingOwners": [
+            "Tab 1"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the authorisation of the ADR-016 core edit, comprising the friend class AeroraVehicleFactGroupRegistrar declaration in src/Vehicle/Vehicle.h and the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP compile definition",
+              "settlementShape": "single",
+              "source": "ADR-016"
+            }
+          ],
+          "signOffConditions": []
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-TEL-01"
+        },
+        {
+          "screen": "SCR-LIV-02"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "R4-001",
+          "requirement": "7.11"
+        },
+        {
+          "id": "Q4-002 recorded DECIDED at Option B and ADR-016",
+          "requirement": "7.4"
+        }
+      ],
+      "guards": [
+        "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-FRS",
+      "status": "OPEN",
+      "implementingOwner": "Tab 4",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#telemetry--3-screens"
+      },
+      "parts": [
+        {
+          "id": "freshness-budget",
+          "signingOwners": [
+            "Product"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "for each freshness class, a threshold value, the unit of the threshold, and the source the value is drawn from",
+              "settlementShape": "keyed",
+              "source": "Q-036",
+              "requiredAttributes": [
+                "thresholdValue",
+                "unit",
+                "source"
+              ],
+              "keySource": "the freshness classes the DG-TLM dialect part names"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-FRS-SOC-01",
+              "requirement": "8.3",
+              "text": "each freshness class the Closure_Record names carries exactly one threshold",
+              "verification": "review"
+            },
+            {
+              "id": "DG-FRS-SOC-02",
+              "requirement": "8.4",
+              "text": "the Closure_Record preserves the latched STALE verdict and the three-outcome evaluation, so an unevaluated class resolves to ObservedFreshnessUnevaluated rather than to a fresh verdict",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-TEL-03"
+        },
+        {
+          "screen": "SCR-SET-02"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "the STALE class of the State_Vocabulary is unreachable while the Gate is OPEN",
+          "requirement": "8.9"
+        }
+      ],
+      "guards": [
+        "AeroraTelemetryState::ObservedFreshnessUnevaluated"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "ObservedFreshnessUnevaluated",
+        "reportsGateIdentifier": false
+      }
+    },
+    {
+      "id": "DG-ROL",
+      "status": "OPEN",
+      "implementingOwner": "Tab 2",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#security--4-screens"
+      },
+      "parts": [
+        {
+          "id": "role-set",
+          "signingOwners": [
+            "Product",
+            "operations"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the role names",
+              "settlementShape": "keyed",
+              "source": "Q-029",
+              "requiredAttributes": [
+                "commandClasses"
+              ],
+              "keySource": "the role set the Closure_Record enumerates"
+            },
+            {
+              "name": "for each role, the command classes the role may authorise",
+              "settlementShape": "mapping",
+              "source": "Q-029"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-ROL-SOC-01",
+              "requirement": "9.4",
+              "text": "each role in the Closure_Record maps to at least one command class",
+              "verification": "review"
+            },
+            {
+              "id": "DG-ROL-SOC-02",
+              "requirement": "9.5",
+              "text": "each command class the station can emit maps to at least one role, so AeroraCorePlugin::authorizeMavCommand() reaches a verdict for every command the station receives",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "authorization-scope",
+          "signingOwners": [
+            "Architecture"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the selected outbound authorization scope among the recorded options A, B and C",
+              "settlementShape": "single",
+              "source": "ADR-014"
+            },
+            {
+              "name": "the point at which the station evaluates an authorization",
+              "settlementShape": "single",
+              "source": "ADR-014"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-ROL-SOC-03",
+              "requirement": "9.6",
+              "text": "the Closure_Record states whether an unauditable allow is denied, which is P7-AUDIT-003",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-SEC-02"
+        },
+        {
+          "screen": "SCR-VEH-05",
+          "part": "calibration-display"
+        },
+        {
+          "screen": "SCR-LIV-05",
+          "part": "approval"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "the implemented ADR-015 calibration authorization seam",
+          "screen": "SCR-VEH-05",
+          "requirement": "9.10"
+        },
+        {
+          "id": "P7-SEC-005",
+          "screen": "SCR-SEC-01",
+          "requirement": "9.10"
+        }
+      ],
+      "guards": [
+        "AeroraCorePlugin::isAuthorizationEnforced()",
+        "kGroundStationActuatorPathImplemented",
+        "kAutonomousPayloadActionImplemented"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-PAY",
+      "status": "OPEN",
+      "implementingOwner": "Tab 6",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#live-operations--9-screens"
+      },
+      "parts": [
+        {
+          "id": "payload",
+          "signingOwners": [
+            "Product",
+            "engineering"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "for each reported payload item, the item name, the unit, the value range, the enumeration members, and the reporting message",
+              "settlementShape": "keyed",
+              "source": "P7-PAY-004",
+              "requiredAttributes": [
+                "itemName",
+                "unit",
+                "valueRange",
+                "enumerationMembers",
+                "reportingMessage"
+              ],
+              "keySource": "the reported payload item set the payload interface control document names"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-PAY-SOC-01",
+              "requirement": "10.6",
+              "text": "every item in the Closure_Record is a vehicle-reported item",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "power",
+          "signingOwners": [
+            "Product",
+            "engineering"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "for each reported tether item, the item name, the unit, the value range, the enumeration members, and the reporting message",
+              "settlementShape": "keyed",
+              "source": "P7-PWR-006",
+              "requiredAttributes": [
+                "itemName",
+                "unit",
+                "valueRange",
+                "enumerationMembers",
+                "reportingMessage"
+              ],
+              "keySource": "the reported tether item set P7-PWR-006 names"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-PAY-SOC-02",
+              "requirement": "10.6",
+              "text": "every tether item in the Closure_Record is a vehicle-reported item",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "capability",
+          "signingOwners": [
+            "Firmware"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the form of a capability identifier",
+              "settlementShape": "single",
+              "source": "Q3-009"
+            },
+            {
+              "name": "the means by which a vehicle reports capability presence separately from capability state",
+              "settlementShape": "single",
+              "source": "Q3-009"
+            }
+          ],
+          "signOffConditions": []
+        },
+        {
+          "id": "consumable",
+          "signingOwners": [
+            "Product",
+            "engineering"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the reported consumable item set",
+              "settlementShape": "keyed",
+              "source": "P7-ARCH-005",
+              "requiredAttributes": [
+                "itemName",
+                "unit",
+                "reportingMessage"
+              ],
+              "keySource": "the reported consumable item set the Closure_Record enumerates"
+            },
+            {
+              "name": "the approved consumption model that P7-ARCH-005 requires before any consumption projection is displayed",
+              "settlementShape": "single",
+              "source": "P7-ARCH-005",
+              "excludedSource": "a station-derived projection with no approved method"
+            }
+          ],
+          "signOffConditions": []
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-LIV-03"
+        },
+        {
+          "screen": "SCR-LIV-04"
+        },
+        {
+          "screen": "SCR-MIS-05"
+        },
+        {
+          "screen": "SCR-MIS-06"
+        },
+        {
+          "screen": "SCR-SHL-02",
+          "part": "per-vehicle"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "P7-PAY-004's rule that painting supervision displays reported values alone",
+          "requirement": "10.11"
+        },
+        {
+          "id": "SCR-VEH-03's empty-inventory reading, which the delivered screen already carries",
+          "screen": "SCR-VEH-03",
+          "requirement": "10.11"
+        }
+      ],
+      "guards": [
+        "AeroraPowerModel::kDefinedThresholdCount",
+        "kAutomaticSourceTransitionImplemented",
+        "kRemainingEnergyEstimationImplemented",
+        "kGroundStationActuatorPathImplemented",
+        "kAutonomousPayloadActionImplemented"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-AUT",
+      "status": "OPEN",
+      "implementingOwner": "Tab 6",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#autonomy--3-screens"
+      },
+      "parts": [
+        {
+          "id": "proposal-model",
+          "signingOwners": [
+            "Architecture"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the proposal's source, timestamp, subject and basis fields",
+              "settlementShape": "single",
+              "source": "P7-AI-001",
+              "requiredAttributes": [
+                "source",
+                "timestamp",
+                "subject",
+                "basis"
+              ]
+            },
+            {
+              "name": "the lifecycle states",
+              "settlementShape": "keyed",
+              "source": "P7-AI-001",
+              "requiredAttributes": [
+                "stateVocabularyClass"
+              ],
+              "keySource": "the lifecycle states the Closure_Record enumerates"
+            },
+            {
+              "name": "the permitted transitions between lifecycle states",
+              "settlementShape": "mapping",
+              "source": "P7-AI-001"
+            },
+            {
+              "name": "the expiry rule",
+              "settlementShape": "single",
+              "source": "P7-AI-001"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-AUT-SOC-02",
+              "requirement": "11.5",
+              "text": "each lifecycle state in the Closure_Record maps to a class of the State_Vocabulary",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "source-interface",
+          "signingOwners": [
+            "Architecture",
+            "the external interface authority"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the autonomy source transport",
+              "settlementShape": "single",
+              "source": "P7-AI-004"
+            },
+            {
+              "name": "the request and response schema",
+              "settlementShape": "single",
+              "source": "P7-AI-004"
+            },
+            {
+              "name": "the station's behaviour on a response the station cannot evaluate",
+              "settlementShape": "single",
+              "source": "P7-AI-005"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-AUT-SOC-01",
+              "requirement": "11.4",
+              "text": "the Closure_Record cites an issued GPU-to-flight-controller interface control document for every schema element",
+              "verification": "review"
+            },
+            {
+              "id": "DG-AUT-SOC-03",
+              "requirement": "11.6",
+              "text": "the Closure_Record defines the display of a proposal the station cannot evaluate, which is P7-AI-005",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-AIS-01"
+        },
+        {
+          "screen": "SCR-AIS-02"
+        },
+        {
+          "screen": "SCR-AIS-03"
+        },
+        {
+          "screen": "SCR-LIV-05",
+          "part": "proposal"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "P7-AI-002's rule that a proposal becomes a command only on an explicit operator approval event",
+          "requirement": "11.10"
+        },
+        {
+          "id": "P7-AI-003's rule that the approval surface is disabled and states why while no authorized command path exists",
+          "requirement": "11.10"
+        }
+      ],
+      "guards": [
+        "autonomy-source"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-STO",
+      "status": "OPEN",
+      "implementingOwner": "Tab 1",
+      "rationale": {
+        "document": "05-product-completion/09-local-persistence-architecture.md",
+        "anchor": "#the-audit-sink-and-what-it-reports"
+      },
+      "parts": [
+        {
+          "id": "tamper-evidence",
+          "signingOwners": [
+            "Tab 2",
+            "security architecture"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the audit chain construction",
+              "settlementShape": "single",
+              "source": "Q-037"
+            },
+            {
+              "name": "the protected chain anchor of D-DAT-05",
+              "settlementShape": "single",
+              "source": "D-DAT-05"
+            },
+            {
+              "name": "the AeroraPlatformKeyProtector backend for each target platform",
+              "settlementShape": "keyed",
+              "source": "Q4-003",
+              "requiredAttributes": [
+                "backend"
+              ],
+              "keySource": "the five target platforms"
+            },
+            {
+              "name": "the write-failure accounting behaviour",
+              "settlementShape": "single",
+              "source": "Q-037"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-STO-SOC-01",
+              "requirement": "12.5",
+              "text": "the Closure_Record names an anchor backend for each of the five target platforms, or records an explicit exception for a platform with no backend",
+              "verification": "review"
+            },
+            {
+              "id": "DG-STO-SOC-02",
+              "requirement": "12.6",
+              "text": "the Closure_Record defines the write-failure accounting behaviour, so a lost audit record is counted rather than silently dropped",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "retention",
+          "signingOwners": [
+            "Product"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the retention caps of D-DAT-01",
+              "settlementShape": "single",
+              "source": "D-DAT-01"
+            },
+            {
+              "name": "whether an audit record may be deleted at all per D-DAT-02",
+              "settlementShape": "single",
+              "source": "D-DAT-02"
+            },
+            {
+              "name": "the event categories of D-DAT-04",
+              "settlementShape": "keyed",
+              "source": "D-DAT-04",
+              "requiredAttributes": [
+                "category"
+              ],
+              "keySource": "the event categories the Closure_Record enumerates"
+            }
+          ],
+          "signOffConditions": []
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-SEC-03"
+        },
+        {
+          "screen": "SCR-SEC-04"
+        },
+        {
+          "screen": "SCR-LOG-01"
+        },
+        {
+          "screen": "SCR-LOG-02"
+        },
+        {
+          "screen": "SCR-TEL-02"
+        },
+        {
+          "screen": "SCR-AIS-03"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "the implementation of AeroraLocalStore against the persistence design",
+          "requirement": "12.11"
+        },
+        {
+          "id": "P7-TEL-004",
+          "screen": "SCR-TEL-02",
+          "requirement": "12.11"
+        },
+        {
+          "id": "P7-LOG-003",
+          "screen": "SCR-LOG-02",
+          "requirement": "12.11"
+        },
+        {
+          "id": "P7-DAT-002 recorded CLOSED at DESIGNED",
+          "requirement": "12.4"
+        }
+      ],
+      "guards": [
+        "AeroraAuditSink::isDurable()",
+        "AeroraAuditSink::isTamperEvident()",
+        "AeroraCommandAuthorizer::lostAuditRecordCount()"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-FLT",
+      "status": "OPEN",
+      "implementingOwner": "Tab 3",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#fleet--3-screens"
+      },
+      "parts": [
+        {
+          "id": "identity-format",
+          "signingOwners": [
+            "Product"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the identifier's form",
+              "settlementShape": "single",
+              "source": "D-DAT-03",
+              "excludedSource": "the MAVLink system id"
+            },
+            {
+              "name": "the authority that issues an identifier",
+              "settlementShape": "single",
+              "source": "D-DAT-03"
+            },
+            {
+              "name": "the scope within which an identifier is unique",
+              "settlementShape": "single",
+              "source": "D-DAT-03"
+            },
+            {
+              "name": "the identifier's lifetime",
+              "settlementShape": "single",
+              "source": "D-DAT-03"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-FLT-SOC-01",
+              "requirement": "13.3",
+              "text": "the Closure_Record states the display for a vehicle observed before an identifier is issued, so SCR-FLT-01 can render a first contact",
+              "verification": "review"
+            },
+            {
+              "id": "DG-FLT-SOC-02",
+              "requirement": "13.4",
+              "text": "the Closure_Record derives the identifier from a source other than the MAVLink system id",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-FLT-01"
+        },
+        {
+          "screen": "SCR-FLT-02"
+        },
+        {
+          "screen": "SCR-FLT-03"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "the static registration of the Aerora page set",
+          "requirement": "13.8"
+        },
+        {
+          "id": "the runtime content resolution of each page",
+          "requirement": "13.8"
+        },
+        {
+          "id": "P7-FLEET-002's rule that a profile grants no capability",
+          "requirement": "13.8"
+        },
+        {
+          "id": "P7-FLEET-004 recorded DESIGNED",
+          "requirement": "13.5"
+        }
+      ],
+      "guards": [
+        "AeroraVehicleIdentity::fleetIdentityKnown()"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-VID",
+      "status": "OPEN",
+      "implementingOwner": "Tab 7",
+      "rationale": {
+        "document": "04-ui-implementation/00-ui-architecture-map.md",
+        "anchor": "#tier-3--populated-file-replacement"
+      },
+      "parts": [
+        {
+          "id": "fork-point",
+          "signingOwners": [
+            "the process owner"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the Tier::PopulatedFile override target src/FlyView/FlyViewVideo.qml",
+              "settlementShape": "single",
+              "source": "Q-038"
+            },
+            {
+              "name": "the upstream commit the replacement is authored against",
+              "settlementShape": "single",
+              "source": "IF-UIS-012"
+            },
+            {
+              "name": "the named fork owner",
+              "settlementShape": "single",
+              "source": "IF-UIS-012"
+            },
+            {
+              "name": "the drift-review cadence",
+              "settlementShape": "single",
+              "source": "IF-UIS-012"
+            },
+            {
+              "name": "the recorded fork reason",
+              "settlementShape": "single",
+              "source": "Q-038"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-VID-SOC-01",
+              "requirement": "14.5",
+              "text": "the Closure_Record raises the recorded class-X fork target from zero to one, with the drift review scheduled and the fork listed in the seam budget",
+              "verification": "review"
+            },
+            {
+              "id": "DG-VID-SOC-02",
+              "requirement": "14.6",
+              "text": "the Closure_Record records the alternatives considered and the reason each was declined, which P7-ARCH-023 requires",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-VID-01"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "P7-VID-004's rule that a video overlay displays a safety value with its state class",
+          "screen": "SCR-VID-01",
+          "requirement": "14.9"
+        },
+        {
+          "id": "the decision to leave createVideoReceiver, createVideoSink and releaseVideoSink un-overridden",
+          "requirement": "14.9"
+        }
+      ],
+      "guards": [
+        "AeroraQmlOverrides::populatedFileOverrideCount()"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    },
+    {
+      "id": "DG-SIM",
+      "status": "OPEN",
+      "implementingOwner": "Tab 8",
+      "rationale": {
+        "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
+        "anchor": "#simulation--1-screen"
+      },
+      "parts": [
+        {
+          "id": "flag-placement",
+          "signingOwners": [
+            "Architecture"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "the location of the simulated-source flag on a reported value",
+              "settlementShape": "single",
+              "source": "P7-SIM-002"
+            },
+            {
+              "name": "the means by which the flag reaches each display that shows the value",
+              "settlementShape": "single",
+              "source": "P7-SIM-002"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-SIM-SOC-02",
+              "requirement": "15.6",
+              "text": "the Closure_Record makes the simulated classification a property of the reported value rather than a property of a screen",
+              "verification": "review"
+            }
+          ]
+        },
+        {
+          "id": "discriminator",
+          "signingOwners": [
+            "Architecture"
+          ],
+          "state": "open",
+          "closureRecord": null,
+          "elements": [
+            {
+              "name": "a means of identifying a simulated link that is present in a release configuration",
+              "settlementShape": "single",
+              "source": "P7-SIM-002",
+              "excludedSource": "LinkConfiguration.linkType compared against TypeMock, which LinkConfiguration.h declares inside #ifdef QT_DEBUG"
+            }
+          ],
+          "signOffConditions": [
+            {
+              "id": "DG-SIM-SOC-01",
+              "requirement": "15.5",
+              "text": "the Closure_Record states the treatment of log replay as a distinct classification from simulation",
+              "verification": "review"
+            }
+          ]
+        }
+      ],
+      "releaseSet": [
+        {
+          "screen": "SCR-SIM-01"
+        }
+      ],
+      "excludedAcceptanceCriteria": [
+        {
+          "id": "P7-SIM-003's rule that a simulated vehicle cannot satisfy a capability requirement for an authorization decision",
+          "requirement": "15.9"
+        },
+        {
+          "id": "P7-SIM-004's build-configuration constraint on test mocks",
+          "requirement": "15.9"
+        }
+      ],
+      "guards": [
+        "simulated-source"
+      ],
+      "restsOnReviewAlone": false,
+      "openStateReading": {
+        "class": "Unknown",
+        "reportsGateIdentifier": true
+      }
+    }
+  ],
+  "screens": [
+    {
+      "id": "SCR-SHL-01",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_vehicleConfigurationIsReachableFromTheOperationsHub"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-SHL-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q3-009",
+          "classification": "Gate",
+          "gate": "DG-PAY",
+          "requirement": "10.9"
+        },
+        {
+          "id": "HO-TAB7-06",
+          "classification": "Acceptance_Criterion"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SHL-03",
+      "released": true,
+      "observation": {
+        "suite": "AeroraFlyViewOverlayUITest",
+        "slot": "_enforcementIndicatorReachesTheToolbarAndReportsNotEnforced"
+      },
+      "blockingEntries": [
+        {
+          "id": "D-UI-01",
+          "classification": "Acceptance_Criterion"
+        },
+        {
+          "id": "HO-TAB1-10",
+          "classification": "Acceptance_Criterion"
+        },
+        {
+          "id": "HO-TAB7-06",
+          "classification": "Acceptance_Criterion"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SHL-04",
+      "released": true,
+      "observation": {
+        "suite": "AeroraSceneAttachmentUITest",
+        "slot": "_provenancePageIsReachableAndReadsTheRegisteredSingleton"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-LIV-01",
+      "released": true,
+      "observation": {
+        "suite": "AeroraFlyViewOverlayUITest",
+        "slot": "_flyViewLoadsTheAeroraOverlayWithItsSeamContractBound"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-LIV-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q4-002",
+          "classification": "Gate",
+          "gate": "DG-TLM",
+          "requirement": "7.8"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-PAY-004",
+          "classification": "Gate",
+          "gate": "DG-PAY",
+          "requirement": "10.20"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-04",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-PWR-006",
+          "classification": "Gate",
+          "gate": "DG-PAY",
+          "requirement": "10.20"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-05",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-AI-001",
+          "classification": "Gate",
+          "gate": "DG-AUT",
+          "requirement": "11.7"
+        },
+        {
+          "id": "Q-029",
+          "classification": "Gate",
+          "gate": "DG-ROL",
+          "requirement": "9.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-06",
+      "released": true,
+      "observation": {
+        "suite": "AeroraSceneAttachmentUITest",
+        "slot": "_missionProgressPageIsReachableFromTheAnalyzeMenu"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-LIV-07",
+      "released": true,
+      "observation": {
+        "suite": "AeroraFlyViewOverlayUITest",
+        "slot": "_linkStatePanelReportsOneRowPerLink"
+      },
+      "blockingEntries": [
+        {
+          "id": "P7-RAD-002",
+          "classification": "Acceptance_Criterion"
+        },
+        {
+          "id": "P7-RAD-004",
+          "classification": "Acceptance_Criterion"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-08",
+      "released": true,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-FLY-005",
+          "classification": "Acceptance_Criterion",
+          "requirement": "2.8"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LIV-09",
+      "released": true,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-CHK-004",
+          "classification": "Acceptance_Criterion",
+          "requirement": "2.8"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-021",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        },
+        {
+          "id": "Q-023",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-021",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        },
+        {
+          "id": "Q-023",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "note:same-item-decisions",
+          "classification": "Gate",
+          "gate": "DG-MIS",
+          "inventoryText": "as above"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-04",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "note:same-item-decisions",
+          "classification": "Gate",
+          "gate": "DG-MIS",
+          "inventoryText": "as above"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-05",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-ARCH-005",
+          "classification": "Gate",
+          "gate": "DG-PAY",
+          "requirement": "10.14"
+        },
+        {
+          "id": "Q-023",
+          "classification": "Gate",
+          "gate": "DG-MIS",
+          "requirement": "6.6"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-06",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-023",
+          "classification": "Gate",
+          "gate": "DG-MIS",
+          "requirement": "6.6"
+        },
+        {
+          "id": "note:no-consumable-item-set",
+          "classification": "Gate",
+          "gate": "DG-PAY",
+          "requirement": "10.14",
+          "inventoryText": "no reported consumable item set"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-07",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-CHK-002",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-08",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-MIS-003",
+          "classification": "Gate",
+          "gate": "DG-MIS"
+        }
+      ]
+    },
+    {
+      "id": "SCR-MIS-09",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-021",
+          "classification": "Gate",
+          "gate": "DG-MIS",
+          "requirement": "6.10"
+        }
+      ]
+    },
+    {
+      "id": "SCR-VEH-01",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_aeroraSetupPagesRenderInTheConfigureView"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-VEH-02",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_identityPageReadsTheLiveVehicleAndWithholdsAFleetIdentity"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-VEH-03",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_capabilityPageReportsAnEmptyInventoryWithoutClaimingAbsence"
+      },
+      "blockingEntries": [
+        {
+          "id": "Q3-009",
+          "classification": "Acceptance_Criterion",
+          "reclassifiedFrom": "Gate",
+          "requirement": "2.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-VEH-04",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_healthPageWithholdsAVerdictUntilTheAircraftReportsOne"
+      },
+      "blockingEntries": [
+        {
+          "id": "P7-VEH-004",
+          "classification": "Acceptance_Criterion",
+          "reclassifiedFrom": "Gate",
+          "requirement": "2.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-VEH-05",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-029",
+          "classification": "Gate",
+          "gate": "DG-ROL",
+          "requirement": "9.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-VEH-06",
+      "released": true,
+      "observation": {
+        "suite": "AeroraVehicleConfigUITest",
+        "slot": "_aeroraSetupPagesRenderInTheConfigureView"
+      },
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-TEL-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q4-002",
+          "classification": "Gate",
+          "gate": "DG-TLM",
+          "requirement": "7.8"
+        }
+      ]
+    },
+    {
+      "id": "SCR-TEL-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-DAT-002",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        },
+        {
+          "id": "P7-TEL-004",
+          "classification": "Acceptance_Criterion"
+        }
+      ]
+    },
+    {
+      "id": "SCR-TEL-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-036",
+          "classification": "Gate",
+          "gate": "DG-FRS",
+          "requirement": "8.6"
+        }
+      ]
+    },
+    {
+      "id": "SCR-AIS-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-AI-001",
+          "classification": "Gate",
+          "gate": "DG-AUT",
+          "requirement": "11.7"
+        },
+        {
+          "id": "P7-AI-004",
+          "classification": "Gate",
+          "gate": "DG-AUT",
+          "requirement": "11.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-AIS-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-AI-004",
+          "classification": "Gate",
+          "gate": "DG-AUT",
+          "requirement": "11.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-AIS-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-AI-001",
+          "classification": "Gate",
+          "gate": "DG-AUT",
+          "requirement": "11.8"
+        },
+        {
+          "id": "Q-037",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-FLT-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-DAT-002",
+          "classification": "Gate",
+          "gate": "DG-FLT",
+          "requirement": "13.6"
+        }
+      ]
+    },
+    {
+      "id": "SCR-FLT-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "note:same-identity-format",
+          "classification": "Gate",
+          "gate": "DG-FLT",
+          "inventoryText": "as above"
+        }
+      ]
+    },
+    {
+      "id": "SCR-FLT-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-FLEET-004",
+          "classification": "Gate",
+          "gate": "DG-FLT",
+          "requirement": "13.6"
+        }
+      ]
+    },
+    {
+      "id": "SCR-VID-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "seam:absent-video-overlay",
+          "classification": "Gate",
+          "gate": "DG-VID",
+          "requirement": "14.15",
+          "inventoryText": "no video overlay seam"
+        },
+        {
+          "id": "P7-VID-004",
+          "classification": "Acceptance_Criterion",
+          "reclassifiedFrom": "Gate",
+          "requirement": "2.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LOG-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-037",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        },
+        {
+          "id": "P7-DAT-002",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-LOG-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "P7-LOG-003",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SEC-01",
+      "released": true,
+      "observation": {
+        "suite": "AeroraSceneAttachmentUITest",
+        "slot": "_securityPosturePageIsReachableAndReportsNotEnforced"
+      },
+      "blockingEntries": [
+        {
+          "id": "P7-SEC-005",
+          "classification": "Acceptance_Criterion",
+          "reclassifiedFrom": "Gate",
+          "requirement": "2.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SEC-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-029",
+          "classification": "Gate",
+          "gate": "DG-ROL",
+          "requirement": "9.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SEC-03",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-037",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.7"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SEC-04",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "seam:absent-key-protector-backend",
+          "classification": "Gate",
+          "gate": "DG-STO",
+          "requirement": "12.8",
+          "inventoryText": "no backend on any target platform"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SET-01",
+      "released": true,
+      "observation": null,
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-SET-02",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "Q-036",
+          "classification": "Gate",
+          "gate": "DG-FRS",
+          "requirement": "8.6"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SET-03",
+      "released": true,
+      "observation": null,
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-SET-04",
+      "released": true,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "UI-A11Y-03",
+          "classification": "Acceptance_Criterion",
+          "requirement": "2.8"
+        }
+      ]
+    },
+    {
+      "id": "SCR-SIM-01",
+      "released": false,
+      "observation": null,
+      "blockingEntries": [
+        {
+          "id": "seam:absent-release-discriminator",
+          "classification": "Gate",
+          "gate": "DG-SIM",
+          "requirement": "15.16",
+          "inventoryText": "the only QML-reachable discriminator is compiled out of release builds"
+        }
+      ]
+    },
+    {
+      "id": "SCR-HLP-01",
+      "released": true,
+      "observation": null,
+      "blockingEntries": []
+    },
+    {
+      "id": "SCR-HLP-02",
+      "released": true,
+      "observation": {
+        "suite": "AeroraSceneAttachmentUITest",
+        "slot": "_stateVocabularyPageIsReachableAndRendersEveryClass"
+      },
+      "blockingEntries": [
+        {
+          "id": "P7-HELP-003",
+          "classification": "Acceptance_Criterion"
+        }
+      ]
+    },
+    {
+      "id": "SCR-HLP-03",
+      "released": true,
+      "observation": {
+        "suite": "AeroraSceneAttachmentUITest",
+        "slot": "_errorReportPageIsReachableAndAssemblesRealStationState"
+      },
+      "blockingEntries": [
+        {
+          "id": "P7-HELP-002",
+          "classification": "Acceptance_Criterion",
+          "reclassifiedFrom": "Gate",
+          "requirement": "2.7"
+        }
+      ]
+    }
+  ],
+  "guards": [
+    {
+      "symbol": "AeroraPowerModel::kDefinedThresholdCount",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Power/AeroraPowerModel.h",
+      "recordedValue": "0",
+      "assertedIn": [
+        "aerora/test/Power/AeroraPowerModelTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:power"
+      ]
+    },
+    {
+      "symbol": "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Telemetry/AeroraVehicleFactGroupRegistrar.cc",
+      "recordedValue": "false",
+      "assertedIn": [],
+      "holdsOpen": [
+        "DG-TLM"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-TLM:dialect",
+        "DG-TLM:adr-016-core-edit"
+      ],
+      "assertedNowhere": true,
+      "disagreement": {
+        "observedValue": "true",
+        "against": [
+          "7.17",
+          "7.18"
+        ],
+        "owner": "Tab 1",
+        "remedies": [
+          "Tab 1 signs the ADR-016 core-edit part, authorising the friend declaration and the compile definition the tree already carries",
+          "the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn from aerora/CMakeLists.txt CUSTOM_DEFINITIONS, returning the guard to false"
+        ],
+        "handOnRow": "finding-1"
+      },
+      "remedy": "whichever ADR-016 remedy lands: Tab 1 signs the core-edit part, or the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn. The assertion is added in the same change, because asserting either value today records the wrong state"
+    },
+    {
+      "symbol": "AeroraCorePlugin::isAuthorizationEnforced()",
+      "kind": "predicate",
+      "declaredIn": "aerora/src/AeroraCorePlugin.cc",
+      "recordedValue": "false",
+      "declaredExpression": "return AeroraCommandAuthorizer::instance()->isFullyConfigured();",
+      "assertedIn": [],
+      "holdsOpen": [
+        "DG-ROL"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-ROL:role-set",
+        "DG-ROL:authorization-scope"
+      ],
+      "assertedNowhere": true,
+      "remedy": "task 11.3 extends the AeroraVehicleIntegrationTest guard slot with the guards it does not yet assert"
+    },
+    {
+      "symbol": "kGroundStationActuatorPathImplemented",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Payload/AeroraPayloadModel.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Payload/AeroraPayloadModelTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY",
+        "DG-ROL"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:payload",
+        "DG-ROL:role-set",
+        "DG-ROL:authorization-scope"
+      ]
+    },
+    {
+      "symbol": "kAutonomousPayloadActionImplemented",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Payload/AeroraPayloadModel.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Payload/AeroraPayloadModelTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY",
+        "DG-ROL"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:payload",
+        "DG-ROL:role-set",
+        "DG-ROL:authorization-scope"
+      ]
+    },
+    {
+      "symbol": "kAutomaticSourceTransitionImplemented",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Power/AeroraPowerModel.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Power/AeroraPowerModelTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:power"
+      ]
+    },
+    {
+      "symbol": "kRemainingEnergyEstimationImplemented",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Power/AeroraPowerModel.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Power/AeroraPowerModelTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:power"
+      ]
+    },
+    {
+      "symbol": "kGcsPayloadStateReplayImplemented",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Mission/AeroraMissionResumeBoundary.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Mission/AeroraMissionTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-MIS"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": []
+    },
+    {
+      "symbol": "mavlink-identifier",
+      "kind": "check",
+      "declaredIn": "tools/analyzers/gate_guard_check.py",
+      "heldBy": "mavlink-identifier",
+      "assertedIn": [],
+      "holdsOpen": [
+        "DG-MIS"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-MIS:mission-command-set"
+      ]
+    },
+    {
+      "symbol": "AeroraTelemetryState::ObservedFreshnessUnevaluated",
+      "kind": "predicate",
+      "declaredIn": "aerora/src/Telemetry/AeroraFreshness.cc",
+      "recordedValue": "ObservedFreshnessUnevaluated",
+      "declaredExpression": "return AeroraTelemetryState::ObservedFreshnessUnevaluated;",
+      "assertedIn": [
+        "aerora/test/Telemetry/AeroraTelemetryStateTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-FRS"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-FRS:freshness-budget"
+      ]
+    },
+    {
+      "symbol": "autonomy-source",
+      "kind": "check",
+      "declaredIn": "tools/analyzers/gate_guard_check.py",
+      "heldBy": "autonomy-source",
+      "assertedIn": [],
+      "holdsOpen": [
+        "DG-AUT"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-AUT:proposal-model",
+        "DG-AUT:source-interface"
+      ]
+    },
+    {
+      "symbol": "AeroraAuditSink::isDurable()",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Security/AeroraAuditSink.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Security/AeroraAuditSinkTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-STO"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-STO:tamper-evidence"
+      ]
+    },
+    {
+      "symbol": "AeroraAuditSink::isTamperEvident()",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Security/AeroraAuditSink.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Security/AeroraAuditSinkTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-STO"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-STO:tamper-evidence"
+      ]
+    },
+    {
+      "symbol": "AeroraCommandAuthorizer::lostAuditRecordCount()",
+      "kind": "predicate",
+      "declaredIn": "aerora/src/Security/AeroraCommandAuthorizer.h",
+      "recordedValue": "the sum of the dropped and failed audit-write counts",
+      "declaredExpression": "return _droppedAuditRecords + _failedAuditWrites;",
+      "assertedIn": [
+        "aerora/test/Security/AeroraAuditSinkTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-STO"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-STO:tamper-evidence"
+      ]
+    },
+    {
+      "symbol": "AeroraVehicleIdentity::fleetIdentityKnown()",
+      "kind": "predicate",
+      "declaredIn": "aerora/src/Vehicle/AeroraVehicleIdentity.h",
+      "recordedValue": "false until an evidence source reports a fleet identity",
+      "declaredExpression": "return !_fleetIdentity.isEmpty();",
+      "assertedIn": [
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc",
+        "aerora/test/UI/AeroraUiFoundationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-FLT"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-FLT:identity-format"
+      ]
+    },
+    {
+      "symbol": "simulated-source",
+      "kind": "check",
+      "declaredIn": "tools/analyzers/gate_guard_check.py",
+      "heldBy": "simulated-source",
+      "assertedIn": [],
+      "holdsOpen": [
+        "DG-SIM"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-SIM:flag-placement",
+        "DG-SIM:discriminator"
+      ]
+    },
+    {
+      "symbol": "AeroraQmlOverrides::populatedFileOverrideCount()",
+      "kind": "predicate",
+      "declaredIn": "aerora/src/UI/AeroraQmlOverrides.cc",
+      "recordedValue": "0",
+      "declaredExpression": "if (entry.tier == Tier::PopulatedFile) {",
+      "assertedIn": [
+        "aerora/test/UI/AeroraUiFoundationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-VID"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-VID:fork-point"
+      ]
+    }
+  ],
+  "readOnly": {
+    "gate": "DG-ROL",
+    "exceptions": [
+      {
+        "screen": "SCR-HLP-03",
+        "file": "aerora/src/UI/Screens/AeroraErrorReportPage.qml",
+        "control": "aeroraErrorReport_copyButton",
+        "reason": "acts on the Aerora_Station's own clipboard and requires no authority",
+        "requirement": "5.1"
+      }
+    ],
+    "actionableControlSites": [
+      {
+        "screen": "SCR-SHL-01",
+        "file": "aerora/src/UI/Screens/AeroraOperationsHub.qml",
+        "control": "aeroraHub_vehicleConfigButton",
+        "handler": "mainWindow.showVehicleConfig()",
+        "reachesNoForbiddenPath": true,
+        "reason": "a local view switch through MainWindow.qml showTool(); it reaches no outbound command path, no mission upload, start or resume path, and no AeroraMissionObserver::verify()",
+        "requirement": "5.1"
+      }
+    ],
+    "forbiddenUntil": [
+      {
+        "id": "P7-FLY-004",
+        "gate": "DG-ROL",
+        "requirement": "5.8"
+      }
+    ],
+    "preApprovedUndeclaredSeams": [
+      "/qml/QGroundControl/FlyView/CustomGuidedActionsController.qml",
+      "/qml/QGroundControl/FlyView/FlyViewAdditionalCustomActionsList.qml"
+    ]
+  },
+  "mavlinkIdentifiers": {
+    "gate": "DG-MIS",
+    "allowList": [
+      {
+        "path": "aerora/src/Mission/AeroraMissionResumeBoundary.cc",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/AeroraMissionResumeBoundary.h",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/AeroraMissionSnapshot.cc",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/AeroraMissionSnapshot.h",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/AeroraMissionValidator.cc",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/AeroraMissionValidator.h",
+        "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
+      },
+      {
+        "path": "aerora/src/Mission/README.md",
+        "reason": "prose recording which upstream command and frame values the module reads, beside the code that reads them. Comments are deliberately not blanked by this rule, so the document is a site like any other"
+      },
+      {
+        "path": "aerora/src/Mission/coverage-mission-contract.md",
+        "reason": "prose recording which upstream command and frame values the module reads, beside the code that reads them. Comments are deliberately not blanked by this rule, so the document is a site like any other"
+      },
+      {
+        "path": "aerora/src/Security/AeroraCalibrationAuthorization.cc",
+        "reason": "names the one command class the calibration authorization gate evaluates, which is upstream's command and the only one ADR-015 scopes the gate to"
+      },
+      {
+        "path": "aerora/src/Security/AeroraCalibrationAuthorization.h",
+        "reason": "names the one command class the calibration authorization gate evaluates, which is upstream's command and the only one ADR-015 scopes the gate to"
+      },
+      {
+        "path": "aerora/src/Security/AeroraCommandAuthorizer.cc",
+        "reason": "names the one command class the calibration authorization gate evaluates, which is upstream's command and the only one ADR-015 scopes the gate to"
+      },
+      {
+        "path": "aerora/src/Telemetry/AeroraStateValue.h",
+        "reason": "a doc-comment example of a message identifier, illustrating what a producer would stamp an observation from. It names no Aerora message, because none is specified"
+      },
+      {
+        "path": "aerora/src/Vehicle/README.md",
+        "reason": "prose recording which upstream command and frame values the module reads, beside the code that reads them. Comments are deliberately not blanked by this rule, so the document is a site like any other"
+      },
+      {
+        "path": "aerora/test/Mission/AeroraMissionMock.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Mission/AeroraMissionMock.h",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Mission/AeroraMissionSyncTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Mission/AeroraMissionTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Security/AeroraAuditSinkTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Security/AeroraCalibrationAuthorizationTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Security/AeroraCalibrationEnforcementTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/Security/AeroraSecurityStatusTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
+        "path": "aerora/test/UI/AeroraUiFoundationTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      }
+    ]
+  },
+  "contractSurface": [
+    {
+      "symbol": "AeroraFirmwareClaim::kFirmwareClass",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kPayloadStatePersistenceEvidenced",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kReplayedCommandCount",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionValidationReport::kNotPerformedBlocksOperation",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPayloadModel::kAutonomousPayloadActionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPayloadModel::kGroundStationActuatorPathImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kAutomaticSourceTransitionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kDefinedThresholdCount",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kPowerArbitrationImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kRemainingEnergyEstimationImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kStationInitiatedPowerActionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kWatchdogToPowerRelationshipEvidenced",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraProvenance::kUpstreamBaseCommitKnown",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraSecurityStatus::kEnforcementVerified",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraSigningKeyStore::kProtectedKeySubgroup",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "kLatitudeLimitDeg",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "kLongitudeLimitDeg",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraAuditEventType::AuthorizationDecision",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::CommandDenied",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::CommandRequested",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::CommandTransmitted",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::OperatorIdentityResolved",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::SecurityEvent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::SystemEvent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::VehicleResponse",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditWriteOutcome::Accepted",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditWriteOutcome::DroppedQueueFull",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditWriteOutcome::FailedStorage",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditWriteOutcome::SinkUnavailable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::Allowed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::DeniedByPolicy",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::DeniedNoIdentity",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::DeniedNotConfigured",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::DeniedPolicyUnavailable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuthorizationOutcome::DeniedRoleUnresolved",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCalibrationRequestKind::CancelOrNoOp",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCalibrationRequestKind::NotCalibration",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCalibrationRequestKind::Start",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::DepthCommandSequence",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::DepthFullParameters",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::DepthItemCount",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::DepthNone",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::Differs",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::Matches",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionAgreement::NotCompared",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::CoordinateRange",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::Failed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::FrameValidity",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::GeometryLimits",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::MissionCommandSupport",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::MissionEmpty",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::MissionNotCaptured",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::MissionPresence",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NoApplicableItems",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NoApprovedOperatingLimits",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NoDeclaredMissionCommandSet",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NoReportedCapability",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NoResumeIndexSupplied",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NotPerformed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::NothingMissing",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::Passed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::ResumeCompatibility",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::ResumeStateCarryForward",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::SequenceNumbering",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionCheck::VehicleCapabilityAgreement",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionIndex::PlanViewSelection",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionIndex::ResumeCandidate",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionIndex::Unattributed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionIndex::VehicleReported",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::Download",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::Failed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::Idle",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::InProgress",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::NotEvidencedActivity",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::NotEvidencedOperation",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::NotEvidencedOutcome",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::RemoveAll",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::Succeeded",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::Upload",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionSnapshot::GcsPlan",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionSnapshot::NotCaptured",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionSnapshot::VehicleStore",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionValidationReport::Failed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionValidationReport::NoChecksPerformed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionValidationReport::Passed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionValidationReport::PassedWithGaps",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPayloadModel::RequestOutcome::RefusedByCommandPath",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPayloadModel::RequestOutcome::RefusedInvalidRequest",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPayloadModel::RequestOutcome::RefusedNoCapabilityReported",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPayloadModel::RequestOutcome::RefusedNoCommandPath",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPayloadModel::RequestOutcome::Submitted",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPlanBridge::Role::GcsPlan",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPlanBridge::Role::ResumeCandidate",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPowerModel::Configuration::Battery",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraPowerModel::Configuration::Tether",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraQmlOverrides::Tier::PopulatedFile",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraQmlOverrides::Tier::PurposeBuiltSeam",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraSecurityStatus::Enforcement::EnforcedAtCommandGate",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraSecurityStatus::Enforcement::NotEnforced",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraStateValue::CapabilityAbsent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraStateValue::CapabilityPresent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraStateValue::CapabilityUnknown",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetrySource::OriginatingComponent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetrySource::SendingComponent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetrySource::Unidentified",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Effective",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::KindEffective",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::KindProposed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::KindReported",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::KindRequested",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::NotObserved",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::ObservedFresh",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::ObservedFreshnessUnevaluated",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::ObservedStale",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Proposed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Reported",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Requested",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::SourceUnavailable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Stale",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Unavailable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::Unknown",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::Category::Command",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::Category::Mission",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::Category::Payload",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::Category::Telemetry",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::Category::Vehicle",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::State::Available",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::State::NotEvidenced",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleCapabilities::State::Unavailable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::Page::Calibration",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::Page::Capabilities",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::Page::Identity",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::Page::SensorHealth",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::Page::ServiceDiagnostics",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleServices::Classification::CorroboratedAerora",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleServices::Classification::NotAerora",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleServices::Classification::SelectedBySeam",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraVehicleServices::Classification::Unknown",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraMissionObserver::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraPayloadModel::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraPowerModel::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraProvenance::kAbsentBranchSentinel",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraProvenance::kAbsentCommitSentinel",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraQmlOverrides::kOverridePrefix",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraQmlOverrides::kResourceScheme",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraTelemetrySet::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraVehicleComponent::kQmlModuleResourceRoot",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemBatteryConfiguration",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemEffectiveState",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemEmergencyStop",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemFault",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemHealth",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemIdentity",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemPayloadState",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemReportedState",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemSafetyState",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemSourceTransition",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemTetherConfiguration",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kItemWatchdogEvent",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kPayloadFreshnessClass",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kPowerFreshnessClass",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    }
+  ]
+}

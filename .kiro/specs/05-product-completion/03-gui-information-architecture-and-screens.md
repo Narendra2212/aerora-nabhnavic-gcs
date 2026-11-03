@@ -499,11 +499,18 @@ Every panel from `SCR-LIV-02` to `SCR-LIV-08` must publish its rect into `custom
 | `SCR-MIS-02` | Industrial surface item editor | O | `VisualMissionItem::editorQml` + `complexMissionItemNames()` / `createComplexMissionItem()` | `SPECIFIED-NOT-DESIGNED` | 5 | `Q-021`/`Q-023` |
 | `SCR-MIS-03` | Surface map visual (QtLocation) | O | `VisualMissionItem::mapVisualQML()` — **pure virtual, mandatory** | `SPECIFIED-NOT-DESIGNED` | 5 | as above |
 | `SCR-MIS-04` | Surface visual (GeoMap engine) | O | `VisualMissionItem::geoMapVisualQML()` — optional, **omission ⇒ invisible under that engine** | `SPECIFIED-NOT-DESIGNED` | 5 | as above |
-| `SCR-MIS-05` | Coverage & pass plan | O | panel inside `SCR-MIS-02`; reuse `TransectStyleComplexItem*` scaffolding | `SPECIFIED-NOT-DESIGNED` | 5 | consumption model is `OPEN` (`P7-ARCH-005`) |
-| `SCR-MIS-06` | Consumable / pass segmentation | O | panel inside `SCR-MIS-02` | `SPECIFIED-NOT-DESIGNED` | 5 + 6 | benchmark gap [§7.4](02-gcs-reference-benchmark.md#74-consumable-constrained-multi-pass-work) — no reported consumable item set |
+| `SCR-MIS-05` | Coverage & pass plan | O | panel inside `SCR-MIS-02`; reuse `TransectStyleComplexItem*` scaffolding | `SPECIFIED-NOT-DESIGNED` | 5 | consumption model is `OPEN` (`P7-ARCH-005`); `Q-023` — the panel sits inside the Aerora complex item, so the item's parameter set gates it too |
+| `SCR-MIS-06` | Consumable / pass segmentation | O | panel inside `SCR-MIS-02` | `SPECIFIED-NOT-DESIGNED` | 5 + 6 | benchmark gap [§7.4](02-gcs-reference-benchmark.md#74-consumable-constrained-multi-pass-work) — no reported consumable item set; `Q-023` — the same complex-item dependency the coverage panel carries |
 | `SCR-MIS-07` | Mission validation report | O | `analyzePages()` or Plan-view panel | `DESIGNED` | 5 | `P7-CHK-002` |
 | `SCR-MIS-08` | 3D plan review | R/C | existing `src/Viewer3D/` Qt Quick 3D viewport | `DESIGNED` | 7 | `P7-MIS-003`. Note: force-disabled on Android upstream |
-| `SCR-MIS-09` | Mission verification (snapshot agreement) | O | `AeroraMissionObserver::verify()` — the one `Q_INVOKABLE` on the mission layer | `IMPLEMENTED-UNCOMPILED` (service) / `DESIGNED` (screen) | 5 + 7 | — |
+| `SCR-MIS-09` | Mission verification (snapshot agreement) | O | `AeroraMissionObserver::verify()` — the one `Q_INVOKABLE` on the mission layer | `IMPLEMENTED-UNCOMPILED` (service) / `DESIGNED` (screen) | 5 + 7 | service half: — ; screen half: `Q-021` — a verification display names the commands it compares |
+
+`SCR-MIS-05` and `SCR-MIS-06` each carry two blockers because each waits on two decisions, and the
+second was missing until the Gate_Register was written. Both are panels *inside* `SCR-MIS-02`, so the
+Aerora complex item's parameter set gates them as surely as the consumption model and the consumable
+item set do. The Seam column said so all along; the "Blocked by" column did not, which would have
+left each reading as a one-decision screen. `SCR-AIS-03` had the same gap in the other direction: it
+recorded the audit durability it waits on and not the proposal model whose approvals it displays.
 
 `SCR-MIS-04` is listed separately on purpose. Two map engines exist
 (`flyViewSettings.useGeoMapEngine`, reboot-required, one instantiated per session), and a complex
@@ -554,7 +561,7 @@ widget. That is only possible because `AeroraTelemetrySet` enumerates its groups
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCR-AIS-01` | Proposal detail & basis | O | `analyzePages()` + `SCR-LIV-05` drill-in | `SPECIFIED-NOT-DESIGNED` | 6 + 7 | `P7-AI-001`, `P7-AI-004` |
 | `SCR-AIS-02` | Autonomy source status | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 6 | `P7-AI-004` — GPU interface `OPEN`, nothing may be invented |
-| `SCR-AIS-03` | Approval audit view | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 2 + 7 | `Q-037` audit durability |
+| `SCR-AIS-03` | Approval audit view | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 2 + 7 | `Q-037` audit durability; `P7-AI-001` — the view shows approvals of proposals the proposal model defines |
 
 ### Fleet & profiles — 3 screens
 
@@ -568,7 +575,7 @@ widget. That is only possible because `AeroraTelemetrySet` enumerates its groups
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `BLOCKED` | 7 | no video overlay seam — see below |
+| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `BLOCKED` | 7 | no video overlay seam — see below; `P7-VID-004` is the content rule the screen satisfies once built, not a blocker |
 
 The three video C++ seams (`createVideoReceiver`, `createVideoSink`, `releaseVideoSink`) are **not**
 overridden and should stay that way: the sink is an opaque `void *` whose lifetime belongs to
