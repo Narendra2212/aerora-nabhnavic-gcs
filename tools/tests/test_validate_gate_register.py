@@ -61,6 +61,7 @@ from common.gate_register import (
     ABSENT,
     ACCEPTED_PART_STATE,
     INVENTORY_COLUMNS,
+    ActionableControlSite,
     Amendment,
     BlockingEntry,
     ClosureRecord,
@@ -219,6 +220,17 @@ UNDELIVERED_STATUS = "DESIGNED"
 # criterion 7's five misreads, so the baseline carries a screen record for it; no set check reads
 # the posture.
 EXCEPTION_SCREEN = "SCR-HLP-03"
+
+# The document and control the baseline posture records the exception on, and the other site it
+# records as reaching no forbidden path. Named here rather than written into `_register()`, because
+# the source half's `actionable-control` lays out a QML tree agreeing with this posture and the two
+# halves have to agree on which control is recorded where.
+EXCEPTION_DOCUMENT = "aerora/src/UI/AFixturePage.qml"
+EXCEPTION_CONTROL = "aFixtureControl"
+SITE_SCREEN = "SCR-SHL-01"
+SITE_DOCUMENT = "aerora/src/UI/AFixtureHub.qml"
+SITE_CONTROL = "aFixtureNavigationControl"
+SITE_HANDLER = "aFixtureWindow.showFixtureView()"
 
 # The one misread screen Requirement 2 criterion 11 records as retaining a Gate-classified entry.
 RETAINED_GATE_SCREEN = "SCR-VID-01"
@@ -515,8 +527,19 @@ def _register(
             exceptions=[
                 ReadOnlyException(
                     screen=EXCEPTION_SCREEN,
-                    file="aerora/src/UI/AFixturePage.qml",
-                    control="aFixtureControl",
+                    file=EXCEPTION_DOCUMENT,
+                    control=EXCEPTION_CONTROL,
+                    reason="a fixture reason",
+                    requirement=None,
+                )
+            ],
+            actionable_control_sites=[
+                ActionableControlSite(
+                    screen=SITE_SCREEN,
+                    file=SITE_DOCUMENT,
+                    control=SITE_CONTROL,
+                    handler=SITE_HANDLER,
+                    reaches_no_forbidden_path=True,
                     reason="a fixture reason",
                     requirement=None,
                 )

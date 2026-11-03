@@ -217,6 +217,7 @@
       "required": [
         "gate",
         "exceptions",
+        "actionableControlSites",
         "forbiddenUntil",
         "preApprovedUndeclaredSeams"
       ],
@@ -255,6 +256,52 @@
               "reason": {
                 "$ref": "#/$defs/nonEmptyString",
                 "description": "Why the control needs no authority."
+              },
+              "requirement": {
+                "$ref": "#/$defs/requirementRef"
+              }
+            }
+          }
+        },
+        "actionableControlSites": {
+          "type": "array",
+          "description": "Every other Aerora QML document permitted to declare an actionable control, recorded by site, control, reviewed handler and reason. This is NOT a second exception to criterion 1 and cannot become one: criterion 1 forbids a control whose activation reaches an outbound command path, a mission upload, start or resume path, or a call to AeroraMissionObserver::verify(), and reachesNoForbiddenPath is const true, so the only control recordable here is one an owner has stated reaches none of them. The exception above remains the single exception to read-only presentation, which is criterion 11's object. The list exists because the source-half check decides a control by its TYPE -- reachability is not decidable from QML text -- so an over-approximating rule needs a recorded baseline or it is a cliff rather than a ratchet, the same shape mavlinkIdentifiers.allowList takes. handler pins the expression the owner reviewed: a control whose handler stops matching is rejected, which is what keeps this list from becoming the escape hatch it would otherwise be.",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "screen",
+              "file",
+              "control",
+              "handler",
+              "reachesNoForbiddenPath",
+              "reason"
+            ],
+            "properties": {
+              "screen": {
+                "$ref": "#/$defs/screenId",
+                "description": "The screen the document presents, so a finding names the screen the inventory knows."
+              },
+              "file": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "The document carrying the control."
+              },
+              "control": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "The control's objectName, so the record cannot drift onto another control in the same file."
+              },
+              "handler": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "The handler expression the owner reviewed when stating that the control reaches no forbidden path. Pinned rather than described: a control whose handler changes has not been reviewed in its new form, so the check rejects it and the owner reads the record again."
+              },
+              "reachesNoForbiddenPath": {
+                "const": true,
+                "description": "The owner's criterion 1 claim, written as a constant so its negation is unrepresentable. A control that DOES reach a forbidden path is not recordable here at all -- it is removed, or it waits on the Gate."
+              },
+              "reason": {
+                "$ref": "#/$defs/nonEmptyString",
+                "description": "Why the control's activation reaches none of the paths criterion 1 names."
               },
               "requirement": {
                 "$ref": "#/$defs/requirementRef"

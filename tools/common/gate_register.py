@@ -72,6 +72,7 @@ __all__ = [
     "RECORD_STATES",
     "SETTLEMENT_SHAPES",
     "Absent",
+    "ActionableControlSite",
     "Amendment",
     "BlockingEntry",
     "ClosureRecord",
@@ -371,6 +372,37 @@ class ReadOnlyException:
 
 
 @dataclass(frozen=True)
+class ActionableControlSite:
+    """One other Aerora QML document permitted to declare an actionable control, and why.
+
+    Not a second exception, and the type cannot express one. Requirement 5 criterion 1 forbids a
+    control whose activation reaches an outbound command path, a mission upload, start or resume
+    path, or a call to ``AeroraMissionObserver::verify()``; ``reaches_no_forbidden_path`` is the
+    owner's statement that this control reaches none of them, and the schema writes it as ``const
+    true`` so its negation cannot be recorded. The single exception to read-only presentation stays
+    :class:`ReadOnlyException`, which is what criterion 11 protects.
+
+    It exists because the source half decides a control by its *type*: whether an activation reaches
+    a forbidden path is not decidable from QML text, so the rule over-approximates, and an
+    over-approximating rule with no recorded baseline rejects the tree it is meant to protect. This
+    is the shape :class:`MavlinkIdentifierSite` takes for the same reason.
+
+    ``handler`` is the expression the owner reviewed, pinned the way a guard's recorded literal is:
+    a control whose handler stops matching has not been reviewed in its new form, so it is rejected
+    and the owner reads the record again. Without it this list would be the escape hatch the rest of
+    this register exists to avoid.
+    """
+
+    screen: str
+    file: str
+    control: str
+    handler: str
+    reaches_no_forbidden_path: bool
+    reason: str
+    requirement: str | None
+
+
+@dataclass(frozen=True)
 class ForbiddenUntil:
     """An item held FORBIDDEN-UNTIL a Gate is recorded CLOSED."""
 
@@ -385,6 +417,7 @@ class ReadOnlyPosture:
 
     gate: str
     exceptions: list[ReadOnlyException]
+    actionable_control_sites: list[ActionableControlSite]
     forbidden_until: list[ForbiddenUntil]
     pre_approved_undeclared_seams: list[str]
 
@@ -855,6 +888,21 @@ def _read_read_only_exception(value: Any, path: str) -> ReadOnlyException:
     return exception
 
 
+def _read_actionable_control_site(value: Any, path: str) -> ActionableControlSite:
+    reader = _Reader(value, path)
+    site = ActionableControlSite(
+        screen=reader.text("screen"),
+        file=reader.text("file"),
+        control=reader.text("control"),
+        handler=reader.text("handler"),
+        reaches_no_forbidden_path=reader.flag("reachesNoForbiddenPath"),
+        reason=reader.text("reason"),
+        requirement=reader.optional_text("requirement"),
+    )
+    reader.done()
+    return site
+
+
 def _read_forbidden_until(value: Any, path: str) -> ForbiddenUntil:
     reader = _Reader(value, path)
     item = ForbiddenUntil(
@@ -871,6 +919,9 @@ def _read_read_only_posture(value: Any, path: str) -> ReadOnlyPosture:
     posture = ReadOnlyPosture(
         gate=reader.member("gate", GATE_IDS, _GATE_ID_DESCRIPTION),
         exceptions=reader.children("exceptions", _read_read_only_exception),
+        actionable_control_sites=reader.children(
+            "actionableControlSites", _read_actionable_control_site
+        ),
         forbidden_until=reader.children("forbiddenUntil", _read_forbidden_until),
         pre_approved_undeclared_seams=reader.text_list("preApprovedUndeclaredSeams"),
     )
@@ -1212,6 +1263,18 @@ def _dump_read_only_exception(exception: ReadOnlyException) -> dict[str, Any]:
     )
 
 
+def _dump_actionable_control_site(site: ActionableControlSite) -> dict[str, Any]:
+    return _object(
+        ("screen", site.screen),
+        ("file", site.file),
+        ("control", site.control),
+        ("handler", site.handler),
+        ("reachesNoForbiddenPath", site.reaches_no_forbidden_path),
+        ("reason", site.reason),
+        ("requirement", _or_omit(site.requirement)),
+    )
+
+
 def _dump_forbidden_until(item: ForbiddenUntil) -> dict[str, Any]:
     return _object(
         ("id", item.id),
@@ -1224,6 +1287,10 @@ def _dump_read_only_posture(posture: ReadOnlyPosture) -> dict[str, Any]:
     return _object(
         ("gate", posture.gate),
         ("exceptions", [_dump_read_only_exception(item) for item in posture.exceptions]),
+        (
+            "actionableControlSites",
+            [_dump_actionable_control_site(item) for item in posture.actionable_control_sites],
+        ),
         ("forbiddenUntil", [_dump_forbidden_until(item) for item in posture.forbidden_until]),
         ("preApprovedUndeclaredSeams", list(posture.pre_approved_undeclared_seams)),
     )

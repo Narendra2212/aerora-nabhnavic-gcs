@@ -248,9 +248,13 @@ AnalyzePage {
                 QGCButton {
                     objectName: "aeroraErrorReport_copyButton"
                     text: qsTr("Copy report to clipboard")
-                    // The only action on any Aerora screen, and it acts on the station's clipboard
-                    // rather than on the aircraft: no command, no authorization, no transmission.
+                    // Requirement 5 criterion 1's single recorded exception to read-only
+                    // presentation: it acts on the station's clipboard rather than on the
+                    // aircraft, so no command, no authorization and no transmission.
                     // QGroundControlQmlGlobal::copyToClipboard() is upstream's own invokable.
+                    // Not the only control on an Aerora screen - AeroraOperationsHub.qml carries a
+                    // navigation button - but the only one the Gate_Register records as an
+                    // exception, because navigation reaches no outbound path to except it from.
                     onClicked: QGroundControl.copyToClipboard(root._report)
                 }
 

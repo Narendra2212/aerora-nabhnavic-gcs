@@ -16,10 +16,11 @@ The rules: `guard-value`, which reads each recorded guard's declaration in its r
 file; `guard-assertion`, which reads each recorded assertion site under `aerora/test/**`;
 `adr-016-pair`, which reads the two files Requirement 7 criterion 17 names against the change
 permission the registry records on the fact-group registrar's guard; `mavlink-identifier`, which
-walks the overlay tree against an allow-list the register records by site and reason; and the four
-absence rules, which walk `aerora/src/**` for a subject that must not be there. None of them reads
-the files the run selected, so the fixture that decides what a rule sees is not the file list but
-the tree.
+walks the overlay tree against an allow-list the register records by site and reason; the four
+absence rules, which walk `aerora/src/**` for a subject that must not be there; and
+`actionable-control`, which walks the Aerora QML documents and compares the controls they declare
+against the controls the read-only posture records. None of them reads the files the run selected, so
+the fixture that decides what a rule sees is not the file list but the tree.
 
 The four absence rules are tested on three axes each, because each is a different answer: the
 subject absent, which is the state the tree stands in; the subject present, which is the rejection;
@@ -82,6 +83,7 @@ from typing import TYPE_CHECKING
 import pytest
 from analyzers.gate_guard_check import (
     ACTION_SEAM,
+    ACTIONABLE_CONTROL,
     ADR_016_PAIR,
     CORE_HEADER,
     CUSTOM_DEFINITIONS,
@@ -106,6 +108,7 @@ from analyzers.gate_guard_check import (
     Finding,
     GateGuardCheckAnalyzer,
     check_action_seam,
+    check_actionable_control,
     check_adr_016_pair,
     check_freshness_threshold,
     check_guard_value,
@@ -120,6 +123,7 @@ from common.analyzer import AnalyzerBase
 from common.file_traversal import find_cpp_files
 from common.gate_register import (
     GATE_IDS,
+    ActionableControlSite,
     Disagreement,
     MavlinkIdentifierSite,
     dump_gate_register,
@@ -144,6 +148,9 @@ from .test_validate_gate_register import (
     ACTUATOR_PATH_GUARD,
     BASELINE_GUARD_GATES,
     BASELINE_PART,
+    EXCEPTION_CONTROL,
+    EXCEPTION_DOCUMENT,
+    EXCEPTION_SCREEN,
     GUARD_DECLARATION,
     MISSION_GATE,
     PAYLOAD_GATE,
@@ -152,6 +159,10 @@ from .test_validate_gate_register import (
     ROLE_GATE,
     SEAM_DIRECTORY,
     SINGLE_GATE,
+    SITE_CONTROL,
+    SITE_DOCUMENT,
+    SITE_HANDLER,
+    SITE_SCREEN,
     TELEMETRY_GUARD,
     _accepting,
     _baseline_rows,
@@ -361,11 +372,12 @@ def _pair_sources(root: Path, *, friend: bool, defined: bool) -> Path:
 # The four absent subjects
 # ---------------------------------------------------------------------------
 
-# How many absence rules the run's summary counts, and the two Gates the rest of this file does not
-# already carry. Spelled here rather than imported from the analyzer: a test that read the rule's
-# own table of Gates, or its own count of itself, would agree with it by construction. The other
-# two Gates are `ROLE_GATE` and `PAYLOAD_GATE`, which the data half's fixtures already name.
-ABSENCE_RULES = 4
+# How many Gate-conditional rules the run's summary counts -- the four absence rules and
+# `actionable-control` -- and the two Gates the rest of this file does not already carry. Spelled
+# here rather than imported from the analyzer: a test that read the rule's own table of Gates, or
+# its own count of itself, would agree with it by construction. The other two Gates are `ROLE_GATE`
+# and `PAYLOAD_GATE`, which the data half's fixtures already name.
+CONDITIONAL_RULES = 5
 VIDEO_GATE = "DG-VID"
 FRESHNESS_GATE = "DG-FRS"
 
@@ -410,6 +422,29 @@ PURPOSE_BUILT_TIER = "Tier::PurposeBuiltSeam"
 # The entry a rejecting case adds: a fork of a populated upstream file, which is a fixture path
 # rather than a file upstream carries. What makes it the subject is the tier beside it.
 FORKED_FILE = f"{SEAM_DIRECTORY}/AFixtureForkedFile.qml"
+
+# The type the fixture documents declare their control as, and the handler the excepted one carries.
+# `QGCButton` is the type both real controls use, and it is the one spelling that proves the rule
+# matches a QGC control rather than only a bare Qt Quick `Button`.
+CONTROL_TYPE = "QGCButton"
+COPY = "AFixtureGlobal.copyToClipboard(root._report)"
+
+# A document recorded nowhere and declaring no actionable control, which is the state of eighteen of
+# the twenty real documents.
+QUIET_DOCUMENT = f"{SOURCE_TREE}/UI/Screens/AFixtureQuietPage.qml"
+
+# Where a rejecting case writes a document the posture records nothing for.
+ADDED_DOCUMENT = f"{SOURCE_TREE}/UI/Screens/AFixtureAddedPage.qml"
+
+# The two real documents that carry the tree's only two actionable controls, and the control each
+# carries. Spelled here rather than discovered, because what the real-tree case is evidence of is
+# that the rule finds *these* two: a rule that silently stopped matching `QGCButton` would pass a
+# discovered-set assertion and fail this one.
+REAL_EXCEPTION_DOCUMENT = f"{SOURCE_TREE}/UI/Screens/AeroraErrorReportPage.qml"
+REAL_EXCEPTION_CONTROL = "aeroraErrorReport_copyButton"
+REAL_SITE_DOCUMENT = f"{SOURCE_TREE}/UI/Screens/AeroraOperationsHub.qml"
+REAL_SITE_CONTROL = "aeroraHub_vehicleConfigButton"
+REAL_SITE_HANDLER = "mainWindow.showVehicleConfig()"
 
 
 def _override_entries(*entries: tuple[str, str]) -> str:
@@ -566,6 +601,67 @@ def _sink_implementation(head: str) -> str:
 RECORDING_SINK_HEAD = f"class ARecordingFixtureSink : public {PAYLOAD_COMMAND_SINK_TYPE}"
 
 
+def _document(*body: str) -> str:
+    """An Aerora QML document, with every legitimate namesake of the rule's subject in it.
+
+    What the rule has to do is tell a declared control from a mention of one, so the fixture carries
+    the mentions the real documents carry: `AeroraErrorReportPage.qml` and `AeroraOperationsHub.qml`
+    both describe their own control in a comment beside it and both state in a `qsTr()` string what
+    the screen does not carry. A rule that read either would reject the tree it protects.
+
+    `QGCFlickable` and `QGCLabel` come with it because the real documents root on them, and because
+    a rule matching the wrong name shape would read `QGCFlickable` as a control: the hub's report
+    scrolls, and scrolling is not an operator action.
+    """
+    return "\n".join(
+        [
+            "import QtQuick",
+            "import QGroundControl.Controls",
+            "",
+            "// A fixture document. It carries no QGCButton outside the one declared below, and",
+            "// nothing on it reaches a MouseArea or a TapHandler.",
+            "QGCFlickable {",
+            '    objectName: "aFixtureFlickable"',
+            "",
+            "    QGCLabel {",
+            '        objectName: "aFixtureLabel"',
+            '        text: qsTr("This screen carries no button and no mouse area.")',
+            "    }",
+            *body,
+            "}",
+            "",
+        ]
+    )
+
+
+def _control(type_name: str, control: str, handler: str) -> list[str]:
+    """One actionable control, declared the way the real documents declare theirs."""
+    return [
+        "",
+        f"    {type_name} {{",
+        f'        objectName: "{control}"',
+        '        text: qsTr("A fixture control")',
+        "        // What this control does, described beside it the way the real two are.",
+        f"        onClicked: {handler}",
+        "    }",
+    ]
+
+
+def _qml_sources(root: Path) -> Path:
+    """Lay out the Aerora QML documents the baseline posture records, and one that records nothing.
+
+    Three documents, because the rule compares two sets and each side needs a member: the
+    exception's document carrying exactly the control the posture excepts, the recorded site's
+    document carrying exactly the control and handler the posture records, and a third carrying no
+    actionable control at all -- which is every real document but two, and the state a rule matching
+    too broad a name shape would reject.
+    """
+    _write(root / EXCEPTION_DOCUMENT, _document(*_control(CONTROL_TYPE, EXCEPTION_CONTROL, COPY)))
+    _write(root / SITE_DOCUMENT, _document(*_control(CONTROL_TYPE, SITE_CONTROL, SITE_HANDLER)))
+    _write(root / QUIET_DOCUMENT, _document())
+    return root
+
+
 def _absence_sources(root: Path) -> Path:
     """Lay out the four subjects of the absence rules, each in the state the real tree holds it.
 
@@ -582,7 +678,7 @@ def _absence_sources(root: Path) -> Path:
     _write(root / SINK_INTERFACE, _sink_interface())
     _write(root / SINK_HOLDER, _sink_holder())
     _write(root / SINK_IMPLEMENTATION, _sink_implementation(RECORDING_SINK_HEAD))
-    return root
+    return _qml_sources(root)
 
 
 def _tree(root: Path, register: GateRegister | None = None, *, applied: bool = False) -> Path:
@@ -677,7 +773,7 @@ def _review(root: Path) -> AnalysisResult:
 
 
 def _established(
-    register: GateRegister, *, files: int = 0, baseline: int = 0, in_force: int = ABSENCE_RULES
+    register: GateRegister, *, files: int = 0, baseline: int = 0, in_force: int = CONDITIONAL_RULES
 ) -> str:
     """The summary line a run ends with, spelled out rather than matched loosely.
 
@@ -693,23 +789,28 @@ def _established(
     says how many, which is how the ratchet case asserts that the baseline is read from the tree
     rather than recorded anywhere.
 
-    *in_force* is how many of the absence rules the derivation leaves in force, which defaults to
-    all of them because every Gate of every register reachable through a document here is open. It
-    is in the summary rather than left implicit because a rule standing down reports nothing: a run
-    in which four rules stood down must not read as a run in which four rules found nothing.
+    *in_force* is how many of the Gate-conditional rules the derivation leaves in force, which
+    defaults to all of them because every Gate of every register reachable through a document here
+    is open. It is in the summary rather than left implicit because a rule standing down reports
+    nothing: a run in which five rules stood down must not read as a run in which five rules found
+    nothing. The recorded control count rides with them for the same reason, because
+    `actionable-control` compares two sets and an empty register is not an empty tree.
     """
     guards = [guard for guard in register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
     sites = sum(len(guard.asserted_in) for guard in guards)
     allow_listed = len(register.mavlink_identifiers.allow_list)
+    read_only = register.read_only
+    controls = len(read_only.exceptions) + len(read_only.actionable_control_sites)
     return (
         f"{REGISTER_PATH} records {len(register.guards)} guards over {len(register.gates)} "
         f"Gate_Dossiers; {len(guards)} guard values and {sites} assertion sites compared against "
         f"the files the register names, and the ADR-016 pair against {CORE_HEADER} and "
         f"{OVERLAY_MANIFEST}; every file under {OVERLAY_TREE}/ searched against {allow_listed} "
-        f"allow-listed sites holding {baseline} identifiers; {in_force} of the four absence rules "
-        f"in force over {SOURCE_TREE}/ and {ABSENCE_RULES - in_force} standing down on a Gate the "
-        f"derivation records closed; no rule read a file because it was among the {files} selected "
-        f"source files\n"
+        f"allow-listed sites holding {baseline} identifiers; {in_force} of the "
+        f"{CONDITIONAL_RULES} Gate-conditional rules in force over {SOURCE_TREE}/ and "
+        f"{CONDITIONAL_RULES - in_force} standing down on a Gate the derivation records closed, "
+        f"with {controls} actionable controls recorded; no rule read a file because it was among "
+        f"the {files} selected source files\n"
     )
 
 
@@ -719,7 +820,7 @@ def _lines(
     *,
     files: int = 0,
     baseline: int = 0,
-    in_force: int = ABSENCE_RULES,
+    in_force: int = CONDITIONAL_RULES,
 ) -> list[str]:
     """The finding lines *result* printed, with the summary the run ends with taken off."""
     return result.output.removesuffix(
@@ -2383,4 +2484,397 @@ def test_payload_command_sink_reads_the_real_source_tree_and_finds_no_implementa
     assert f"{PAYLOAD_COMMAND_SINK_TYPE} *_commandSink" in before[REAL_SINK_HOLDER]
     assert f": public {PAYLOAD_COMMAND_SINK_TYPE}" in before[REAL_SINK_IMPLEMENTATION]
     assert check_payload_command_sink(_premises(_register())) == []
+    assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read} == before
+
+
+# ---------------------------------------------------------------------------
+# actionable-control
+#
+# Named with the `qml` token, which is the selector this group reaches under: `-k qml` runs it and
+# nothing else.
+#
+# The rule compares two sets, so every case is about one side disagreeing with the other, and the
+# accepting cases assert the mentions are present first. The fixture documents carry what the real
+# ones carry -- a comment describing the control beside it, and a `qsTr()` string saying the screen
+# holds no button -- because a rule that read either would reject the tree it protects.
+#
+# The real-tree case is the one with the sharpest evidence here. The repository carries exactly two
+# actionable controls and the design accounted for one, so that case asserts both: the clipboard
+# copy the exception records, and the hub's navigation button, whose handler reaches no path
+# Requirement 5 criterion 1 names.
+# ---------------------------------------------------------------------------
+
+
+def _site(**changes: object) -> ActionableControlSite:
+    """The recorded site the baseline posture carries, with *changes* applied."""
+    recorded: dict[str, object] = {
+        "screen": SITE_SCREEN,
+        "file": SITE_DOCUMENT,
+        "control": SITE_CONTROL,
+        "handler": SITE_HANDLER,
+        "reaches_no_forbidden_path": True,
+        "reason": "a fixture reason",
+        "requirement": None,
+        **changes,
+    }
+    return ActionableControlSite(**recorded)  # type: ignore[arg-type]
+
+
+def _posture(register: GateRegister, *sites: ActionableControlSite) -> GateRegister:
+    """*register* with its recorded actionable-control sites replaced by *sites*."""
+    return replace(
+        register, read_only=replace(register.read_only, actionable_control_sites=list(sites))
+    )
+
+
+def _over(register: GateRegister, root: Path) -> Premises:
+    """Premises over *register*, rooted at the QML tree at *root* rather than at the repository."""
+    return replace(_premises(register), root=root)
+
+
+def test_actionable_control_accepts_the_qml_documents_the_recorded_posture_matches(
+    tmp_path: Path,
+) -> None:
+    """The baseline: two recorded controls, two declared, and a third document carrying none.
+
+    The mentions are asserted present before the pass, so this is evidence that a type named in a
+    comment or in a translated string is not read as a declaration, and that `QGCFlickable` and
+    `QGCLabel` are not read as controls.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    excepted = (root / EXCEPTION_DOCUMENT).read_text(encoding="utf-8")
+    assert f"// {CONTROL_TYPE}" not in excepted
+    assert CONTROL_TYPE in excepted
+    assert "carries no button and no mouse area" in excepted
+    assert "QGCFlickable {" in (root / QUIET_DOCUMENT).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_actionable_control_rejects_a_qml_control_the_posture_records_nowhere(
+    tmp_path: Path,
+) -> None:
+    """Requirement 5 criterion 2: reject the change before it enters the repository.
+
+    The finding names the Gate and states the owner's two ways out, because a reviewer reading it
+    has to be able to tell which decision is being protected and what settles it.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / ADDED_DOCUMENT,
+        _document(*_control(CONTROL_TYPE, "aFixtureAddedControl", "vehicle.aFixtureAction()")),
+    )
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert ADDED_DOCUMENT in finding.message
+    assert "aFixtureAddedControl" in finding.message
+    assert "records neither the single exception" in finding.message
+
+
+def test_actionable_control_rejects_a_second_qml_control_in_the_excepted_document(
+    tmp_path: Path,
+) -> None:
+    """Requirement 5 criterion 11, and the reason set equality needs no count beside it.
+
+    The design asks the excepted document to carry *exactly one* control. Nothing here counts: the
+    second control is simply a control the posture records nothing for, so it is rejected by the
+    same line that rejects one in any other document.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / EXCEPTION_DOCUMENT,
+        _document(
+            *_control(CONTROL_TYPE, EXCEPTION_CONTROL, COPY),
+            *_control(CONTROL_TYPE, "aFixtureSecondControl", "vehicle.aFixtureAction()"),
+        ),
+    )
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert EXCEPTION_DOCUMENT in finding.message
+    assert "aFixtureSecondControl" in finding.message
+
+
+def test_actionable_control_rejects_a_qml_control_whose_object_name_drifted(
+    tmp_path: Path,
+) -> None:
+    """An objectName that moves is both halves of the set disagreeing, and both are reported.
+
+    This is what pins the exception to a control rather than to a file: the recorded name is gone
+    and an unrecorded one is there, so renaming the control cannot carry the exception with it.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / EXCEPTION_DOCUMENT,
+        _document(*_control(CONTROL_TYPE, "aFixtureRenamedControl", COPY)),
+    )
+
+    unrecorded, stale = check_actionable_control(_over(register, root))
+
+    assert "aFixtureRenamedControl" in unrecorded.message
+    assert "records neither the single exception" in unrecorded.message
+    assert EXCEPTION_CONTROL in stale.message
+    assert "the single exception to read-only presentation" in stale.message
+    assert "is stale rather than satisfied" in stale.message
+    assert unrecorded.blocking
+    assert stale.blocking
+
+
+def test_actionable_control_rejects_a_recorded_qml_control_the_tree_no_longer_carries(
+    tmp_path: Path,
+) -> None:
+    """A record naming a control the tree lost is stale rather than satisfied.
+
+    A register still accounting for a control nothing carries tells a reviewer the opposite of the
+    truth, which is the reasoning the contract-surface ratchet applies in the other direction.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SITE_DOCUMENT, _document())
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert SITE_DOCUMENT in finding.message
+    assert "a site reaching no forbidden path" in finding.message
+
+
+def test_actionable_control_rejects_a_qml_control_whose_recorded_handler_changed(
+    tmp_path: Path,
+) -> None:
+    """The pin that stops the site list becoming an escape hatch.
+
+    `reachesNoForbiddenPath` is a claim about an expression, so recording a navigation button does
+    not license turning it into a command path later: the handler the owner reviewed is gone, and
+    the finding names it and the reason it was recorded under.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / SITE_DOCUMENT,
+        _document(*_control(CONTROL_TYPE, SITE_CONTROL, "vehicle.sendAFixtureCommand()")),
+    )
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert SITE_HANDLER in finding.message
+    assert "has not been reviewed in its new form" in finding.message
+
+
+def test_actionable_control_rejects_a_qml_site_not_claiming_it_reaches_no_forbidden_path(
+    tmp_path: Path,
+) -> None:
+    """The schema writes the claim as a constant, so a model carrying it unset has bypassed it.
+
+    Checked here as well for the reason `guard-value` checks a disagreement's handed-on row: a
+    register reaching a rule as a model has not passed the schema, and the rule is the second line.
+    """
+    register = _posture(_register(), _site(reaches_no_forbidden_path=False))
+    root = _tree(tmp_path / "repo", register)
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert "does not state that the control reaches no path" in finding.message
+
+
+def test_actionable_control_rejects_a_qml_control_setting_no_object_name(tmp_path: Path) -> None:
+    """A control with no objectName cannot be recorded, so it cannot be permitted.
+
+    A site pins a control by its objectName. Without one there is nothing for the register to hold
+    the control by and nothing to tell it apart from another in the same document, so it is rejected
+    whether or not its document is recorded -- here the excepted document, which is the harder case.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / EXCEPTION_DOCUMENT,
+        _document(
+            *_control(CONTROL_TYPE, EXCEPTION_CONTROL, COPY),
+            "",
+            f"    {CONTROL_TYPE} {{",
+            '        text: qsTr("A fixture control with no objectName")',
+            "        onClicked: vehicle.aFixtureAction()",
+            "    }",
+        ),
+    )
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert "setting no objectName" in finding.message
+    assert "cannot be recorded" in finding.message
+
+
+@pytest.mark.parametrize(
+    "type_name",
+    ["Button", "QGCCheckBox", "MouseArea", "TapHandler", "DragHandler", "ItemDelegate"],
+)
+def test_actionable_control_finds_each_actionable_qml_type_family(
+    tmp_path: Path, type_name: str
+) -> None:
+    """Every family the runtime walk asks `inherits()` for, matched by the shape of its name.
+
+    `QQuickAbstractButton`, `QQuickMouseArea` and `QQuickPointerHandler` have no QML spelling, so
+    the rule matches the convention the three share. A type nobody here thought to name is caught by
+    the same token a named one is, which is what a written-out list of types would not do.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / ADDED_DOCUMENT,
+        _document(*_control(type_name, "aFixtureAddedControl", "vehicle.aFixtureAction()")),
+    )
+
+    (finding,) = check_actionable_control(_over(register, root))
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert f"declares {type_name} aFixtureAddedControl" in finding.message
+    assert finding.blocking
+
+
+def test_actionable_control_reads_a_scrolling_qml_type_as_not_a_control(tmp_path: Path) -> None:
+    """`QGCFlickable` is draggable and is not an operator action.
+
+    It is not one of the three bases the runtime walk names, and the hub's own report scrolls inside
+    one, so a rule that rejected it would reject scrolling on the screen it protects.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / ADDED_DOCUMENT,
+        _document(
+            "",
+            "    QGCFlickable {",
+            '        objectName: "aFixtureInnerFlickable"',
+            "    }",
+        ),
+    )
+
+    assert check_actionable_control(_over(register, root)) == []
+
+
+def test_actionable_control_reads_a_nested_object_name_as_the_childs_qml_name(
+    tmp_path: Path,
+) -> None:
+    """A control takes its own objectName rather than a descendant's.
+
+    Without the depth test the first `objectName` inside the control would be read as the control's,
+    so a recorded site would pin the wrong object and a renamed child would read as a renamed
+    control.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / SITE_DOCUMENT,
+        _document(
+            "",
+            f"    {CONTROL_TYPE} {{",
+            f'        objectName: "{SITE_CONTROL}"',
+            "        QGCLabel {",
+            '            objectName: "aFixtureInnerLabel"',
+            "        }",
+            f"        onClicked: {SITE_HANDLER}",
+            "    }",
+        ),
+    )
+
+    assert check_actionable_control(_over(register, root)) == []
+
+
+def test_actionable_control_stands_down_once_the_gate_records_an_accepted_closure(
+    tmp_path: Path,
+) -> None:
+    """Once the Gate holds an accepted Closure_Record, a control is what an owner signed for."""
+    premises = _closing(tmp_path / "repo", ROLE_GATE)
+    _write(
+        premises.root / ADDED_DOCUMENT,
+        _document(*_control(CONTROL_TYPE, "aFixtureAddedControl", "vehicle.aFixtureAction()")),
+    )
+
+    assert not premises.derived.gate_open[ROLE_GATE].is_open
+    assert check_actionable_control(premises) == []
+
+
+def test_actionable_control_rejects_a_qml_tree_it_could_not_walk(tmp_path: Path) -> None:
+    """A run that searched no document must not read as a run that found no control."""
+    premises = replace(_premises(_register()), root=tmp_path / "repo")
+
+    (finding,) = check_actionable_control(premises)
+
+    assert finding.check == ACTIONABLE_CONTROL
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+    assert finding.message.startswith(f"{SOURCE_TREE}/ is not a directory")
+    assert "indistinguishable from a run that found nothing" in finding.message
+
+
+def test_actionable_control_reads_the_real_qml_tree_and_finds_exactly_two_controls() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    It is also the case that records the finding this rule was written around. The design states
+    that the clipboard copy on `SCR-HLP-03` is the only actionable control on the Aerora surface and
+    that every other document carries none; the tree carries a second, the hub's navigation button,
+    whose handler is a local view switch through `MainWindow.qml` and reaches no outbound command
+    path, no mission path and no `AeroraMissionObserver::verify()`.
+
+    So the posture that makes the real tree pass records one exception and one site, and a rule
+    admitting only the exception would reject the repository on every commit. Both documents are
+    asserted to carry their control and the tree is asserted to carry no third, which is what fails
+    the day a third arrives.
+    """
+    register = _posture(
+        _register(),
+        _site(
+            screen=SITE_SCREEN,
+            file=REAL_SITE_DOCUMENT,
+            control=REAL_SITE_CONTROL,
+            handler=REAL_SITE_HANDLER,
+        ),
+    )
+    register = replace(
+        register,
+        read_only=replace(
+            register.read_only,
+            exceptions=[
+                replace(
+                    register.read_only.exceptions[0],
+                    screen=EXCEPTION_SCREEN,
+                    file=REAL_EXCEPTION_DOCUMENT,
+                    control=REAL_EXCEPTION_CONTROL,
+                )
+            ],
+        ),
+    )
+    read = (REAL_EXCEPTION_DOCUMENT, REAL_SITE_DOCUMENT)
+    before = {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read}
+
+    assert f'objectName: "{REAL_EXCEPTION_CONTROL}"' in before[REAL_EXCEPTION_DOCUMENT]
+    assert f'objectName: "{REAL_SITE_CONTROL}"' in before[REAL_SITE_DOCUMENT]
+    assert REAL_SITE_HANDLER in before[REAL_SITE_DOCUMENT]
+    assert check_actionable_control(_premises(register)) == []
     assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read} == before

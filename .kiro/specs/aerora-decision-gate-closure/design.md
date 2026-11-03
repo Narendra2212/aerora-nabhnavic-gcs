@@ -407,7 +407,7 @@ auto-fix here, because the only thing to "fix" would be a recorded value a revie
 | `action-seam` | Neither `CustomGuidedActionsController.qml` nor `FlyViewAdditionalCustomActionsList.qml` appears in the override allow-list while `DG-ROL` is `OPEN` | 5.4 |
 | `freshness-threshold` | `kDefinedThresholdCount` holds its recorded literal and no `setThreshold(` call site exists in `aerora/src/**` | 8.13, 8.16 |
 | `payload-command-sink` | No implementation of `AeroraPayloadCommandSink` exists in `aerora/src/**` | 10.18 |
-| `actionable-control` | No `QGCButton`, `MouseArea`, `TapHandler` or other actionable type is written into an Aerora QML document outside the single recorded read-only exception | 5.1, 5.2 |
+| `actionable-control` | The actionable controls the Aerora QML documents declare are exactly the controls the read-only posture records — the single exception, plus each recorded site with the handler it was reviewed under | 5.1, 5.2, 5.11 |
 | `contract-surface` | The enumerators, declared constants and registry string keys in `aerora/src/**` match the recorded contract surface | 3.12, 4.2 (approximation — see below) |
 
 The `mavlink-identifier` allow-list is recorded **by site, never by identifier.** Each entry is a file
@@ -586,10 +586,36 @@ control exists today: one `QGCButton` in `AeroraErrorReportPage.qml`'s `pageComp
   control on the same screen fails as loudly as one on another screen;
 - it requires that control's `objectName` to equal the one the register records, so the exception
   cannot drift onto a different control in the same file;
-- every other document must have none.
+- every other document carries only the controls `readOnly.actionableControlSites` records, and
+  nothing else.
 
 That is the `AeroraUiFoundationTest::_exactlyOnePurposeBuiltSeamIsDeclared` shape — the set spelled
 out rather than counted, because a count is satisfied by swapping one member for another.
+
+**The exception is not the only actionable control, and the first draft of this design said it was.**
+`AeroraOperationsHub.qml` carries `aeroraHub_vehicleConfigButton`, whose `onClicked` is
+`mainWindow.showVehicleConfig()` — `showTool()` in `MainWindow.qml:161`, a local view switch. It
+reaches no outbound command path, no mission upload, start or resume path, and no
+`AeroraMissionObserver::verify()`, so criterion 1 does not forbid it and it needs no exception to be
+excepted from. What it does need is to be *accounted for*, because the checks decide a control by its
+type: whether an activation reaches a forbidden path is not decidable from QML text, and it is not
+decidable from a `QObject::inherits()` walk either.
+
+So the register records two lists and only one of them is an exception. `readOnly.exceptions` is
+criterion 11's object, pinned by the schema to one entry on `SCR-HLP-03`.
+`readOnly.actionableControlSites` is every other document permitted to declare a control, each
+carrying the screen, the `objectName`, the handler the owner reviewed, the reason the control reaches
+none of the paths criterion 1 names, and `reachesNoForbiddenPath` as a `const true` — so a control
+that *does* reach one is unrecordable rather than recordable-with-a-note, and has to be withdrawn or
+wait on the Gate.
+
+Without that second list the rule would be a cliff rather than a ratchet, and the three ways to
+satisfy it are all worse than recording the control: delete a button that `SCR-SHL-01`'s `VERIFIED`
+status rests on (`AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperationsHub`
+clicks it), record a second exception the schema cannot hold, or leave the hook advisory, which
+rejects nothing. The handler pin is what stops the list becoming an escape hatch: recording a
+navigation button does not license turning it into a command path later, because a control whose
+handler stops matching has not been reviewed in its new form and is rejected naming both.
 
 ### 6. What stays human review
 
@@ -719,6 +745,17 @@ register records a reviewer and a date for each instead.
         "file": "aerora/src/UI/Screens/AeroraErrorReportPage.qml",
         "control": "aeroraErrorReport_copyButton",
         "reason": "acts on the Aerora_Station's own clipboard and requires no authority",
+        "requirement": "5.1"
+      }
+    ],
+    "actionableControlSites": [
+      {
+        "screen": "SCR-SHL-01",
+        "file": "aerora/src/UI/Screens/AeroraOperationsHub.qml",
+        "control": "aeroraHub_vehicleConfigButton",
+        "handler": "mainWindow.showVehicleConfig()",
+        "reachesNoForbiddenPath": true,
+        "reason": "a local view switch through MainWindow.qml; no command path, no mission path, no verify()",
         "requirement": "5.1"
       }
     ],
@@ -1058,13 +1095,15 @@ value was invented. See
 
 **Validates: Requirements 3.12, 4.2, 6.14, 7.16, 8.13, 9.15, 10.16, 11.17, 12.19, 13.12, 15.14**.
 
-### Property 24: No Aerora screen document carries an actionable control except the one recorded exception
+### Property 24: An Aerora screen document carries only the actionable controls the register records
 
-*For any* Aerora screen QML document discovered under the overlay's UI tree, the instantiated content
-root carries no object inheriting `QQuickAbstractButton`, `QQuickMouseArea` or
-`QQuickPointerHandler`, except for the single document the register records as the `SCR-HLP-03`
-clipboard-copy exception, which carries exactly one and whose `objectName` is the one the register
-records.
+*For any* Aerora screen QML document discovered under the overlay's UI tree, every object in the
+instantiated content root inheriting `QQuickAbstractButton`, `QQuickMouseArea` or
+`QQuickPointerHandler` is recorded in the read-only posture by that document and that `objectName`:
+the single document the register records as the `SCR-HLP-03` clipboard-copy exception carries exactly
+one, whose `objectName` is the one the register records, and every other document carries exactly the
+controls `readOnly.actionableControlSites` records for it — which today is one, the Operations Hub's
+navigation button, and for every other document is none.
 
 **Validates: Requirements 5.1, 5.2, 5.11**.
 

@@ -476,10 +476,28 @@ Constraints every task inherits:
     - _Requirements: 5.4, 8.13, 8.16, 10.18, 14.13_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k "override or seam or threshold or sink"`
 
-  - [ ] 7.6 Implement `actionable-control` over Aerora QML
-    - No `QGCButton`, `MouseArea`, `TapHandler` or other actionable type is written into an Aerora QML
-      document outside the single recorded exception, which must carry exactly one and whose
-      `objectName` must equal the recorded one
+  - [x] 7.6 Implement `actionable-control` over Aerora QML
+    - The actionable controls the Aerora QML documents declare are exactly the controls the read-only
+      posture records. Set equality in both directions, so "exactly one in the exception's document",
+      "none unrecorded anywhere" and "no record for a control that has gone" are one rule
+    - The recorded exception must carry exactly one control whose `objectName` equals the recorded
+      one; a control setting no `objectName` is rejected, because a site pins a control by its name
+    - **Scope corrected against the tree.** The tree carries *two* actionable controls, not one:
+      the clipboard copy on `SCR-HLP-03`, and `aeroraHub_vehicleConfigButton` on `SCR-SHL-01`, whose
+      handler `mainWindow.showVehicleConfig()` is a local view switch reaching no outbound command
+      path, no mission path and no `verify()`. So `readOnly.actionableControlSites` is added to the
+      schema beside `readOnly.exceptions`, recording each permitted non-exception control by screen,
+      file, `objectName`, reviewed handler, reason and `reachesNoForbiddenPath` as a `const true`.
+      It is not a second exception and cannot become one — criterion 11's object is `exceptions`,
+      which the schema still pins to one entry on `SCR-HLP-03`. Without it the gating hook of task
+      10.3 would reject the tree on every commit, and the alternatives are deleting a control that
+      `SCR-SHL-01`'s `VERIFIED` status rests on, recording an exception the schema cannot hold, or
+      leaving the hook advisory
+    - Decided by *type*, because reachability is not decidable from QML text. Types are matched by
+      the shape of their name rather than against a written-out list, which is the `inherits()`
+      approach in text: `QQuickAbstractButton`, `QQuickMouseArea` and `QQuickPointerHandler` have no
+      QML spelling, and a hand-maintained list of types is the failure mode
+      `aerora-ui-static-check.ps1` already recorded once
     - Source inspection is the gate; it fires on this host before any build. It sees only types
       spelled out in a document, which is why the C++ walk in task 11 exists alongside it
     - The check walks for controls. It adds none
@@ -557,6 +575,12 @@ Constraints every task inherits:
   - [ ] 9.4 Write the `readOnly` block and the contract-surface inventory
     - `readOnly`: `DG-ROL`, the single `SCR-HLP-03` clipboard exception with its file, control
       `objectName` and reason, the `forbiddenUntil` rows, and both pre-approved undeclared seams
+    - `actionableControlSites`: `aeroraHub_vehicleConfigButton` on `SCR-SHL-01`, with
+      `mainWindow.showVehicleConfig()` as the reviewed handler and the reason it reaches none of the
+      paths Requirement 5 criterion 1 names. This is the one entry the tree needs today, and whether
+      the narrow reading of criterion 1 it rests on is the governing one is **Product and
+      operations'** answer (Requirement 9 criterion 3) — the record is what keeps the control visible
+      until they give it
     - `contractSurface`: the current enumerators, declared constants and registry string keys under
       `aerora/src/**`, each mapped to the Gate whose Decision_Content would record it or to `none`
       with a reason
@@ -651,9 +675,14 @@ Constraints every task inherits:
       popout control and say nothing about Aerora's content
     - Assert the exception in both directions and by identity: the recorded document's content carries
       **exactly one** actionable control whose `objectName` equals the recorded one, and every other
-      document carries none. That is the set-spelled-out shape
-      `_exactlyOnePurposeBuiltSeamIsDeclared` already uses, because a count is satisfied by swapping
-      one member for another
+      document carries exactly the controls `readOnly.actionableControlSites` records for it. That is
+      the set-spelled-out shape `_exactlyOnePurposeBuiltSeamIsDeclared` already uses, because a count
+      is satisfied by swapping one member for another
+    - **"Every other document carries none" would fail CI**, which is why it reads against the
+      recorded sites instead: `AeroraOperationsHub.qml` carries `aeroraHub_vehicleConfigButton`, and
+      `AeroraVehicleConfigUITest::_vehicleConfigurationIsReachableFromTheOperationsHub` requires it
+      to exist, be enabled and be clickable. Task 7.6 records the finding and adds the schema field
+      this reads
     - No `Q_ASSERT`, no `QTest::ignoreMessage`, no fixed-delay `QTest::qWait`. The walk needs no wait:
       `QQmlComponent::create()` returns a constructed tree
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Unit`

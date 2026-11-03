@@ -51,8 +51,19 @@ permission on the same registry entry, through the freedom derivation, because R
 criterion 18 records exactly that as the condition under which the core edit's authorisation lets
 the guard move. Both files are read as characters and neither is written.
 
+**``actionable-control`` compares two sets rather than asserting an absence.** Requirement 5
+criterion 1 forbids a control whose activation *reaches* a forbidden path, which no text rule can
+decide, so the rule decides a control by its type and the register carries the judgement: the
+actionable controls the Aerora QML documents declare must be exactly the controls the read-only
+posture records. The single exception to read-only presentation is one of them and the other
+recorded sites are not exceptions -- each carries an owner's statement that the control reaches none
+of the paths criterion 1 names, and the handler that statement was made about. Set equality is what
+makes "exactly one in the exception's document", "none in any other" and "no record for a control
+that has gone" one rule instead of three.
+
 **The four absence rules assert that something is not there, and each stands down when its Gate
-closes.** ``populated-file-override``, ``action-seam``, ``freshness-threshold`` and
+closes, and so does the fifth.** ``populated-file-override``, ``action-seam``,
+``freshness-threshold`` and
 ``payload-command-sink`` read criteria written ``WHILE <gate> is OPEN``, so each reads the *derived*
 openness of the Gate it waits on -- ``premises.derived.gate_open``, which the data half evaluates
 once and ``gate-status-derivation`` owns the disagreement between recorded and derived. A rule whose
@@ -145,6 +156,7 @@ POPULATED_FILE_OVERRIDE: Final = "populated-file-override"
 ACTION_SEAM: Final = "action-seam"
 FRESHNESS_THRESHOLD: Final = "freshness-threshold"
 PAYLOAD_COMMAND_SINK: Final = "payload-command-sink"
+ACTIONABLE_CONTROL: Final = "actionable-control"
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -1157,11 +1169,16 @@ VIDEO_GATE: Final = "DG-VID"
 FRESHNESS_GATE: Final = "DG-FRS"
 PAYLOAD_GATE: Final = "DG-PAY"
 
-ABSENCE_GATES: Final[Mapping[str, tuple[str, ...]]] = {
+# Every rule whose criterion is written `WHILE <gate> is OPEN`, which is the four absence rules and
+# `actionable-control`. The fifth is not an absence rule -- it compares two sets rather than
+# asserting that something is missing -- but its conditional is the same one, and `_standing` and the
+# run's summary read this mapping for the stand-down reasoning that applies identically to all five.
+CONDITIONAL_GATES: Final[Mapping[str, tuple[str, ...]]] = {
     POPULATED_FILE_OVERRIDE: (VIDEO_GATE,),
     ACTION_SEAM: (READ_ONLY_GATE,),
     FRESHNESS_THRESHOLD: (FRESHNESS_GATE,),
     PAYLOAD_COMMAND_SINK: (PAYLOAD_GATE, READ_ONLY_GATE),
+    ACTIONABLE_CONTROL: (READ_ONLY_GATE,),
 }
 
 
@@ -1184,7 +1201,7 @@ def _standing(premises: Premises, check: str) -> tuple[tuple[str, ...], list[Fin
     reported here is the rule read against nothing.
     """
     openness = premises.derived.gate_open
-    gates = ABSENCE_GATES[check]
+    gates = CONDITIONAL_GATES[check]
     unrecorded = tuple(gate for gate in gates if gate not in openness)
     if unrecorded:
         return (), [
@@ -1203,11 +1220,11 @@ def _standing(premises: Premises, check: str) -> tuple[tuple[str, ...], list[Fin
 
 
 def _in_force(premises: Premises) -> int:
-    """How many of the four rules the derivation leaves in force, for the run's own summary."""
+    """How many Gate-conditional rules the derivation leaves in force, for the run's own summary."""
     openness = premises.derived.gate_open
     return sum(
         1
-        for gates in ABSENCE_GATES.values()
+        for gates in CONDITIONAL_GATES.values()
         if any(gate in openness and openness[gate].is_open for gate in gates)
     )
 
@@ -1769,6 +1786,321 @@ def check_payload_command_sink(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# actionable-control
+# ---------------------------------------------------------------------------
+
+_QML_SUFFIX: Final = ".qml"
+
+# A QML object declaration: a capitalised type name and the brace that opens its body. Comments and
+# string literals are blanked before this runs, so a type named in prose or inside a quoted path is
+# not a declaration.
+#
+# The brace has to belong to the name. `Component.onCompleted: {`, `function f() {` and
+# `onClicked: {` all put a character between the identifier and the brace that is not whitespace, so
+# none of them matches, and a lower-case first letter excludes every property and signal handler.
+_QML_DECLARATION: Final = re.compile(r"\b(?P<type>[A-Z][A-Za-z0-9_]*)\s*\{")
+
+# What makes a declared type actionable, matched by the shape of its *name* rather than against a
+# list of types. The runtime walk in `AeroraUiFoundationTest` asks `QObject::inherits()` for
+# `QQuickAbstractButton`, `QQuickMouseArea` and `QQuickPointerHandler`; none of those three has a
+# QML spelling, and a text rule cannot resolve a QML type to its C++ base. So this matches the
+# naming convention the three families share, which is what lets the rule see a type nobody here
+# thought to name -- `QGCButton`, `Button`, `ToolButton` and `SwitchDelegate` all end in a token
+# below, and so does a control added next year.
+#
+# A hand-maintained list of types is the failure mode this repository keeps recording:
+# `aerora-ui-static-check.ps1` skipped a file for a whole pass because its target list was written
+# out, and the design's own note on the runtime walk gives naming the types as the reason the
+# `inherits()` approach was kept. Suffixes are that approach in text.
+#
+# `Flickable` is deliberately absent. `QGCFlickable` carries the hub's report and upstream's own
+# `QQuickFlickable` is not one of the three bases the runtime walk names, so a rule that rejected it
+# would reject scrolling rather than action.
+_ACTIONABLE_SUFFIXES: Final = (
+    "Button",
+    "CheckBox",
+    "ComboBox",
+    "Delegate",
+    "Handler",
+    "MouseArea",
+    "Slider",
+    "SpinBox",
+    "Switch",
+    "TextArea",
+    "TextField",
+)
+
+# The `objectName` a declaration sets, which is the identity a recorded site pins. Read at the depth
+# of the declaration's own body, so a control takes its own name rather than a child's.
+_OBJECT_NAME: Final = re.compile(r'\bobjectName\s*:\s*"(?P<name>[^"\n]*)"')
+
+# How a finding refers to a control that sets no `objectName`. Such a control cannot be recorded --
+# a site pins an objectName, so there is nothing for the register to hold it by -- and that is the
+# reason it is rejected rather than a technicality.
+_UNNAMED: Final = "<no objectName>"
+
+
+@dataclass(frozen=True)
+class _Control:
+    """One actionable control a QML document declares: what it is, where, and what it handles."""
+
+    file: str
+    control: str
+    type_name: str
+    line: int
+    body: str
+
+
+@dataclass(frozen=True)
+class _QmlTree:
+    """The Aerora QML documents as this rule reads them, on :class:`_SourceTree`'s own terms."""
+
+    walked: bool
+    documents: tuple[tuple[str, str], ...]
+    unreadable: tuple[tuple[str, str], ...]
+
+
+def _qml_tree(root: Path) -> _QmlTree:
+    """Read every Aerora QML document, in path order.
+
+    Scoped to the overlay source rather than the whole overlay, for the reason
+    :data:`SOURCE_TREE` is: `aerora/test/**` is where the instrument proving a prohibition lives, so
+    a fixture document written to show that the runtime walk catches a control must not be rejected
+    by the rule it exercises.
+    """
+    tree = root / SOURCE_TREE
+    if not tree.is_dir():
+        return _QmlTree(walked=False, documents=(), unreadable=())
+
+    documents: list[tuple[str, str]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in sorted(tree.rglob(f"*{_QML_SUFFIX}")):
+        relative = path.relative_to(root)
+        if not path.is_file() or should_skip_path(relative, _SKIP_DIRS):
+            continue
+        text, cannot_read = _searchable(root, relative.as_posix())
+        if text is None:
+            unreadable.append((relative.as_posix(), cannot_read))
+            continue
+        documents.append((relative.as_posix(), text))
+    return _QmlTree(walked=True, documents=tuple(documents), unreadable=tuple(unreadable))
+
+
+def _is_actionable(type_name: str) -> bool:
+    """Whether *type_name* names one of the three families the runtime walk asks `inherits()` for."""
+    return type_name.endswith(_ACTIONABLE_SUFFIXES)
+
+
+def _own_object_name(body: str) -> str:
+    """The `objectName` *body* sets on itself, or :data:`_UNNAMED` where it sets none.
+
+    *body* starts at the declaration's opening brace. A match is its own only at depth one: a child
+    declaration opens another brace, and the first `objectName` inside that child is the child's.
+    Without the depth test a panel containing a named label would report the label's name, and a
+    recorded site would pin the wrong object.
+    """
+    depth = 0
+    for index, character in enumerate(body):
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        elif depth == 1 and body.startswith("objectName", index):
+            named = _OBJECT_NAME.match(body, index)
+            if named is not None:
+                return named.group("name")
+    return _UNNAMED
+
+
+def _controls(tree: _QmlTree) -> list[_Control]:
+    """Every actionable control the documents declare, in document and then declaration order."""
+    found: list[_Control] = []
+    for path, text in tree.documents:
+        # Comments out and strings out, on the terms the brace-reading rules use them: a type named
+        # in a doc comment is not a declaration, and `objectName` is read back off the text that
+        # keeps its literals.
+        code = _code(text)
+        scanned = _without_strings(code)
+        for declared in _QML_DECLARATION.finditer(scanned):
+            type_name = declared.group("type")
+            if not _is_actionable(type_name):
+                continue
+            opening = declared.end() - 1
+            closing = _balanced(scanned, opening)
+            body = code[opening : len(code) if closing is None else closing + 1]
+            found.append(
+                _Control(
+                    file=path,
+                    control=_own_object_name(body),
+                    type_name=type_name,
+                    line=_line_of(code, declared.start()),
+                    body=body,
+                )
+            )
+    return found
+
+
+def check_actionable_control(premises: Premises) -> list[Finding]:
+    """The actionable controls the Aerora QML documents declare are the ones the register records.
+
+    Requirement 5 criterion 2 rejects a change adding a control criterion 1 forbids and names the
+    read-only Gate. Criterion 1 forbids a control "whose activation reaches an outbound command
+    path, a mission upload, start or resume path, or a call to `AeroraMissionObserver::verify()`",
+    and records the clipboard copy on `SCR-HLP-03` as the single exception to read-only
+    presentation.
+
+    **Reachability is not decidable from QML text, so the rule decides by type and the register
+    carries the judgement.** That is the move the design makes for the contract surface and the one
+    `AeroraUiSafetyTest` makes for the QML-reachable method set: an undecidable question becomes the
+    decidable one of whether the surface changed, and a reviewer classifies once. Here the decidable
+    question is set equality -- the actionable controls in source against the controls the register
+    records -- and every consequence the design asks for falls out of it rather than needing a rule
+    of its own: a new control anywhere is unrecorded; a second control in the exception's own
+    document is unrecorded, so "exactly one" needs no count; a removed control is recorded and
+    absent; and an `objectName` that drifts is both at once.
+
+    **Two recorded lists, and only one of them is an exception.** `readOnly.exceptions` is the single
+    exception to read-only presentation, which the schema pins to one entry on one screen and which
+    criterion 11 protects. `readOnly.actionableControlSites` is every other document permitted to
+    declare a control, each carrying an owner's statement that this control reaches none of the paths
+    criterion 1 names. The second list is not a way to add an exception: a control that *does* reach
+    a forbidden path cannot be recorded in it, because `reachesNoForbiddenPath` is `const true` in
+    the schema and is rejected here as well, the way `guard-value` rejects a disagreement carrying no
+    handed-on row -- a register reaching a rule as a model has not passed the schema.
+
+    Without that second list the rule would be a cliff rather than a ratchet. The tree carries two
+    actionable controls today: the clipboard copy the exception records, and
+    `aeroraHub_vehicleConfigButton`, whose handler is `mainWindow.showVehicleConfig()` -- a local
+    view switch through `MainWindow.qml`, reaching no command path, no mission path and no
+    `verify()`. A rule admitting only the exception would reject the tree on every commit, and the
+    only ways to satisfy it would be to delete a control that `SCR-SHL-01`'s `VERIFIED` status rests
+    on or to record a second exception the schema cannot hold.
+
+    **A recorded site pins the handler the owner reviewed.** `reachesNoForbiddenPath` is a claim
+    about an expression, so the expression is held still: a control whose handler stops matching has
+    not been reviewed in its new form and is rejected naming both. That is what stops the list
+    becoming the escape hatch -- recording a navigation button does not license turning it into a
+    command path later.
+
+    A control setting no `objectName` is rejected whether or not its document is recorded, because a
+    site pins an objectName and there is nothing to record such a control by.
+
+    The rule walks for controls. It adds none, and it reads every document and writes none.
+    """
+    gates, findings = _standing(premises, ACTIONABLE_CONTROL)
+    if findings or not gates:
+        return findings
+
+    posture = premises.register.read_only
+    tree = _qml_tree(premises.root)
+    subject = "an actionable control"
+    findings = []
+    if not tree.walked:
+        return [
+            Finding(
+                ACTIONABLE_CONTROL,
+                gates,
+                f"{SOURCE_TREE}/ is not a directory this rule could walk, so no document was "
+                f"searched for {subject}. A run that searched nothing is a failure rather than a "
+                f"pass: it is indistinguishable from a run that found nothing",
+            )
+        ]
+    findings.extend(
+        Finding(
+            ACTIONABLE_CONTROL,
+            gates,
+            f"{path}: the document {reason}, so it was searched for {subject} nowhere. A document "
+            f"under {SOURCE_TREE}/ that this rule cannot read is a failure rather than a pass",
+        )
+        for path, reason in tree.unreadable
+    )
+
+    # The exception and the other recorded sites, keyed alike, because set equality is over controls
+    # and a control is a document and an objectName. Which list an entry came from decides what else
+    # is checked about it and how a finding describes it, never whether it is permitted.
+    recorded = {(site.file, site.control): site for site in posture.actionable_control_sites}
+    excepted = {(item.file, item.control): item for item in posture.exceptions}
+    found = _controls(tree)
+
+    for control in found:
+        key = (control.file, control.control)
+        if control.control == _UNNAMED:
+            findings.append(
+                Finding(
+                    ACTIONABLE_CONTROL,
+                    gates,
+                    f"{control.file}: declares {control.type_name} at line {control.line} setting "
+                    f"no objectName. A recorded site pins a control by its objectName, so a control "
+                    f"without one cannot be recorded and cannot be told apart from another in the "
+                    f"same document. Requirement 5 criterion 2 rejects the change before it enters "
+                    f"the repository",
+                )
+            )
+            continue
+        if key in excepted:
+            continue
+        site = recorded.get(key)
+        if site is None:
+            findings.append(
+                Finding(
+                    ACTIONABLE_CONTROL,
+                    gates,
+                    f"{control.file}: declares {control.type_name} {control.control} at line "
+                    f"{control.line}, and the register records neither the single exception to "
+                    f"read-only presentation nor a site for it. Requirement 5 criterion 2 rejects "
+                    f"the change before it enters the repository. Either the control reaches a path "
+                    f"criterion 1 forbids, in which case it waits on this Gate, or it reaches none, "
+                    f"in which case an owner records it with the handler they reviewed and the "
+                    f"reason it reaches none",
+                )
+            )
+            continue
+        if not site.reaches_no_forbidden_path:
+            findings.append(
+                Finding(
+                    ACTIONABLE_CONTROL,
+                    gates,
+                    f"{control.file}: the recorded site for {control.control} does not state that "
+                    f"the control reaches no path criterion 1 forbids. The schema writes that claim "
+                    f"as a constant, so a register carrying it unset has not passed the schema; a "
+                    f"control that does reach one is not recordable here at all",
+                )
+            )
+        if site.handler not in control.body:
+            findings.append(
+                Finding(
+                    ACTIONABLE_CONTROL,
+                    gates,
+                    f"{control.file}: {control.control} at line {control.line} no longer carries "
+                    f"the handler the register records for it, {site.handler}. The recorded reason "
+                    f'"{site.reason}" was an owner\'s statement about that expression, so a control '
+                    f"whose handler has changed has not been reviewed in its new form. Requirement "
+                    f"5 criterion 2 rejects the change before it enters the repository",
+                )
+            )
+
+    present = {(control.file, control.control) for control in found}
+    findings.extend(
+        Finding(
+            ACTIONABLE_CONTROL,
+            gates,
+            f"{file}: the register records {control} as {described}, and the document declares no "
+            f"actionable control of that name. A record naming a control the tree does not carry is "
+            f'stale rather than satisfied: "not found" is not "withdrawn", and a reviewer reading '
+            f"the register would be told a control is accounted for that nothing accounts for",
+        )
+        for (file, control), described in sorted(
+            [(key, "the single exception to read-only presentation") for key in excepted]
+            + [(key, "a site reaching no forbidden path") for key in recorded]
+        )
+        if (file, control) not in present
+    )
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 
@@ -1783,6 +2115,7 @@ _CHECKS: Final = (
     check_action_seam,
     check_freshness_threshold,
     check_payload_command_sink,
+    check_actionable_control,
 )
 
 
@@ -1805,26 +2138,34 @@ def _established(premises: Premises, files: int) -> str:
     sites hold are read out of the tree on every run and recorded nowhere, so an allow-list whose
     sites have stopped holding any is visible as a number rather than as a silence.
 
-    The four absence rules are counted for that reason too, and it is the sharper case. Each is
+    The Gate-conditional rules are counted for that reason too, and it is the sharper case. Each is
     conditional on a Gate the register records, so a rule that is not in force reports nothing --
-    and a run in which four rules reported nothing because four Gates closed must not read as a run
-    in which four rules looked and found nothing.
+    and a run in which five rules reported nothing because their Gates closed must not read as a run
+    in which five rules looked and found nothing.
+
+    The recorded control surface is stated beside them, because `actionable-control` compares two
+    sets and a run that found none on either side is a different answer from a run over a register
+    recording none: the first is a tree with no control in it, the second is a register that has
+    stopped accounting for one.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
     posture = premises.register.mavlink_identifiers
     baseline = _baseline(premises.root, posture)
     in_force = _in_force(premises)
+    read_only = premises.register.read_only
+    controls = len(read_only.exceptions) + len(read_only.actionable_control_sites)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
         f"assertion sites compared against the files the register names, and the ADR-016 pair "
         f"against {CORE_HEADER} and {OVERLAY_MANIFEST}; every file under {OVERLAY_TREE}/ searched "
         f"against {len(posture.allow_list)} allow-listed sites holding "
-        f"{len(baseline.identifiers)} identifiers; {in_force} of the four absence rules in force "
-        f"over {SOURCE_TREE}/ and {len(ABSENCE_GATES) - in_force} standing down on a Gate the "
-        f"derivation records closed; no rule read a file because it was among the {files} selected "
-        f"source files\n"
+        f"{len(baseline.identifiers)} identifiers; {in_force} of the "
+        f"{len(CONDITIONAL_GATES)} Gate-conditional rules in force over {SOURCE_TREE}/ and "
+        f"{len(CONDITIONAL_GATES) - in_force} standing down on a Gate the derivation records "
+        f"closed, with {controls} actionable controls recorded; no rule read a file because it was "
+        f"among the {files} selected source files\n"
     )
 
 

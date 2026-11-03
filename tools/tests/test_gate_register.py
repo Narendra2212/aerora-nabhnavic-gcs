@@ -355,6 +355,7 @@ def _register(
         read_only=ReadOnlyPosture(
             gate=READ_ONLY_GATE,
             exceptions=[],
+            actionable_control_sites=[],
             forbidden_until=[],
             pre_approved_undeclared_seams=[],
         ),
@@ -679,6 +680,7 @@ def _register_document() -> dict[str, object]:
         "readOnly": {
             "gate": READ_ONLY_GATE,
             "exceptions": [],
+            "actionableControlSites": [],
             "forbiddenUntil": [],
             "preApprovedUndeclaredSeams": [],
         },
