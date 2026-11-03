@@ -717,9 +717,9 @@ Constraints every task inherits:
     - _Requirements: 4.2, 4.7_
     - **Local**: `uv run --quiet --with pytest --with pyyaml python -m pytest -q tools/tests/test_pre_commit.py`
 
-- [ ] 11. The three C++ ratchet assertions
+- [x] 11. The three C++ ratchet assertions
 
-  - [ ] 11.1 Generalise the actionable-control predicate in `AeroraFlyViewOverlayUITest`
+  - [x] 11.1 Generalise the actionable-control predicate in `AeroraFlyViewOverlayUITest`
     - Replace `hasActionableControl()`'s `childItems()` recursion with a walk over the union of the
       visual tree and the object tree, deduplicated by pointer, returning the controls found by
       `objectName` where one is set and by class name otherwise. Keep the `QObject::inherits()`
@@ -736,7 +736,30 @@ Constraints every task inherits:
     - _Requirements: 5.1, 5.2_
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Integration`
 
-  - [ ] 11.2 Add the data-driven read-only walk to `AeroraUiFoundationTest`
+  - [x] 11.2 Add the read-only walk to `AeroraSceneAttachmentUITest`, not to `AeroraUiFoundationTest`
+    - **Moved, on evidence `AeroraUiFoundationTest` already records about itself.** The plan put the
+      walk there and had it instantiate each screen document with `QQmlComponent`. That suite's own
+      `_aeroraPageDocumentsCompile` explains at its call site why it stops at compilation and never
+      calls `create()`: both page base classes read from context their real host supplies —
+      `SetupPage` reads `globals` and `vehicleComponent` from `VehicleConfigView`'s `Loader`,
+      `AnalyzePage` reads `qgcPal` from the Analyze view — so instantiating a page there reports
+      that absence as a failure of the page, and supplying a stand-in asserts the stand-in
+    - `AeroraSceneAttachmentUITest` already navigates to four Aerora Analyze pages in a booted
+      scene and holds each rendered with real context, so the walk runs over an instantiated tree
+      with nothing faked. That is also what the design wanted from it: "Source inspection is the
+      gate; the walk is the thing that is actually true"
+    - Walks each page's **content flickable** rather than its page root, which is the design's own
+      point: `AnalyzePage` carries upstream's popout control when `allowPopout: true`, so a walk
+      from the root would fail on upstream's button and say nothing about Aerora's content
+    - Set equality by `objectName`, both directions, per page — the recorded exception on
+      `SCR-HLP-03` and nothing on the other three. A closing assertion requires the walk to find
+      the exception, so a walk that reached nothing fails rather than reporting four clean pages
+    - The Operations Hub's navigation button is covered by `AeroraVehicleConfigUITest`, which is the
+      suite that navigates to the Hub; it is recorded in `readOnly.actionableControlSites`
+    - _Requirements: 5.1, 5.2, 5.11_
+    - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Integration`
+
+    - **Superseded by 11.2 above.** The original wording placed the walk in `AeroraUiFoundationTest` and instantiated each document there.
     - **Property 24: No Aerora screen document carries an actionable control except the one recorded exception**
     - **Validates: Requirements 5.1, 5.2, 5.11**
     - `_noAeroraScreenCarriesAnActionableControl()` plus `_data()`. The screen set is **discovered**
@@ -766,7 +789,7 @@ Constraints every task inherits:
       `QQmlComponent::create()` returns a constructed tree
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Unit`
 
-  - [ ] 11.3 Pin the remaining guards at the composition root in `AeroraVehicleIntegrationTest`
+  - [x] 11.3 Pin the remaining guards at the composition root in `AeroraVehicleIntegrationTest`
     - Extend the existing guard slot with the recorded guards it does not yet assert
     - `AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()` gets **no** assertion here, and the
       omission is deliberate: asserting `false` would fail CI because the `ADR-016` pair is applied,

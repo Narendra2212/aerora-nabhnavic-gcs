@@ -4,10 +4,12 @@
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
+#include "AeroraCorePlugin.h"
 #include "AeroraFirmwareClaim.h"
 #include "AeroraFirmwarePlugin.h"
 #include "AeroraFirmwarePluginFactory.h"
 #include "AeroraFreshness.h"
+#include "AeroraMissionResumeBoundary.h"
 #include "AeroraPayloadModel.h"
 #include "AeroraPowerModel.h"
 #include "AeroraTelemetrySet.h"
@@ -552,6 +554,38 @@ void AeroraVehicleIntegrationTest::_domainServicesOpenNoActuatorPath()
     QVERIFY(!AeroraPowerModel::kAutomaticSourceTransitionImplemented);
     QVERIFY(!AeroraPowerModel::kRemainingEnergyEstimationImplemented);
     QCOMPARE(AeroraPowerModel::kDefinedThresholdCount, 0);
+
+    // The mission-side pin, asserted here as well as in AeroraMissionTest. Requirement 6 criterion
+    // 17 records it as a guard that holds at false *after* DG-MIS closes, so no Gate part permits
+    // it to move and the Gate_Register records its change permission as empty. Composing a vehicle
+    // is exactly when a replay path would appear, so the composition root is the second place it
+    // has to be absent.
+    QVERIFY(!AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented);
+
+    // The authorization posture, which nothing asserted anywhere until now. The Gate_Register
+    // recorded it as asserted nowhere with this slot as the remedy, so this is that remedy: the
+    // station reports authorization as not enforced while DG-ROL holds no accepted Closure_Record,
+    // and P7-AUTH-002 requires it to be able to say so.
+    //
+    // Called statically rather than through instance(), which matters in a Unit-labelled suite: no
+    // plugin instance is constructed here, and routing a static call through a null pointer would
+    // make this slot depend on application composition it does not otherwise need.
+    //
+    // There is no constant to read instead. The function delegates to the authorizer singleton,
+    // which is why the Gate_Register records it as a predicate pinning its expression rather than
+    // as a literal holding a value.
+    QVERIFY(!AeroraCorePlugin::isAuthorizationEnforced());
+
+    // AeroraVehicleFactGroupRegistrar::isRegistrationAvailable() gets no assertion here, and the
+    // omission is a decision rather than an oversight.
+    //
+    // The ADR-016 pair is applied in this tree - the friend declaration is in src/Vehicle/Vehicle.h
+    // and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP is in aerora/CMakeLists.txt - so the function returns
+    // true. Asserting false would fail CI; asserting true would record an unauthorised core edit as
+    // the expected state and launder it into a passing test. The Gate_Register carries the gap
+    // instead, as a recorded disagreement naming Tab 1 as the owner and both remedies, and it
+    // prints on every run of the Gate_Review. The assertion belongs in whichever change resolves
+    // it: Tab 1 signs the core-edit part, or the definition is withdrawn.
 
     // No payload command path is installed, so a request cannot leave the ground station.
     QVERIFY(!payload->isCommandPathInstalled());

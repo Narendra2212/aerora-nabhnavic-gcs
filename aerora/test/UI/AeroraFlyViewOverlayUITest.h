@@ -36,7 +36,8 @@
 /// \section readonly The read-only boundary, asserted structurally
 ///
 /// The seam declaration was approved for read-only display only. `_overlayCarriesNoActionableControl()`
-/// walks the overlay's item tree for any `QQuickAbstractButton` or `QQuickMouseArea` and requires
+/// walks the overlay's visual *and* object trees for any `QQuickAbstractButton`,
+/// `QQuickMouseArea` or `QQuickPointerHandler` and requires
 /// none. That is a stronger guarantee than reviewing the QML, because it fails on a control added
 /// through any route - a new panel, a nested control, an upstream type that happens to be clickable.
 class AeroraFlyViewOverlayUITest : public QmlUITestBase

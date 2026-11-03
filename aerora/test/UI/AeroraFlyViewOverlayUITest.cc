@@ -10,6 +10,7 @@
 #include <QtQuick/QQuickItem>
 #include <QtTest/QTest>
 
+#include "AeroraActionableControls.h"
 #include "MockLink.h"
 #include "Vehicle.h"
 
@@ -20,28 +21,6 @@ namespace {
 /// The overlay root's objectName, set by the Aerora mirror. Upstream's seam sets none, so this
 /// string is what distinguishes "the override took effect" from "the stock empty seam loaded".
 constexpr const char* kOverlayObjectName = "aeroraLiveOperationsOverlay";
-
-/// Returns true if @a item or any descendant is something an operator could press.
-///
-/// QQuickAbstractButton covers every Qt Quick Controls button, which is what QGCButton and friends
-/// derive from; QQuickMouseArea covers a hand-rolled click target. Searched by class name through
-/// QObject::inherits() so a control added through any route is caught, rather than only the types
-/// this test thought to name.
-bool hasActionableControl(QQuickItem* item)
-{
-    if (item->inherits("QQuickAbstractButton") || item->inherits("QQuickMouseArea")) {
-        return true;
-    }
-
-    const QList<QQuickItem*> children = item->childItems();
-    for (QQuickItem* const child : children) {
-        if (hasActionableControl(child)) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 }  // namespace
 
@@ -231,8 +210,16 @@ void AeroraFlyViewOverlayUITest::_overlayCarriesNoActionableControl()
 
             // The boundary the seam declaration was approved under: read-only display. Asserted
             // structurally rather than by review, so a control added through any route fails here.
-            QVERIFY2(!hasActionableControl(overlay),
-                     "the Live Operations overlay must carry no button and no mouse area");
+            //
+            // The walk is the union of the visual and object trees, which is what catches a pointer
+            // handler: a TapHandler is a QObject child of the item it handles and not a QQuickItem,
+            // so the childItems() recursion this replaced never saw one. The names are reported
+            // rather than a bare boolean, so a failure says which control to withdraw.
+            const QStringList actionable = AeroraActionableControls::actionableControls(overlay);
+            QVERIFY2(actionable.isEmpty(),
+                     qPrintable(QStringLiteral("the Live Operations overlay must carry no button, "
+                                               "mouse area or pointer handler; it carries: %1")
+                                    .arg(actionable.join(QStringLiteral(", ")))));
         });
 }
 

@@ -12,6 +12,7 @@
 #include <QtQuick/QQuickWindow>
 #include <QtTest/QTest>
 
+#include "AeroraActionableControls.h"
 #include "AeroraPlanBridge.h"
 #include "AeroraProvenance.h"
 #include "PlanMasterController.h"
@@ -47,6 +48,20 @@ constexpr const char* kErrorReportEntryButton = "analyzeButton_Aerora Error Repo
 constexpr const char* kErrorReportFlickable = "aeroraErrorReport_flickable";
 constexpr const char* kProvenanceEntryButton = "analyzeButton_Aerora Build";
 constexpr const char* kProvenanceFlickable = "aeroraProvenance_flickable";
+
+/// The one actionable control the Gate_Register records on an Aerora screen reachable from here,
+/// and the page content that carries it.
+///
+/// Requirement 5 criterion 1 records the clipboard copy on SCR-HLP-03 as the single exception to
+/// read-only presentation, and criterion 11 forbids a second. The register pins it by objectName so
+/// the exception cannot drift onto another control in the same document, and this asserts the same
+/// string rather than counting: a count is satisfied by swapping one member for another.
+///
+/// The hub's navigation button is the other actionable control on the Aerora surface. It is not
+/// reachable from this suite - the hub is an Analyze page AeroraVehicleConfigUITest navigates
+/// through - and it is recorded in `readOnly.actionableControlSites` rather than as an exception,
+/// because `mainWindow.showVehicleConfig()` reaches no outbound command path.
+constexpr const char* kRecordedExceptionControl = "aeroraErrorReport_copyButton";
 
 /// The Analyze view's own page-list flickable. Every Aerora entry is appended after the upstream
 /// ones, so the list is taller than an offscreen window and an entry has to be scrolled into view
@@ -371,4 +386,82 @@ void AeroraSceneAttachmentUITest::_provenancePageIsReachableAndReadsTheRegistere
     const QVariant pageReading = page->property("_commitKnown");
     QVERIFY2(pageReading.isValid(), "the page must expose the reading it took from the singleton");
     QCOMPARE(pageReading.toBool(), reference.isCommitKnown());
+}
+
+void AeroraSceneAttachmentUITest::_onlyTheRecordedControlIsActionableOnAnAeroraPage()
+{
+    startUI();
+    if (QTest::currentTestFailed()) {
+        return;
+    }
+
+    QVERIFY2(clickToolSelectDropdownButton(QStringLiteral("toolbar_viewAnalyze")),
+             "the Analyze view must be reachable from the tool-select dropdown");
+
+    // The four Aerora Analyze pages this suite reaches, each with the content flickable to walk and
+    // the actionable controls the Gate_Register records on it. Only SCR-HLP-03 records one.
+    //
+    // Listed rather than discovered, and that is a deliberate narrowing of what the design asked
+    // for. The register's screen set is discovered by the Python half, which reads every Aerora QML
+    // document; this walk needs each page *navigated to*, and the route differs per page - an
+    // Analyze entry here, the Configure sidebar in AeroraVehicleConfigUITest. A discovered list
+    // would have to invent a route for a page it found, which is how a walk starts asserting its
+    // own navigation rather than the page.
+    struct Page {
+        const char* entryButton;
+        const char* contentFlickable;
+        QStringList recorded;
+    };
+
+    const QList<Page> pages{
+        {kVocabularyEntryButton, kVocabularyFlickable, {}},
+        {kSecurityEntryButton, kSecurityFlickable, {}},
+        {kErrorReportEntryButton, kErrorReportFlickable,
+         {QString::fromUtf8(kRecordedExceptionControl)}},
+        {kProvenanceEntryButton, kProvenanceFlickable, {}},
+    };
+
+    for (const Page& page : pages) {
+        const QString entry = QString::fromUtf8(page.entryButton);
+        QVERIFY2(clickButtonScrolled(entry, QString::fromUtf8(kAnalyzeListFlickable)),
+                 qPrintable(QStringLiteral("%1 must appear in the Analyze page list").arg(entry)));
+
+        QQuickItem* const content =
+            findVisibleItem(_rootItem, QString::fromUtf8(page.contentFlickable), TestTimeout::mediumMs());
+        QVERIFY2(content, qPrintable(QStringLiteral("clicking %1 must load its page content").arg(entry)));
+
+        // The walk is over the union of the visual and object trees, so a pointer handler is seen:
+        // a TapHandler is a QObject child of the item it handles and not a QQuickItem, which is
+        // what a childItems() recursion misses. Sorted so the comparison is about membership and
+        // not about discovery order.
+        QStringList actionable = AeroraActionableControls::actionableControls(content);
+        actionable.sort();
+
+        QStringList recorded = page.recorded;
+        recorded.sort();
+
+        // Set equality, in both directions and by name. Asserted as a set rather than a count
+        // because a count is satisfied by swapping one member for another, which is exactly how an
+        // exception drifts onto a control nobody signed for. The same shape
+        // _exactlyOnePurposeBuiltSeamIsDeclared uses.
+        QVERIFY2(actionable == recorded,
+                 qPrintable(QStringLiteral("%1 actionable controls changed.\n  recorded: %2\n  "
+                                           "rendered: %3\nRequirement 5 criterion 1 admits one "
+                                           "exception, the clipboard copy on SCR-HLP-03. A control "
+                                           "added here waits on DG-ROL, or is recorded in the "
+                                           "Gate_Register with the handler a reviewer read.")
+                                .arg(entry, recorded.join(QStringLiteral(", ")),
+                                     actionable.join(QStringLiteral(", ")))));
+    }
+
+    // The walk must actually find something, or every assertion above passes by walking an empty
+    // tree. The recorded exception is that something: it exists today, on the page this loop just
+    // visited, so a walk that reached nothing fails here rather than reporting four clean pages.
+    QQuickItem* const excepted =
+        findVisibleItem(_rootItem, QString::fromUtf8(kErrorReportFlickable), TestTimeout::mediumMs());
+    QVERIFY2(excepted, "the error report page content must still be in the scene");
+    QVERIFY2(AeroraActionableControls::actionableControls(excepted)
+                 == QStringList{QString::fromUtf8(kRecordedExceptionControl)},
+             "the recorded exception must be found by the walk; a walk that finds nothing would "
+             "satisfy every negative assertion above for the wrong reason");
 }

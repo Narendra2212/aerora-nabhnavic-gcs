@@ -1892,7 +1892,9 @@
       "declaredIn": "aerora/src/AeroraCorePlugin.cc",
       "recordedValue": "false",
       "declaredExpression": "return AeroraCommandAuthorizer::instance()->isFullyConfigured();",
-      "assertedIn": [],
+      "assertedIn": [
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
       "holdsOpen": [
         "DG-ROL"
       ],
@@ -1900,9 +1902,7 @@
       "permittedToChangeBy": [
         "DG-ROL:role-set",
         "DG-ROL:authorization-scope"
-      ],
-      "assertedNowhere": true,
-      "remedy": "task 11.3 extends the AeroraVehicleIntegrationTest guard slot with the guards it does not yet assert"
+      ]
     },
     {
       "symbol": "kGroundStationActuatorPathImplemented",
@@ -1984,7 +1984,8 @@
       "declaredIn": "aerora/src/Mission/AeroraMissionResumeBoundary.h",
       "recordedValue": "false",
       "assertedIn": [
-        "aerora/test/Mission/AeroraMissionTest.cc"
+        "aerora/test/Mission/AeroraMissionTest.cc",
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
       ],
       "holdsOpen": [
         "DG-MIS"

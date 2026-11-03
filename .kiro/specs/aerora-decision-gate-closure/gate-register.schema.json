@@ -980,9 +980,15 @@
         {
           "if": {
             "required": [
+              "kind",
               "assertedIn"
             ],
             "properties": {
+              "kind": {
+                "not": {
+                  "const": "check"
+                }
+              },
               "assertedIn": {
                 "maxItems": 0
               }
@@ -998,13 +1004,40 @@
                 "const": true
               }
             }
-          },
-          "else": {
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
             "properties": {
-              "assertedNowhere": {
-                "const": false
+              "kind": {
+                "const": "check"
               }
             }
+          },
+          "then": {
+            "properties": {
+              "assertedIn": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "assertedNowhere"
+                  ]
+                },
+                {
+                  "required": [
+                    "remedy"
+                  ]
+                }
+              ]
+            },
+            "description": "A check is asserted by the tests of the rule that holds it, which live under tools/tests/ rather than under aerora/test/**. So assertedIn is empty by construction and records no gap: what makes the check real is that guard-value resolves its heldBy against the rules this repository carries. An assertedNowhere beside it would name a remedy for an absence that is not one."
           }
         },
         {

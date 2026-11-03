@@ -248,6 +248,9 @@ set(AERORA_UI_TEST_DIR ${AERORA_UI_DIR}/../../test/UI)
 cmake_path(NORMAL_PATH AERORA_UI_TEST_DIR)
 
 set(AERORA_UI_TEST_SOURCES
+    # Header-only, and declared here so the manifest check sees it: the read-only walk two suites
+    # share. No add_qgc_test line and no *_TEST_NAMES entry, because it registers no test.
+    ${AERORA_UI_TEST_DIR}/AeroraActionableControls.h
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.cc
     ${AERORA_UI_TEST_DIR}/AeroraFlyViewOverlayUITest.h
     ${AERORA_UI_TEST_DIR}/AeroraSceneBootOnlyTest.cc

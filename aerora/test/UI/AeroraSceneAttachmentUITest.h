@@ -81,6 +81,19 @@ private slots:
     // singleton the page reads against a C++ instance of the same type.
     void _provenancePageIsReachableAndReadsTheRegisteredSingleton();
 
+    // Property 24, over the pages this suite can reach: Requirement 5 criterion 1's read-only
+    // presentation, asserted against the *rendered* content rather than against the source text.
+    //
+    // The source-text rule `actionable-control` already reads every Aerora QML document and runs on
+    // every commit. What it cannot see is a control arriving through a composed control, a Loader,
+    // or a type nobody thought to pattern-match. This walk sees the instantiated tree, so it is the
+    // half that is actually true.
+    //
+    // Walked from each page's *content* flickable and not from its page root, which is deliberate:
+    // `AnalyzePage` carries upstream's own popout control when `allowPopout: true`, so a walk from
+    // the root would fail on upstream's button and say nothing about Aerora's content.
+    void _onlyTheRecordedControlIsActionableOnAnAeroraPage();
+
 private:
     /// @return The scene's controller for @a flyView, or nullptr when absent.
     PlanMasterController* _sceneController(bool flyView);

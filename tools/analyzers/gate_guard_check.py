@@ -746,10 +746,10 @@ def check_guard_assertion(premises: Premises) -> list[Finding]:
                     GUARD_ASSERTION,
                     tuple(guard.holds_open),
                     f"{guard.symbol}: no suite asserts this guard, and the register records that "
-                    f"rather than leaving it to an empty list. Remedy: {guard.remedy}. Two of "
-                    f"Requirement 4 criterion 5's nine guards are in this state today; what "
-                    f"criterion 9 rejects is a site being removed, which a recorded absence makes "
-                    f"visible instead of indistinguishable from one",
+                    f"rather than leaving it to an empty list. Remedy: {guard.remedy}. What "
+                    f"Requirement 4 criterion 9 rejects is an assertion site being *removed*, "
+                    f"which a recorded absence keeps distinguishable from a guard that never had "
+                    f"one",
                     blocking=False,
                 )
             )
