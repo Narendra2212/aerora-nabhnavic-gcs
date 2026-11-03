@@ -800,13 +800,52 @@ Constraints every task inherits:
     - _Requirements: 4.7, 4.9_
     - **CI-only**: `aerora-linux.yml` / `aerora-windows.yml`, `^Aerora` with label `Integration`
 
-- [ ] 12. Final checkpoint
+- [x] 12. Final checkpoint
   - Local: both Python test files, both direct script invocations, the lint and type-check commands,
     and `uv run --quiet --with jsonschema python tools/validate_gate_register.py` against the
     populated register
   - CI: the `pre-commit.yml` leg for the three hooks, the `ci-scripts.yml` pytest jobs for the tools
     tests, and the `^Aerora` selections with labels `Unit` and `Integration` for the three suites
   - Ensure all tests pass, ask the user if questions arise.
+
+  **Passed.** 376 tests across the three files; `ruff check`, `ruff format --check` and
+  `pyright==1.1.411` clean on all six modules; `markdownlint` clean on all five spec documents and
+  the screen inventory; `typos` clean over the spec; both schemas valid against the metaschema and
+  the register valid against its schema. Both entry points exit **0** against the populated
+  register, which is the first time in this spec they have — every earlier checkpoint recorded them
+  failing on the absent register, which was the error contract working rather than a defect.
+
+  Four findings print on every run and none blocks, which is the intended steady state:
+
+  | Finding | Why it does not block |
+  | --- | --- |
+  | `guard-value` on `isRegistrationAvailable()` | The recorded disagreement observes exactly the value the source holds, names Tab 1 and both remedies, and tracks it at `finding-1` |
+  | `guard-assertion` on the same guard | Recorded `assertedNowhere` with its remedy: asserting either value today would record the wrong state |
+  | `adr-016-pair` | The same applied pair, reported once more against the two files Requirement 7 criterion 17 names |
+
+  Zero recorded disagreements is the target and there is one. It is the only optional escape the
+  register has, it is confined to a guard, and the derivations have none at all.
+
+  **CI is the remaining evidence.** Everything under task 11 is C++ and this host has no compiler
+  and no Qt, so the local evidence for it stops at byte hygiene and the manifest check — both of
+  which agree the new header is declared and that nothing regressed. The `pre-commit.yml` leg, the
+  `ci-scripts.yml` pytest jobs and the `^Aerora` label selections are what prove the rest.
+
+## What this spec did not do, and deliberately
+
+- **No Closure_Record was written.** `closures/` carries its contract and no content. Writing the
+  content would be the engineering forging the signature it exists to demand.
+- **No Contract_Value entered the repository.** The register records element names and owner labels
+  taken from `requirements.md`, the guard registry records symbols and the values they already hold,
+  and the MAVLink allow-list is recorded by site and reason and carries no identifier.
+- **No operator action control, outbound command path, mission upload, start or resume path, or call
+  to `AeroraMissionObserver::verify()` was added.** The read-only ratchet walks for controls and
+  adds none.
+- **The optional `*` sub-tasks are not done.** They are the ~30 Hypothesis property tests and the
+  schema-rejection and source-fixture suites. The plan marks them optional for a faster first pass,
+  and the behaviour each would cover is asserted by an example-based test already: 376 tests pass
+  over the two checkers. They remain the highest-value next increment, because a property test finds
+  the case nobody thought to write a row for.
 
 ## Out of scope for this spec
 
