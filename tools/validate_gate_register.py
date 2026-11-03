@@ -215,6 +215,12 @@ MAVLINK_IDENTIFIER_GUARD: Final = "mavlink-identifier"
 # a second spelling of the symbol would be a second thing to keep in step.
 FACT_GROUP_REGISTRAR_GUARD: Final = "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()"
 
+# Requirement 4 criterion 5's guard over the defined-threshold count, named here for the same
+# reason: the source half's `freshness-threshold` defers the literal this guard holds to
+# `guard-value` and reports the registry recording no entry for it, so both halves name the symbol
+# once.
+THRESHOLD_COUNT_GUARD: Final = "AeroraPowerModel::kDefinedThresholdCount"
+
 # Requirement 4 criterion 5: each mechanical guard that holds an open Gate visible, with the value
 # the criterion records it holding. Recorded here rather than read out of the register, for the
 # reason TWO_GATE_SCREENS is: a check that took its expectation from the document it checks agrees
@@ -225,7 +231,7 @@ FACT_GROUP_REGISTRAR_GUARD: Final = "AeroraVehicleFactGroupRegistrar::isRegistra
 # guard symbol and the literal it holds are not Contract_Values: the Glossary's list carries
 # neither, and requirements.md names all nine already.
 MECHANICAL_GUARDS: Final[Mapping[str, str | None]] = {
-    "AeroraPowerModel::kDefinedThresholdCount": "0",
+    THRESHOLD_COUNT_GUARD: "0",
     FACT_GROUP_REGISTRAR_GUARD: "false",
     "AeroraCorePlugin::isAuthorizationEnforced()": "false",
     "kGroundStationActuatorPathImplemented": "false",

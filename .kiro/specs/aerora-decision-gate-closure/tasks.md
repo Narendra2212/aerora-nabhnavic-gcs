@@ -464,7 +464,7 @@ Constraints every task inherits:
     - _Requirements: 4.2, 6.14_
     - **Local**: `uv run --quiet --with pytest --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k mavlink`
 
-  - [ ] 7.5 Implement the four absence checks
+  - [x] 7.5 Implement the four absence checks
     - `populated-file-override`: no `Tier::PopulatedFile` entry in `AeroraQmlOverrides::overrideEntries()`
       while `DG-VID` is `OPEN`
     - `action-seam`: neither pre-approved seam appears in the override allow-list while `DG-ROL` is

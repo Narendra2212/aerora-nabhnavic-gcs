@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the shell and the three source-half rules in tools/analyzers/gate_guard_check.py.
+"""Tests for the shell and the source-half rules in tools/analyzers/gate_guard_check.py.
 
 Two things are under test, and they are tested differently.
 
@@ -15,10 +15,32 @@ failure, never a pass -- so it is asserted here as the shell's answer in that st
 The rules: `guard-value`, which reads each recorded guard's declaration in its recorded `declaredIn`
 file; `guard-assertion`, which reads each recorded assertion site under `aerora/test/**`;
 `adr-016-pair`, which reads the two files Requirement 7 criterion 17 names against the change
-permission the registry records on the fact-group registrar's guard; and `mavlink-identifier`, which
-walks the overlay tree against an allow-list the register records by site and reason. None of them
-reads the files the run selected, so the fixture that decides what a rule sees is not the file list
-but the tree.
+permission the registry records on the fact-group registrar's guard; `mavlink-identifier`, which
+walks the overlay tree against an allow-list the register records by site and reason; and the four
+absence rules, which walk `aerora/src/**` for a subject that must not be there. None of them reads
+the files the run selected, so the fixture that decides what a rule sees is not the file list but
+the tree.
+
+The four absence rules are tested on three axes each, because each is a different answer: the
+subject absent, which is the state the tree stands in; the subject present, which is the rejection;
+and the Gate the rule waits on recorded closed, in which the subject is present and the rule is
+silent because what it rejects is then the thing an owner signed for. The Gate-closed cases reach
+the register as a model rather than as a document, for the reason `_authorised` does -- a closed
+Gate needs an accepted part with a Closure_Record, which `_accepting` builds in code.
+
+What most of these cases actually assert is the *negative*: that a legitimate mention of a subject's
+own name is not the subject. The fixture tree carries every one the real tree does -- the override
+allow-list's comment block naming the forbidden tier and both pre-approved seams in prose, the count
+that compares an entry's tier against the tier in code, the threshold setter's declaration and its
+out-of-line definition, the payload command sink's own declaration, a pointer member of that type, a
+setter taking one, and the one implementation in the tree, which is a test double under
+`aerora/test/**`. A rule that fired on any of them would fail on a clean tree and be removed rather
+than obeyed, so the fixture is written to look like the tree rather than to agree with the rule, and
+each accepting case asserts that the mention is there before asserting that nothing was reported.
+
+One case per rule reads the **real** tree with a fixture register, which is the only evidence that
+the four read the overlay rather than the fixtures: it is what fails the day `AeroraFreshness.cc`'s
+out-of-line definition starts reading as a call site.
 
 `adr-016-pair` is tested over both recorded authorisation states and all four states of the pair,
 because each combination is a different answer: the applied pair under an unsigned authorisation is
@@ -59,9 +81,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 from analyzers.gate_guard_check import (
+    ACTION_SEAM,
     ADR_016_PAIR,
     CORE_HEADER,
     CUSTOM_DEFINITIONS,
+    FRESHNESS_THRESHOLD,
     FRIEND_DECLARATION,
     FRIENDSHIP_DEFINITION,
     GUARD_ASSERTION,
@@ -70,13 +94,24 @@ from analyzers.gate_guard_check import (
     MAVLINK_IDENTIFIER,
     NAME,
     OVERLAY_MANIFEST,
+    OVERRIDE_ENTRIES,
+    PAYLOAD_COMMAND_SINK,
+    PAYLOAD_COMMAND_SINK_TYPE,
+    POPULATED_FILE_OVERRIDE,
+    POPULATED_FILE_TIER,
     REPORTED,
+    SOURCE_TREE,
+    THRESHOLD_SETTER,
     UNASSIGNED,
     Finding,
     GateGuardCheckAnalyzer,
+    check_action_seam,
     check_adr_016_pair,
+    check_freshness_threshold,
     check_guard_value,
     check_mavlink_identifier,
+    check_payload_command_sink,
+    check_populated_file_override,
     main,
     premise_findings,
     review,
@@ -97,6 +132,7 @@ from validate_gate_register import (
     MECHANICAL_GUARDS,
     OPEN_STATUS,
     OVERLAY_TREE,
+    PRE_APPROVED_SEAMS,
     PREMISES,
     REGISTER_PATH,
     TEST_TREE,
@@ -111,8 +147,10 @@ from .test_validate_gate_register import (
     GUARD_DECLARATION,
     MISSION_GATE,
     PAYLOAD_GATE,
+    POWER_GUARD,
     REPLAY_GUARD,
     ROLE_GATE,
+    SEAM_DIRECTORY,
     SINGLE_GATE,
     TELEMETRY_GUARD,
     _accepting,
@@ -319,6 +357,234 @@ def _pair_sources(root: Path, *, friend: bool, defined: bool) -> Path:
     return root
 
 
+# ---------------------------------------------------------------------------
+# The four absent subjects
+# ---------------------------------------------------------------------------
+
+# How many absence rules the run's summary counts, and the two Gates the rest of this file does not
+# already carry. Spelled here rather than imported from the analyzer: a test that read the rule's
+# own table of Gates, or its own count of itself, would agree with it by construction. The other
+# two Gates are `ROLE_GATE` and `PAYLOAD_GATE`, which the data half's fixtures already name.
+ABSENCE_RULES = 4
+VIDEO_GATE = "DG-VID"
+FRESHNESS_GATE = "DG-FRS"
+
+# Where the fixture tree carries each subject, under the tree the four rules walk. Fixture names,
+# because no rule reads a recorded path for any of them: the two allow-list rules find the
+# definition by walking, and the other two search every source file. The real-tree cases below are
+# what prove the rules find the real files.
+OVERRIDES_SOURCE = f"{SOURCE_TREE}/UI/AFixtureQmlOverrides.cc"
+FRESHNESS_HEADER = f"{SOURCE_TREE}/Telemetry/AFixtureFreshness.h"
+FRESHNESS_SOURCE = f"{SOURCE_TREE}/Telemetry/AFixtureFreshness.cc"
+SINK_INTERFACE = f"{SOURCE_TREE}/Payload/AFixturePayloadCommandSink.h"
+SINK_HOLDER = f"{SOURCE_TREE}/Payload/AFixturePayloadModel.h"
+SINK_IMPLEMENTATION = f"{TEST_TREE}/Payload/AFixturePayloadModelTest.cc"
+
+# How a fixture source includes the interface, which is the file name of the header above.
+SINK_HEADER_NAME = SINK_INTERFACE.rpartition("/")[2]
+
+# Where a rejecting case writes the subject it asserts a finding for: a file the baseline does not
+# carry, so the tree under review is the agreeing one plus the one file the test wrote.
+ADDED_SOURCE = f"{SOURCE_TREE}/Payload/AFixtureAddedSource.cc"
+ADDED_TEST_SOURCE = f"{TEST_TREE}/Payload/AFixtureAddedTest.cc"
+
+# The four subjects where the repository actually holds them, read by the real-tree case of each
+# rule. Spelled here rather than discovered, because what those cases are evidence of is that the
+# rules read *these* files: the day `AeroraFreshness.cc`'s out-of-line definition starts reading as
+# a call site, the case that fails has to be the one naming it.
+REAL_OVERRIDES = f"{SOURCE_TREE}/UI/AeroraQmlOverrides.cc"
+REAL_FRESHNESS_HEADER = f"{SOURCE_TREE}/Telemetry/AeroraFreshness.h"
+REAL_FRESHNESS_SOURCE = f"{SOURCE_TREE}/Telemetry/AeroraFreshness.cc"
+REAL_SINK_INTERFACE = f"{SOURCE_TREE}/Payload/AeroraPayloadCommandSink.h"
+REAL_SINK_HOLDER = f"{SOURCE_TREE}/Payload/AeroraPayloadModel.h"
+REAL_SINK_IMPLEMENTATION = f"{TEST_TREE}/Payload/AeroraPayloadModelTest.cc"
+
+# The one entry this build declares and the tier it carries. `FlyViewCustomLayer.qml` is the third
+# pre-approved seam and is legitimately in the allow-list -- it is an empty upstream seam carrying
+# no action -- so the baseline declares it and the two rules passing over it is the baseline rather
+# than a case of its own. A rule that confused the three seams, or that read any declared entry as
+# a populated-file fork, would reject the tree it exists to protect.
+DECLARED_SEAM = f"{SEAM_DIRECTORY}/FlyViewCustomLayer.qml"
+PURPOSE_BUILT_TIER = "Tier::PurposeBuiltSeam"
+
+# The entry a rejecting case adds: a fork of a populated upstream file, which is a fixture path
+# rather than a file upstream carries. What makes it the subject is the tier beside it.
+FORKED_FILE = f"{SEAM_DIRECTORY}/AFixtureForkedFile.qml"
+
+
+def _override_entries(*entries: tuple[str, str]) -> str:
+    """The override allow-list as the overlay writes it, returning *entries* as path and tier.
+
+    Every legitimate mention `aerora/src/UI/AeroraQmlOverrides.cc` carries is here: the comment
+    block inside the function names the forbidden tier and both pre-approved seams in prose, and
+    `populatedFileOverrideCount()` compares an entry's tier against the forbidden tier in code. So
+    a rule reading the file rather than the returned list reports a finding against this fixture,
+    and the accepting cases below are evidence that the span is the list.
+    """
+    declared = "".join(f'        {{QStringLiteral("{path}"), {tier}}},\n' for path, tier in entries)
+    undeclared = "".join(f"    //       {seam}\n" for seam in PRE_APPROVED_SEAMS)
+    return (
+        '#include "AFixtureQmlOverrides.h"\n'
+        "\n"
+        f"QList<AeroraQmlOverrides::OverrideEntry> {OVERRIDE_ENTRIES}\n"
+        "{\n"
+        "    // A fixture comment block standing where the overlay's own does.\n"
+        "    //\n"
+        "    // The other two pre-approved seams stay UNDECLARED, because both exist to introduce\n"
+        "    // operator actions:\n"
+        f"{undeclared}"
+        "    //\n"
+        f"    // A {POPULATED_FILE_TIER} entry additionally requires a recorded reason, a\n"
+        "    // fork-point commit and a named owner before it is added.\n"
+        "    return {\n"
+        f"{declared}"
+        "    };\n"
+        "}\n"
+        "\n"
+        "int AeroraQmlOverrides::populatedFileOverrideCount()\n"
+        "{\n"
+        "    int count = 0;\n"
+        "\n"
+        "    for (const OverrideEntry &entry : overrideEntries()) {\n"
+        f"        if (entry.tier == {POPULATED_FILE_TIER}) {{\n"
+        "            ++count;\n"
+        "        }\n"
+        "    }\n"
+        "\n"
+        "    return count;\n"
+        "}\n"
+    )
+
+
+def _freshness_declaration() -> str:
+    """The setter declared in a header, which is a declaration and never a call site."""
+    return (
+        "#pragma once\n"
+        "\n"
+        "class AFixtureFreshness\n"
+        "{\n"
+        "public:\n"
+        f"    /// A fixture doc comment naming {THRESHOLD_SETTER}() in prose.\n"
+        f"    void {THRESHOLD_SETTER}(const QString &freshnessClass, "
+        "std::chrono::microseconds threshold);\n"
+        "};\n"
+    )
+
+
+def _freshness_definition() -> str:
+    """The setter defined out of line, which is a definition and never a call site."""
+    return (
+        '#include "AFixtureFreshness.h"\n'
+        "\n"
+        f"void AFixtureFreshness::{THRESHOLD_SETTER}(const QString &freshnessClass, "
+        "std::chrono::microseconds threshold)\n"
+        "{\n"
+        "    _thresholds.insert(freshnessClass, threshold);\n"
+        "}\n"
+    )
+
+
+def _threshold_call(reached_by: str) -> str:
+    """A fixture source calling the setter, reaching it the way *reached_by* spells.
+
+    The arguments are fixture calls rather than values: the class a call names and the budget it
+    passes are Decision_Content, and a threshold value is a Contract_Value outright, so nothing
+    here -- and nothing in a finding about it -- writes one.
+    """
+    return (
+        '#include "AFixtureFreshness.h"\n'
+        "\n"
+        "void aFixtureFunction(AFixtureFreshness *freshness)\n"
+        "{\n"
+        f"    {reached_by}{THRESHOLD_SETTER}(aFixtureClass(), aFixtureBudget());\n"
+        "}\n"
+    )
+
+
+def _sink_interface() -> str:
+    """The interface itself: declared, and deliberately carrying no implementation."""
+    return (
+        "#pragma once\n"
+        "\n"
+        f"/// A fixture doc comment naming {PAYLOAD_COMMAND_SINK_TYPE} in prose.\n"
+        f"class {PAYLOAD_COMMAND_SINK_TYPE}\n"
+        "{\n"
+        "public:\n"
+        f"    virtual ~{PAYLOAD_COMMAND_SINK_TYPE}() = default;\n"
+        "\n"
+        "    [[nodiscard]] virtual bool submitPayloadRequest(const AFixtureRequest &r) = 0;\n"
+        "};\n"
+    )
+
+
+def _sink_holder() -> str:
+    """A class holding the sink as a pointer member and taking one as a parameter.
+
+    Both are the shape `aerora/src/Payload/AeroraPayloadModel.h` has, and neither is an
+    implementation: the member is a pointer the overlay never assigns, and the parameter belongs to
+    the setter that would assign it. The class derives from something else, so the base-class list
+    the rule reads is there and names another type.
+    """
+    return (
+        "#pragma once\n"
+        "\n"
+        f'#include "{SINK_HEADER_NAME}"\n'
+        "\n"
+        f"/// Nothing in the fixture tree implements {PAYLOAD_COMMAND_SINK_TYPE}, so the sink is\n"
+        "/// null for the lifetime of this object.\n"
+        "class AFixturePayloadModel : public AFixtureBase\n"
+        "{\n"
+        "public:\n"
+        f"    void setCommandSink({PAYLOAD_COMMAND_SINK_TYPE} *sink);\n"
+        "\n"
+        "private:\n"
+        f"    {PAYLOAD_COMMAND_SINK_TYPE} *_commandSink = nullptr;\n"
+        "};\n"
+    )
+
+
+def _sink_implementation(head: str) -> str:
+    """A class whose head is *head*, which derives from the interface and so implements it."""
+    return (
+        f'#include "{SINK_HEADER_NAME}"\n'
+        "\n"
+        "/// A fixture double recording what it was handed.\n"
+        f"{head}\n"
+        "{\n"
+        "public:\n"
+        "    bool submitPayloadRequest(const AFixtureRequest &r) override\n"
+        "    {\n"
+        "        _requests.append(r);\n"
+        "        return true;\n"
+        "    }\n"
+        "};\n"
+    )
+
+
+# The derivation the fixture test double is written with, which is the shape
+# `aerora/test/Payload/AeroraPayloadModelTest.cc` uses for the one implementation in the tree.
+RECORDING_SINK_HEAD = f"class ARecordingFixtureSink : public {PAYLOAD_COMMAND_SINK_TYPE}"
+
+
+def _absence_sources(root: Path) -> Path:
+    """Lay out the four subjects of the absence rules, each in the state the real tree holds it.
+
+    Absent is not empty. Each subject's legitimate namesakes are written here, because telling the
+    subject from a mention of its own name is what the four rules have to do: the allow-list
+    declares an entry and names the forbidden tier and both pre-approved seams in prose; the
+    threshold setter is declared and defined and never called; and the payload command sink is
+    declared, held as a pointer member, taken as a parameter, named in doc comments and implemented
+    exactly once, under the test tree, which is where the prohibition's own instrument lives.
+    """
+    _write(root / OVERRIDES_SOURCE, _override_entries((DECLARED_SEAM, PURPOSE_BUILT_TIER)))
+    _write(root / FRESHNESS_HEADER, _freshness_declaration())
+    _write(root / FRESHNESS_SOURCE, _freshness_definition())
+    _write(root / SINK_INTERFACE, _sink_interface())
+    _write(root / SINK_HOLDER, _sink_holder())
+    _write(root / SINK_IMPLEMENTATION, _sink_implementation(RECORDING_SINK_HEAD))
+    return root
+
+
 def _tree(root: Path, register: GateRegister | None = None, *, applied: bool = False) -> Path:
     """A repository root carrying *register*, the inventory it names and the sources it names.
 
@@ -329,19 +595,24 @@ def _tree(root: Path, register: GateRegister | None = None, *, applied: bool = F
     because every register reachable through a document here records the authorisation unsigned --
     no fixture part is accepted -- and neither half applied is the state Requirement 7 criterion 17
     protects. A test wanting the applied pair says so.
+
+    The four subjects of the absence rules come with it, each in its absent state, so the baseline
+    passes every rule in this module and a test asserting a finding writes that finding itself.
     """
     recorded = _register() if register is None else register
-    return _guard_sources(
-        _pair_sources(
-            _repository(
-                root,
-                register=dump_gate_register(recorded),
-                inventory=_inventory_text(_baseline_rows(recorded), _blocked_by(recorded)),
+    return _absence_sources(
+        _guard_sources(
+            _pair_sources(
+                _repository(
+                    root,
+                    register=dump_gate_register(recorded),
+                    inventory=_inventory_text(_baseline_rows(recorded), _blocked_by(recorded)),
+                ),
+                friend=applied,
+                defined=applied,
             ),
-            friend=applied,
-            defined=applied,
-        ),
-        recorded,
+            recorded,
+        )
     )
 
 
@@ -405,19 +676,27 @@ def _review(root: Path) -> AnalysisResult:
     return review(root, [])
 
 
-def _established(register: GateRegister, *, files: int = 0, baseline: int = 0) -> str:
+def _established(
+    register: GateRegister, *, files: int = 0, baseline: int = 0, in_force: int = ABSENCE_RULES
+) -> str:
     """The summary line a run ends with, spelled out rather than matched loosely.
 
     What it claims is the point: the guard rules read the files *register* names, `adr-016-pair`
-    reads the two files the criterion names and `mavlink-identifier` walks the overlay tree, so the
-    line reports the guard values, the assertion sites, the pair and the allow-list it compared, and
-    states that the selection decided none of it. Taking it off a run's output by equality is what
-    makes every test below assert that the claim still reads that way.
+    reads the two files the criterion names, `mavlink-identifier` walks the overlay tree and the
+    four absence rules walk the overlay source, so the line reports the guard values, the assertion
+    sites, the pair, the allow-list and the rules in force, and states that the selection decided
+    none of it. Taking it off a run's output by equality is what makes every test below assert that
+    the claim still reads that way.
 
     *baseline* is how many identifiers the allow-listed sites held, which defaults to none because
     no fixture tree carries a MAVLink identifier until a test writes one. A test that writes one
     says how many, which is how the ratchet case asserts that the baseline is read from the tree
     rather than recorded anywhere.
+
+    *in_force* is how many of the absence rules the derivation leaves in force, which defaults to
+    all of them because every Gate of every register reachable through a document here is open. It
+    is in the summary rather than left implicit because a rule standing down reports nothing: a run
+    in which four rules stood down must not read as a run in which four rules found nothing.
     """
     guards = [guard for guard in register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
     sites = sum(len(guard.asserted_in) for guard in guards)
@@ -427,17 +706,24 @@ def _established(register: GateRegister, *, files: int = 0, baseline: int = 0) -
         f"Gate_Dossiers; {len(guards)} guard values and {sites} assertion sites compared against "
         f"the files the register names, and the ADR-016 pair against {CORE_HEADER} and "
         f"{OVERLAY_MANIFEST}; every file under {OVERLAY_TREE}/ searched against {allow_listed} "
-        f"allow-listed sites holding {baseline} identifiers; no rule read a file because it was "
-        f"among the {files} selected source files\n"
+        f"allow-listed sites holding {baseline} identifiers; {in_force} of the four absence rules "
+        f"in force over {SOURCE_TREE}/ and {ABSENCE_RULES - in_force} standing down on a Gate the "
+        f"derivation records closed; no rule read a file because it was among the {files} selected "
+        f"source files\n"
     )
 
 
 def _lines(
-    result: AnalysisResult, register: GateRegister, *, files: int = 0, baseline: int = 0
+    result: AnalysisResult,
+    register: GateRegister,
+    *,
+    files: int = 0,
+    baseline: int = 0,
+    in_force: int = ABSENCE_RULES,
 ) -> list[str]:
     """The finding lines *result* printed, with the summary the run ends with taken off."""
     return result.output.removesuffix(
-        _established(register, files=files, baseline=baseline)
+        _established(register, files=files, baseline=baseline, in_force=in_force)
     ).splitlines()
 
 
@@ -1521,3 +1807,580 @@ def test_mavlink_identifier_reports_the_real_overlay_tree_against_an_empty_allow
     assert [path for path in reported if path.startswith(f"{OVERLAY_TREE}/src/")]
     assert not any(_NAMED_IDENTIFIER.search(finding.message) for finding in findings)
     assert _snapshot(REPO_ROOT / OVERLAY_TREE) == before
+
+
+# ---------------------------------------------------------------------------
+# populated-file-override
+#
+# Named with the `override` token, which is the selector this group reaches under: `-k override`
+# runs it and nothing else.
+#
+# The subject is one entry in one list, and everything hard about the rule is that the file holding
+# that list names the subject twice more -- in the function's own comment block and in the count
+# that counts it. So the accepting cases assert the mentions are present before asserting that
+# nothing was reported, because a quiet fixture would prove nothing.
+# ---------------------------------------------------------------------------
+
+
+def _closing(root: Path, *gates: str) -> Premises:
+    """Premises in which each of *gates* is accepted, rooted at the four absent subjects.
+
+    The route every Gate-closed case takes, for the reason `_authorised` takes it: a closed Gate
+    needs an accepted part naming a Closure_Record, which `_accepting` builds in code, so the
+    register cannot reach the rule as a document.
+    """
+    premises = _accepting(_register(), {gate: _permissions(gate) for gate in gates})
+    return replace(premises, root=_absence_sources(root))
+
+
+def _line_holding(root: Path, path: str, text: str) -> int:
+    """The one-based line of *path* under *root* that holds *text*, and it must hold it once.
+
+    Counted here rather than taken off the finding, so the line a rule reports is compared against
+    a number this file worked out from the fixture it wrote.
+    """
+    lines = (root / path).read_text(encoding="utf-8").splitlines()
+    (found,) = [number for number, line in enumerate(lines, 1) if text in line]
+    return found
+
+
+def test_populated_file_override_accepts_a_list_naming_the_tier_only_in_prose_and_in_the_count(
+    tmp_path: Path,
+) -> None:
+    """The state the tree stands in, with both legitimate mentions of the tier in the file.
+
+    The comment block inside the function names the forbidden tier, and
+    `populatedFileOverrideCount()` compares an entry's tier against it in code. A rule that read the
+    file would reject both; a rule that read the function body would reject the comment. Nothing is
+    reported, and the mentions are asserted present, so the pass is evidence that the span read is
+    the returned list and that comments came out.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    declared = (root / OVERRIDES_SOURCE).read_text(encoding="utf-8")
+    assert declared.count(POPULATED_FILE_TIER) == 2
+    assert f'{{QStringLiteral("{DECLARED_SEAM}"), {PURPOSE_BUILT_TIER}}}' in declared
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_populated_file_override_rejects_an_entry_carrying_the_forbidden_tier(
+    tmp_path: Path,
+) -> None:
+    """Requirement 14 criterion 13: reject the change before it enters the repository.
+
+    The entry is added beside the one the build declares, so what the rule rejects is the entry
+    rather than a list it could not read, and the line it names is the entry's own.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / OVERRIDES_SOURCE,
+        _override_entries(
+            (DECLARED_SEAM, PURPOSE_BUILT_TIER),
+            (FORKED_FILE, POPULATED_FILE_TIER),
+        ),
+    )
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    entry = _line_holding(root, OVERRIDES_SOURCE, f'QStringLiteral("{FORKED_FILE}")')
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{POPULATED_FILE_OVERRIDE}: {VIDEO_GATE}: {OVERRIDES_SOURCE}: ")
+    assert f"carries a {POPULATED_FILE_TIER} entry at line {entry}" in line
+    assert "Requirement 14 criterion 13" in line
+
+
+def test_populated_file_override_reads_an_entry_path_naming_the_tier_as_a_path(
+    tmp_path: Path,
+) -> None:
+    """A quoted path is not code, so a file named after the tier is not an entry carrying it.
+
+    The false rejection this avoids is the kind that gets a gate removed rather than obeyed: the
+    rule matches the tier without its qualifier, because the span is a list of paths and tiers, and
+    what makes that sound is that the paths are blanked before the match.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / OVERRIDES_SOURCE,
+        _override_entries(
+            ("/qml/QGroundControl/FlyView/PopulatedFile.qml", PURPOSE_BUILT_TIER),
+        ),
+    )
+
+    result = _review(root)
+
+    assert "PopulatedFile" in (root / OVERRIDES_SOURCE).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_populated_file_override_stands_down_once_the_gate_records_an_accepted_closure(
+    tmp_path: Path,
+) -> None:
+    """The criterion is written `WHILE DG-VID holds no accepted Closure_Record`.
+
+    The entry is in the list and the rule says nothing, because once the Gate is closed the fork
+    the entry makes is the one an owner signed a fork point, an owner and a drift-review cadence
+    for. A rule that kept rejecting it would be rejecting the decision.
+    """
+    premises = _closing(tmp_path / "repo", VIDEO_GATE)
+    _write(
+        premises.root / OVERRIDES_SOURCE,
+        _override_entries((FORKED_FILE, POPULATED_FILE_TIER)),
+    )
+
+    assert not premises.derived.gate_open[VIDEO_GATE].is_open
+    assert check_populated_file_override(premises) == []
+
+
+def test_populated_file_override_and_action_seam_each_name_a_tree_defining_no_allow_list(
+    tmp_path: Path,
+) -> None:
+    """The allow-list is read against nothing, reported once per decision left unprotected.
+
+    Two findings for one defect, deliberately: the two rules protect two Gates, and a reviewer
+    repairing one of them has to see that the other is unguarded too. The criteria name the
+    function rather than a file, so a function nobody defines is a failure rather than an absence --
+    renaming it would otherwise switch both rules off silently.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    (root / OVERRIDES_SOURCE).unlink()
+
+    result = _review(root)
+
+    override, seam = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 2
+    assert override.startswith(f"{POPULATED_FILE_OVERRIDE}: {VIDEO_GATE}: ")
+    assert seam.startswith(f"{ACTION_SEAM}: {ROLE_GATE}: ")
+    assert all(
+        f"no file under {SOURCE_TREE}/ defines {OVERRIDE_ENTRIES}" in line
+        for line in (override, seam)
+    )
+    assert all('"not found" is not "absent"' in line for line in (override, seam))
+
+
+def test_populated_file_override_reads_the_real_allow_list_without_writing_it() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    The real file names the forbidden tier in its comment block and in the count, and declares one
+    purpose-built seam, so a rule that read the file or the whole function body would reject this
+    tree. Nothing is reported, the mentions are asserted present, and the file comes back byte for
+    byte: the rule reads the overlay and never writes it.
+    """
+    before = (REPO_ROOT / REAL_OVERRIDES).read_text(encoding="utf-8")
+
+    assert POPULATED_FILE_TIER in before
+    assert check_populated_file_override(_premises(_register())) == []
+    assert (REPO_ROOT / REAL_OVERRIDES).read_text(encoding="utf-8") == before
+
+
+# ---------------------------------------------------------------------------
+# action-seam
+#
+# Named with the `seam` token, which is the selector this group reaches under.
+#
+# Three seams exist and one of them is declared, so the rule's job is to tell the two the criterion
+# retains from the one it does not mention. The baseline declares `FlyViewCustomLayer.qml`, so every
+# accepting case here is a list with an entry in it rather than an empty one.
+# ---------------------------------------------------------------------------
+
+
+def test_action_seam_accepts_the_one_seam_the_allow_list_declares(tmp_path: Path) -> None:
+    """A declared seam the criterion does not name is not a declared action seam.
+
+    `FlyViewCustomLayer.qml` is an empty upstream seam carrying a read-only overlay, and both seams
+    the criterion retains are named in the same file's comment block as deliberately undeclared. A
+    rule that matched any seam, or that read the comment, would reject the tree it protects.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    declared = (root / OVERRIDES_SOURCE).read_text(encoding="utf-8")
+    assert DECLARED_SEAM in declared
+    assert all(seam in declared for seam in PRE_APPROVED_SEAMS)
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+@pytest.mark.parametrize("seam", PRE_APPROVED_SEAMS)
+def test_action_seam_rejects_either_pre_approved_seam_added_to_the_allow_list(
+    tmp_path: Path, seam: str
+) -> None:
+    """Requirement 5 criterion 4: reject the addition, and retain both seams as undeclared.
+
+    Both seams, because the criterion names both and a rule watching one would let the other in.
+    The seam is added as the resource path the allow-list carries, and the finding names it by the
+    file name the criterion names it by.
+    """
+    register = _register()
+    declared = f"{SEAM_DIRECTORY}/{seam}"
+    root = _tree(tmp_path / "repo", register)
+    _write(
+        root / OVERRIDES_SOURCE,
+        _override_entries((DECLARED_SEAM, PURPOSE_BUILT_TIER), (declared, PURPOSE_BUILT_TIER)),
+    )
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    entry = _line_holding(root, OVERRIDES_SOURCE, f'QStringLiteral("{declared}")')
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{ACTION_SEAM}: {ROLE_GATE}: {OVERRIDES_SOURCE}: ")
+    assert f"carries {seam} at line {entry}" in line
+    assert "Requirement 5 criterion 4" in line
+    assert "retains both seams as pre-approved and undeclared" in line
+
+
+def test_action_seam_stands_down_once_the_gate_records_an_accepted_closure(tmp_path: Path) -> None:
+    """The criterion is written `WHILE DG-ROL is OPEN`.
+
+    Both seams are declared and the rule says nothing, because the operator actions each one
+    introduces are then inside the authorisation scope the acceptance settled.
+    """
+    premises = _closing(tmp_path / "repo", ROLE_GATE)
+    _write(
+        premises.root / OVERRIDES_SOURCE,
+        _override_entries(
+            *((f"{SEAM_DIRECTORY}/{seam}", PURPOSE_BUILT_TIER) for seam in PRE_APPROVED_SEAMS)
+        ),
+    )
+
+    assert not premises.derived.gate_open[ROLE_GATE].is_open
+    assert check_action_seam(premises) == []
+
+
+def test_action_seam_reads_the_real_allow_list_and_finds_neither_seam() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    The real file names both seams in prose, as the two it deliberately leaves undeclared, so a
+    rule that read the file rather than the returned list would reject exactly the posture the
+    criterion requires.
+    """
+    before = (REPO_ROOT / REAL_OVERRIDES).read_text(encoding="utf-8")
+
+    assert all(seam in before for seam in PRE_APPROVED_SEAMS)
+    assert check_action_seam(_premises(_register())) == []
+    assert (REPO_ROOT / REAL_OVERRIDES).read_text(encoding="utf-8") == before
+
+
+# ---------------------------------------------------------------------------
+# freshness-threshold
+#
+# Named with the `threshold` token, which is the selector this group reaches under.
+#
+# The sharp edge: the setter is declared and defined under the overlay source tree today, and every
+# call in the repository is in a suite. A rule searching for the name, or for the name and its
+# parenthesis, would reject the declaration and the definition and fail on a clean tree.
+# ---------------------------------------------------------------------------
+
+
+def test_freshness_threshold_accepts_a_declaration_and_an_out_of_line_definition(
+    tmp_path: Path,
+) -> None:
+    """Neither a declaration nor a definition introduces a value, so neither is a call site."""
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    assert f"void {THRESHOLD_SETTER}(" in (root / FRESHNESS_HEADER).read_text(encoding="utf-8")
+    assert f"::{THRESHOLD_SETTER}(" in (root / FRESHNESS_SOURCE).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+@pytest.mark.parametrize(
+    "reached_by",
+    ["freshness->", "freshness.", "", "AFixtureFreshness::", "return freshness->"],
+    ids=["arrow", "dot", "implicit-this", "qualified", "returned"],
+)
+def test_freshness_threshold_rejects_a_call_site_however_it_reaches_the_setter(
+    tmp_path: Path, reached_by: str
+) -> None:
+    """Requirement 8 criterion 13: a call is where a threshold value is introduced.
+
+    Five spellings, because the classification reads the statement backwards from the name and each
+    spelling exercises a different branch of it: a member access through a pointer and through a
+    value, an implicit `this`, a qualified call whose qualifier an out-of-line definition also
+    carries, and an expression keyword that ends in an identifier the way a return type does.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / ADDED_SOURCE, _threshold_call(reached_by))
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    called = _line_holding(root, ADDED_SOURCE, f"{THRESHOLD_SETTER}(")
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{FRESHNESS_THRESHOLD}: {FRESHNESS_GATE}: {ADDED_SOURCE}: ")
+    assert f"calls {THRESHOLD_SETTER}() at line {called}" in line
+    assert "Requirement 8 criterion 13" in line
+    assert f"holds the Gate at {OPEN_STATUS}" in line
+
+
+def test_freshness_threshold_leaves_a_call_site_under_the_test_tree_alone(tmp_path: Path) -> None:
+    """Every call in the repository is a suite configuring a fixture, which is the evidence.
+
+    The suites assert the three-outcome evaluation criterion 4 requires, and they cannot assert it
+    without registering a threshold. A rule scoped to the overlay tree would reject the tests that
+    prove the behaviour the Gate holds open.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / ADDED_TEST_SOURCE, _threshold_call("freshness->"))
+
+    result = _review(root)
+
+    assert f"{THRESHOLD_SETTER}(" in (root / ADDED_TEST_SOURCE).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_freshness_threshold_stands_down_once_the_gate_records_an_accepted_closure(
+    tmp_path: Path,
+) -> None:
+    """The criterion is written `WHILE DG-FRS holds no accepted Closure_Record for a class`.
+
+    The call site is there and the rule says nothing, because the value it would pass is then a
+    value an owner signed with its unit and its source.
+    """
+    premises = _closing(tmp_path / "repo", FRESHNESS_GATE)
+    _write(premises.root / ADDED_SOURCE, _threshold_call("freshness->"))
+
+    assert not premises.derived.gate_open[FRESHNESS_GATE].is_open
+    assert check_freshness_threshold(premises) == []
+
+
+def test_freshness_threshold_leaves_the_recorded_literal_to_guard_value(tmp_path: Path) -> None:
+    """The division of one subject between two rules, asserted as output.
+
+    `AeroraPowerModel::kDefinedThresholdCount` is a recorded guard, so the literal it holds is
+    `guard-value`'s to read against the register -- with the disagreement, the three-value case and
+    the renamed declaration all reported there. A declaration carrying another literal is one
+    finding from that rule and none from this one, so the two never answer the same question twice.
+    """
+    register = _alone(_register(), POWER_GUARD)
+    root = _tree(tmp_path / "repo", register)
+    _write(root / SOLO_DECLARATION, _declares(POWER_GUARD, ANOTHER_VALUE))
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{GUARD_VALUE}: {PAYLOAD_GATE}: {POWER_GUARD}: ")
+    assert FRESHNESS_THRESHOLD not in result.output
+
+
+def test_freshness_threshold_names_the_registry_recording_no_entry_for_the_count(
+    tmp_path: Path,
+) -> None:
+    """A deferral has to land somewhere, and this is the case in which it would not.
+
+    Without a registry entry, `guard-value` reads nothing for the count and the literal is pinned by
+    neither rule. That the registry covers the guard is `guard-registry`'s finding in the data half;
+    what is reported here is the deferral landing nowhere.
+    """
+    register = _register(
+        guards=[_guard(symbol) for symbol in BASELINE_GUARD_GATES if symbol != POWER_GUARD]
+    )
+    premises = replace(_premises(register), root=_absence_sources(tmp_path / "repo"))
+
+    (finding,) = check_freshness_threshold(premises)
+
+    assert finding.check == FRESHNESS_THRESHOLD
+    assert finding.gates == (FRESHNESS_GATE,)
+    assert finding.blocking
+    assert finding.message.startswith(f"{POWER_GUARD}: ")
+    assert "records no entry for it" in finding.message
+    assert f"defers to {GUARD_VALUE}" in finding.message
+    assert f"is {GUARD_REGISTRY}'s finding in the data half" in finding.message
+
+
+def test_freshness_threshold_reads_the_real_source_tree_and_finds_no_call_site() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    `AeroraFreshness.h` declares the setter and `AeroraFreshness.cc` defines it out of line, and
+    both are asserted present here, so a rule that read either as a call site would reject a clean
+    tree -- and this is the test that fails the day one of them starts reading as one. The tree
+    comes back byte for byte.
+    """
+    pair = (REAL_FRESHNESS_HEADER, REAL_FRESHNESS_SOURCE)
+    before = {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in pair}
+
+    assert f"void {THRESHOLD_SETTER}(" in before[REAL_FRESHNESS_HEADER]
+    assert f"::{THRESHOLD_SETTER}(" in before[REAL_FRESHNESS_SOURCE]
+    assert check_freshness_threshold(_premises(_register())) == []
+    assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in pair} == before
+
+
+# ---------------------------------------------------------------------------
+# payload-command-sink
+#
+# Named with the `sink` token, which is the selector this group reaches under.
+#
+# The other sharp edge: the interface is declared under the overlay source tree deliberately, and
+# the overlay holds its name in a pointer member, a setter parameter and three doc comments. The one
+# implementation in the repository is a recording double under `aerora/test/**`, which the
+# prohibition's own tests need.
+# ---------------------------------------------------------------------------
+
+
+def test_payload_command_sink_accepts_the_interface_a_pointer_member_and_a_parameter(
+    tmp_path: Path,
+) -> None:
+    """Declaring the interface is the Gate's recorded state; holding one is not implementing one."""
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    assert f"class {PAYLOAD_COMMAND_SINK_TYPE}" in (root / SINK_INTERFACE).read_text(
+        encoding="utf-8"
+    )
+    holder = (root / SINK_HOLDER).read_text(encoding="utf-8")
+    assert f"{PAYLOAD_COMMAND_SINK_TYPE} *_commandSink" in holder
+    assert f"setCommandSink({PAYLOAD_COMMAND_SINK_TYPE} *sink)" in holder
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+def test_payload_command_sink_leaves_the_implementation_under_the_test_tree_alone(
+    tmp_path: Path,
+) -> None:
+    """The one implementation in the repository is the instrument the prohibition tests need.
+
+    It records what it was handed so a suite can assert that nothing was handed to it, which is how
+    the absence of an outbound path is asserted rather than reviewed. A rule scoped to the overlay
+    tree would reject the evidence for the prohibition it enforces.
+    """
+    register = _register()
+
+    root = _tree(tmp_path / "repo", register)
+    result = _review(root)
+
+    assert RECORDING_SINK_HEAD in (root / SINK_IMPLEMENTATION).read_text(encoding="utf-8")
+    assert result.passed
+    assert result.issues == 0
+    assert _lines(result, register) == []
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        f"class AFixtureSink : public {PAYLOAD_COMMAND_SINK_TYPE}",
+        f"struct AFixtureSink : {PAYLOAD_COMMAND_SINK_TYPE}",
+        f"class AFixtureSink final : public {PAYLOAD_COMMAND_SINK_TYPE}",
+        f"class AFixtureSink : public AFixtureBase, public {PAYLOAD_COMMAND_SINK_TYPE}",
+    ],
+    ids=["public", "implicit-struct", "final", "second-base"],
+)
+def test_payload_command_sink_rejects_an_implementation_under_the_source_tree(
+    tmp_path: Path, head: str
+) -> None:
+    """Requirement 10 criterion 18: reject the change and name each of the two Gates that is open.
+
+    Four class heads, because a derivation is what an implementation is and each of these is one:
+    the access specifier is optional, `final` sits between the name and the base clause, and the
+    interface may be the second base rather than the first.
+    """
+    register = _register()
+    root = _tree(tmp_path / "repo", register)
+    _write(root / ADDED_SOURCE, _sink_implementation(head))
+
+    result = _review(root)
+
+    (line,) = _lines(result, register)
+    derived = _line_holding(root, ADDED_SOURCE, head)
+    assert not result.passed
+    assert result.issues == 1
+    assert line.startswith(f"{PAYLOAD_COMMAND_SINK}: {PAYLOAD_GATE}, {ROLE_GATE}: {ADDED_SOURCE}: ")
+    assert f"derives from {PAYLOAD_COMMAND_SINK_TYPE} at line {derived}" in line
+    assert "Requirement 10 criterion 18" in line
+
+
+def test_payload_command_sink_names_only_the_gate_that_is_still_open(tmp_path: Path) -> None:
+    """Criterion 18 is a disjunction over two Gates, and the finding names the ones that are open.
+
+    With the payload Gate accepted, the implementation is still rejected and the read-only Gate is
+    the only one named: the payload Decision_Content exists, and nothing yet evaluates an
+    authorisation for the command path it would reach.
+    """
+    premises = _closing(tmp_path / "repo", PAYLOAD_GATE)
+    _write(premises.root / ADDED_SOURCE, _sink_implementation(RECORDING_SINK_HEAD))
+
+    (finding,) = check_payload_command_sink(premises)
+
+    assert not premises.derived.gate_open[PAYLOAD_GATE].is_open
+    assert premises.derived.gate_open[ROLE_GATE].is_open
+    assert finding.check == PAYLOAD_COMMAND_SINK
+    assert finding.gates == (ROLE_GATE,)
+    assert finding.blocking
+
+
+def test_payload_command_sink_stands_down_once_both_gates_record_an_accepted_closure(
+    tmp_path: Path,
+) -> None:
+    """Both halves of the disjunction closed, so the rule has nothing left to say."""
+    premises = _closing(tmp_path / "repo", PAYLOAD_GATE, ROLE_GATE)
+    _write(premises.root / ADDED_SOURCE, _sink_implementation(RECORDING_SINK_HEAD))
+
+    assert not premises.derived.gate_open[PAYLOAD_GATE].is_open
+    assert not premises.derived.gate_open[ROLE_GATE].is_open
+    assert check_payload_command_sink(premises) == []
+
+
+def test_payload_command_sink_rejects_a_source_tree_it_could_not_walk(tmp_path: Path) -> None:
+    """A run that searched nothing must not read as a run that found nothing.
+
+    The premises are rooted at a tree carrying no overlay source at all, which is the state none of
+    the four absence rules can answer in: an absence read off a tree that was never walked is an
+    absence nobody established.
+    """
+    premises = replace(_premises(_register()), root=tmp_path / "repo")
+
+    (finding,) = check_payload_command_sink(premises)
+
+    assert finding.check == PAYLOAD_COMMAND_SINK
+    assert finding.gates == (PAYLOAD_GATE, ROLE_GATE)
+    assert finding.blocking
+    assert finding.message.startswith(f"{SOURCE_TREE}/ is not a directory")
+    assert "indistinguishable from a run that found nothing" in finding.message
+
+
+def test_payload_command_sink_reads_the_real_source_tree_and_finds_no_implementation() -> None:
+    """The one case for this rule whose evidence is the repository rather than a fixture.
+
+    The interface's own declaration, a pointer member of that type and a setter taking one are all
+    asserted present, and the one implementation in the repository is asserted to be the test
+    double under `aerora/test/**`. So a rule that searched for the name would reject the interface
+    the Gate exists to leave unimplemented, and this is the test that notices.
+    """
+    read = (REAL_SINK_INTERFACE, REAL_SINK_HOLDER, REAL_SINK_IMPLEMENTATION)
+    before = {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read}
+
+    assert f"class {PAYLOAD_COMMAND_SINK_TYPE}" in before[REAL_SINK_INTERFACE]
+    assert f"{PAYLOAD_COMMAND_SINK_TYPE} *_commandSink" in before[REAL_SINK_HOLDER]
+    assert f": public {PAYLOAD_COMMAND_SINK_TYPE}" in before[REAL_SINK_IMPLEMENTATION]
+    assert check_payload_command_sink(_premises(_register())) == []
+    assert {path: (REPO_ROOT / path).read_text(encoding="utf-8") for path in read} == before

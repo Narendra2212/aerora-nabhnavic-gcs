@@ -51,6 +51,18 @@ permission on the same registry entry, through the freedom derivation, because R
 criterion 18 records exactly that as the condition under which the core edit's authorisation lets
 the guard move. Both files are read as characters and neither is written.
 
+**The four absence rules assert that something is not there, and each stands down when its Gate
+closes.** ``populated-file-override``, ``action-seam``, ``freshness-threshold`` and
+``payload-command-sink`` read criteria written ``WHILE <gate> is OPEN``, so each reads the *derived*
+openness of the Gate it waits on -- ``premises.derived.gate_open``, which the data half evaluates
+once and ``gate-status-derivation`` owns the disagreement between recorded and derived. A rule whose
+Gate is closed reports nothing, and the run's summary states how many stood down, so a rule that
+stopped looking is a number rather than a silence. Each of the four distinguishes its subject from a
+legitimate mention of the same name -- the entry list rather than the file, a call rather than a
+declaration, a derivation rather than a pointer member -- because a rule that fired on this tree
+would be removed rather than obeyed. They add no path of their own: Requirement 5 criterion 2 counts
+an outbound path as the thing to reject, and four rules that reject one introduce none.
+
 **Reported is not passed.** A guard carrying a ``disagreement`` the source actually holds is the one
 concession the design makes to being gating: the finding is printed on every run and the run still
 exits zero, because a hook that blocks every commit until an unrelated authorisation lands gets
@@ -92,13 +104,16 @@ from validate_gate_register import (
     MAVLINK_IDENTIFIER_GUARD,
     OPEN_STATUS,
     OVERLAY_TREE,
+    PRE_APPROVED_SEAMS,
+    READ_ONLY_GATE,
     REGISTER_PATH,
     TEST_TREE,
+    THRESHOLD_COUNT_GUARD,
     load_premises,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from common.gate_register import (
         Disagreement,
@@ -118,14 +133,18 @@ ROOT: Final = Path(__file__).resolve().parents[2]
 # The name a finding and the dispatcher's status line carry, which is the hook id as well.
 NAME: Final = "gate-guards"
 
-# The four rules this module carries, named as the design's table names them. The fourth is spelled
-# by the registry entry rather than again: Requirement 4 criterion 5's ninth guard *is* this check,
-# so the guard's symbol and the check's name are one string and a second spelling of it would be a
-# second thing to keep in step.
+# The rules this module carries, named as the design's table names them. `mavlink-identifier` is
+# spelled by the registry entry rather than again: Requirement 4 criterion 5's ninth guard *is*
+# this check, so the guard's symbol and the check's name are one string and a second spelling of it
+# would be a second thing to keep in step.
 GUARD_VALUE: Final = "guard-value"
 GUARD_ASSERTION: Final = "guard-assertion"
 ADR_016_PAIR: Final = "adr-016-pair"
 MAVLINK_IDENTIFIER: Final = MAVLINK_IDENTIFIER_GUARD
+POPULATED_FILE_OVERRIDE: Final = "populated-file-override"
+ACTION_SEAM: Final = "action-seam"
+FRESHNESS_THRESHOLD: Final = "freshness-threshold"
+PAYLOAD_COMMAND_SINK: Final = "payload-command-sink"
 
 # How a finding names the Gate set where no Gate_Dossier records the element it rejects, which is
 # the second half of Requirement 4 criterion 2: name the element as unassigned Decision_Content.
@@ -182,8 +201,13 @@ def premise_findings(findings: Sequence[PremiseFinding]) -> list[Finding]:
 # Reading the files the register names
 # ---------------------------------------------------------------------------
 
-_BLOCK_COMMENT: Final = re.compile(r"/\*.*?\*/", re.S)
-_LINE_COMMENT: Final = re.compile(r"//[^\n]*")
+_COMMENT: Final = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
+
+# A string literal, with its escapes, so a path inside one is not read as code. Only the rules that
+# read a brace-delimited span mask these: a declaration and the literal beside it carry none, and
+# `mavlink-identifier` reads a token wherever it is written.
+_STRING: Final = re.compile(r'"(?:[^"\\\n]|\\.)*"')
+_NOT_NEWLINE: Final = re.compile(r"[^\n]")
 
 # The literal a definition's body returns, read from the first `return` after its opening brace.
 # A body whose value depends on a preprocessor condition therefore reads as its first branch, which
@@ -192,16 +216,45 @@ _LINE_COMMENT: Final = re.compile(r"//[^\n]*")
 _RETURN: Final = re.compile(r"\breturn\s+(?P<value>[^;]+);")
 
 
+def _blanked(match: re.Match[str]) -> str:
+    """*match* as the same span of spaces, with its newlines kept."""
+    return _NOT_NEWLINE.sub(" ", match.group())
+
+
 def _code(text: str) -> str:
-    """*text* with its comments removed, so a comment naming a guard does not declare one.
+    """*text* with its comments blanked, so a comment naming a guard does not declare one.
 
     The overlay documents every one of these guards in a doc comment beside it, and
     `AeroraSecurityStatus.h` carries ``kRemainingEnergyEstimationImplemented = false`` in prose, so
-    a rule that read comments would read a sentence *about* a guard as the guard itself. The removal
-    is textual and knows nothing about string literals, which is sound for what it reads here -- a
-    declaration and the literal beside it.
+    a rule that read comments would read a sentence *about* a guard as the guard itself. The same
+    holds for every subject the four absence rules read: the override allow-list's own comment block
+    names `Tier::PopulatedFile` and both pre-approved seams in prose, and
+    `AeroraPayloadModel.h` names the payload command sink in three doc comments.
+
+    Blanked rather than deleted, so a line number or an offset read off the result is the line
+    number in the file. A finding that named the wrong line would send a reviewer to the wrong
+    place, and the rules that walk a tree have no other way to say where they found a subject.
+
+    The removal is textual and knows nothing about string literals, which is sound for what it reads
+    here -- a declaration and the literal beside it, and spans the brace-reading rules mask
+    separately.
     """
-    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", text))
+    return _COMMENT.sub(_blanked, text)
+
+
+def _without_strings(text: str) -> str:
+    """*text* with its string literals blanked, on the same terms :func:`_code` blanks comments.
+
+    What this keeps out is a resource path read as code: the override allow-list carries each entry
+    as a quoted path beside its tier, so a path that happened to carry a tier's name would be read
+    as the tier. Length and newlines are preserved for the reason :func:`_code` preserves them.
+    """
+    return _STRING.sub(_blanked, text)
+
+
+def _line_of(text: str, offset: int) -> int:
+    """The one-based line of *text* that *offset* falls on."""
+    return text.count("\n", 0, offset) + 1
 
 
 def _read(root: Path, relative: str) -> tuple[str | None, str]:
@@ -1073,6 +1126,649 @@ def check_mavlink_identifier(premises: Premises) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# The four absence rules
+# ---------------------------------------------------------------------------
+
+# The tree the four absence rules read. The overlay's own source, without its suites: every subject
+# here is something the *product* must not carry, and `aerora/test/**` is where the instrument that
+# proves the prohibition lives -- the one implementation of the payload command sink in the tree is
+# a test double whose own comment says so, and every threshold call site is a suite configuring a
+# fixture. A rule scoped to the overlay tree would reject the evidence for the prohibition it
+# enforces. Recorded here rather than read out of the register, for the reason the data half records
+# `TEST_TREE`: the design's table names the tree, and a directory name is not a Contract_Value.
+SOURCE_TREE: Final = f"{OVERLAY_TREE}/src"
+
+# What an implementation can be written in. A `.md` naming a type in prose and a `.cmake` listing a
+# header are neither a declaration nor a call, and `aerora/src/Payload/README.md` and
+# `aerora/src/PayloadPower.cmake` carry the payload command sink's name for exactly those reasons.
+_SOURCE_SUFFIXES: Final = (".h", ".cc")
+
+# The Gate each absence rule waits on, which is the one place that mapping is written: `_standing`
+# reads it to decide whether a rule is in force and `_established` reads it to say how many stood
+# down. Requirement 14 criterion 13 names `DG-VID`, Requirement 5 criterion 4 names the read-only
+# Gate, Requirement 8 criteria 13 and 16 name `DG-FRS`, and Requirement 10 criterion 18 names
+# `DG-PAY` *and* the read-only Gate and requires each of the two that is open to be named.
+#
+# The read-only Gate is the data half's constant, imported rather than respelled, because the
+# posture that records both seams and every `FORBIDDEN-UNTIL` row reads that one Gate. The other
+# three are constants here on the same terms `MISSION_GATE` is: requirements.md names each verbatim
+# against the criterion the rule discharges.
+VIDEO_GATE: Final = "DG-VID"
+FRESHNESS_GATE: Final = "DG-FRS"
+PAYLOAD_GATE: Final = "DG-PAY"
+
+ABSENCE_GATES: Final[Mapping[str, tuple[str, ...]]] = {
+    POPULATED_FILE_OVERRIDE: (VIDEO_GATE,),
+    ACTION_SEAM: (READ_ONLY_GATE,),
+    FRESHNESS_THRESHOLD: (FRESHNESS_GATE,),
+    PAYLOAD_COMMAND_SINK: (PAYLOAD_GATE, READ_ONLY_GATE),
+}
+
+
+def _standing(premises: Premises, check: str) -> tuple[tuple[str, ...], list[Finding]]:
+    """The Gates *check* waits on that are open, or the premise it could not read them against.
+
+    **The derived openness, never the recorded status.** Each of these four criteria is written
+    ``WHILE <gate> is OPEN``, and Requirement 3 criterion 7 derives that from whether every part is
+    accepted. Reading ``dossier.status`` would let a Gate recorded `CLOSED` over an unsigned part
+    switch four rules off, which is the disagreement `gate-status-derivation` exists to report in
+    the data half -- so this reads the derivation and that check reports the gap.
+
+    An empty tuple with no finding is a rule standing down, which is the criterion's own
+    conditional rather than a rule going quiet: once the Gate holds an accepted Closure_Record, the
+    thing the rule rejects is the thing an owner signed for.
+
+    A Gate the register records no Gate_Dossier for leaves the conditional unanswerable, so the
+    rule reports that and does not run. That the register carries one dossier per Gate is the
+    schema's to reject -- ten items, each `id` an enum of the ten identifiers -- and what is
+    reported here is the rule read against nothing.
+    """
+    openness = premises.derived.gate_open
+    gates = ABSENCE_GATES[check]
+    unrecorded = tuple(gate for gate in gates if gate not in openness)
+    if unrecorded:
+        return (), [
+            Finding(
+                check,
+                (gate,),
+                "the register records no Gate_Dossier for the Gate this rule waits on, so whether "
+                "the rule is in force could not be derived and the subject it rejects was looked "
+                "for nowhere. That the register carries a Gate_Dossier per Gate is the schema's "
+                'to reject; what is reported here is the rule read against nothing: "not found" '
+                'is not "not open"',
+            )
+            for gate in unrecorded
+        ]
+    return tuple(gate for gate in gates if openness[gate].is_open), []
+
+
+def _in_force(premises: Premises) -> int:
+    """How many of the four rules the derivation leaves in force, for the run's own summary."""
+    openness = premises.derived.gate_open
+    return sum(
+        1
+        for gates in ABSENCE_GATES.values()
+        if any(gate in openness and openness[gate].is_open for gate in gates)
+    )
+
+
+@dataclass(frozen=True)
+class _SourceTree:
+    """The overlay source as the absence rules read it: whether it was walked, and what it holds.
+
+    ``walked`` is false for a tree that is not a directory, which is the state a run must not report
+    as an absence: a rule that searched nothing is indistinguishable from a rule that found nothing.
+
+    ``unreadable`` carries a file and the reason, so a file whose subject could be hidden behind an
+    I/O error is a finding rather than a gap. Each rule reports it under its own name and its own
+    Gate, the way ``guard-value`` and ``guard-assertion`` each report the declaring file they could
+    not read: one defect, but a different decision left unprotected in each line.
+    """
+
+    walked: bool
+    sources: tuple[tuple[str, str], ...]
+    unreadable: tuple[tuple[str, str], ...]
+
+
+def _source_tree(root: Path) -> _SourceTree:
+    """Read every overlay source file an absence rule searches, in path order.
+
+    Decoded leniently, for the reason :func:`_searchable` is: an undecodable byte somewhere in a
+    file must not stop the subject elsewhere in it from being found, and a file whose bytes are not
+    text at all carries no declaration and no call.
+    """
+    tree = root / SOURCE_TREE
+    if not tree.is_dir():
+        return _SourceTree(walked=False, sources=(), unreadable=())
+
+    sources: list[tuple[str, str]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in sorted(tree.rglob("*")):
+        relative = path.relative_to(root)
+        if path.suffix not in _SOURCE_SUFFIXES or not path.is_file():
+            continue
+        if should_skip_path(relative, _SKIP_DIRS):
+            continue
+        text, cannot_read = _searchable(root, relative.as_posix())
+        if text is None:
+            unreadable.append((relative.as_posix(), cannot_read))
+            continue
+        sources.append((relative.as_posix(), text))
+    return _SourceTree(walked=True, sources=tuple(sources), unreadable=tuple(unreadable))
+
+
+def _unsearched(
+    tree: _SourceTree, check: str, gates: tuple[str, ...], subject: str
+) -> list[Finding]:
+    """What *check* could not search, which is a failure rather than an absence."""
+    if not tree.walked:
+        return [
+            Finding(
+                check,
+                gates,
+                f"{SOURCE_TREE}/ is not a directory this rule could walk, so no file was searched "
+                f"for {subject}. A run that searched nothing is a failure rather than a pass: it "
+                f"is indistinguishable from a run that found nothing",
+            )
+        ]
+    return [
+        Finding(
+            check,
+            gates,
+            f"{path}: the file {reason}, so it was searched for {subject} nowhere. A file under "
+            f"{SOURCE_TREE}/ that this rule cannot read is a failure rather than a pass",
+        )
+        for path, reason in tree.unreadable
+    ]
+
+
+def _balanced(text: str, opening: int) -> int | None:
+    """The index of the brace closing the one at *opening*, or ``None`` where none closes it.
+
+    Comments and string literals are blanked before this runs, so a brace inside either is gone and
+    the depth count is over code. An unbalanced span is ``None`` rather than the end of the file:
+    reading a truncated list as the whole of it would read an absence off half a document.
+    """
+    depth = 0
+    for index in range(opening, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+# ---------------------------------------------------------------------------
+# populated-file-override and action-seam
+# ---------------------------------------------------------------------------
+
+# The allow-list both rules read, and the tier one of them rejects. Requirement 5 criterion 4 and
+# Requirement 14 criterion 13 name the function verbatim and neither names a file, so the rules find
+# the definition by walking rather than against a path the register does not record -- which is also
+# what keeps them working if the file moves, and what makes a function nobody defines a finding
+# instead of a silence.
+OVERRIDE_ENTRIES: Final = "AeroraQmlOverrides::overrideEntries()"
+POPULATED_FILE_TIER: Final = "Tier::PopulatedFile"
+
+_OVERRIDE_ENTRIES_DEFINITION: Final = re.compile(
+    r"\bAeroraQmlOverrides\s*::\s*overrideEntries\s*\(\s*\)\s*\{"
+)
+
+# The list the definition returns. Only whitespace is admitted between the signature and the body's
+# brace, so a *call* to the function -- which `populatedFileOverrideCount()` makes inside a `for`
+# header -- is not read as a definition and its loop body is not read as an entry list.
+_RETURNED_LIST: Final = re.compile(r"\breturn\b[^;{}]*\{")
+
+# The tier, matched without its qualifier because the span this runs over is the entry list alone:
+# `using enum Tier` would write the member bare, and nothing else inside a list of paths and tiers
+# is named `PopulatedFile`. The paths are blanked first, so a file called `PopulatedFile.qml` is a
+# path rather than a tier.
+_POPULATED_FILE: Final = re.compile(r"\bPopulatedFile\b")
+
+
+@dataclass(frozen=True)
+class _AllowList:
+    """One definition of the override allow-list: where it is, and the entries it returns.
+
+    The span is the returned list rather than the file, which is what makes these two rules usable.
+    Three things in `aerora/src/UI/AeroraQmlOverrides.cc` name a subject of theirs and are not one:
+    the comment block inside the function names `Tier::PopulatedFile` and both pre-approved seams in
+    prose, `populatedFileOverrideCount()` compares an entry's tier against `Tier::PopulatedFile` in
+    code, and the header declares the enumerator. A rule that read the file would reject the tree it
+    exists to protect.
+
+    Two readings of that one span, because the two rules read opposite halves of an entry.
+    ``entries`` keeps the quoted paths, which is what ``action-seam`` matches a seam in. ``tiers``
+    blanks them, which is what keeps a path named after a tier from reading as one. Both are the
+    same length as the span they came from, so an index into either is an index into the other and
+    into the file.
+
+    ``line`` is the file line the list opens on, so a finding can say where without re-reading.
+    """
+
+    file: str
+    entries: str
+    tiers: str
+    line: int
+
+
+def _entry_line(allow_list: _AllowList, index: int) -> int:
+    """The file line the character at *index* of the entry list falls on."""
+    return allow_list.line + allow_list.entries.count("\n", 0, index)
+
+
+def _allow_lists(tree: _SourceTree) -> tuple[list[_AllowList], list[str]]:
+    """Every override allow-list the tree defines, and each file whose list could not be read.
+
+    More than one definition is read as more than one allow-list rather than as an error: two
+    definitions are two lists, and a rule that rejected the second would reject a fixture double
+    instead of reading it. A file defining the function whose returned list this cannot bracket is
+    the other half -- "not found" is not "empty", because an entry list read as empty is an absence
+    nobody established.
+    """
+    found: list[_AllowList] = []
+    unreadable: list[str] = []
+    for path, text in tree.sources:
+        # Scanned with the paths blanked as well, so a brace or a `return` inside a quoted path
+        # cannot move where the list is read to end. Sliced from the text that keeps them, at the
+        # same indices, because blanking preserves every offset.
+        masked = _code(text)
+        scanned = _without_strings(masked)
+        for definition in _OVERRIDE_ENTRIES_DEFINITION.finditer(scanned):
+            body = _balanced(scanned, definition.end() - 1)
+            ends = len(scanned) if body is None else body
+            returned = _RETURNED_LIST.search(scanned, definition.end(), ends)
+            opening = None if returned is None else _balanced(scanned, returned.end() - 1)
+            if returned is None or opening is None:
+                unreadable.append(path)
+                continue
+            span = slice(returned.end() - 1, opening + 1)
+            found.append(
+                _AllowList(
+                    file=path,
+                    entries=masked[span],
+                    tiers=scanned[span],
+                    line=_line_of(masked, span.start),
+                )
+            )
+    return found, unreadable
+
+
+def _no_allow_list(check: str, gates: tuple[str, ...], subject: str) -> Finding:
+    """No file under the overlay source tree defines the allow-list both rules read."""
+    return Finding(
+        check,
+        gates,
+        f"no file under {SOURCE_TREE}/ defines {OVERRIDE_ENTRIES}, so the override allow-list was "
+        f"searched for {subject} nowhere. The criterion names the function rather than a file, so "
+        f"this rule finds the definition by walking -- and a function that has been renamed, moved "
+        f'out of the tree or deleted is a failure rather than a pass: "not found" is not "absent"',
+    )
+
+
+def _unreadable_allow_list(check: str, gates: tuple[str, ...], path: str, subject: str) -> Finding:
+    """A file defining the allow-list whose returned entry list could not be bracketed."""
+    return Finding(
+        check,
+        gates,
+        f"{path}: defines {OVERRIDE_ENTRIES} and returns no entry list this check can bracket, so "
+        f"the list was searched for {subject} nowhere. The rules read the returned list rather than "
+        f"the file, because the file names every subject of both of them in prose beside it",
+    )
+
+
+def check_populated_file_override(premises: Premises) -> list[Finding]:
+    """No `Tier::PopulatedFile` entry is in the override allow-list while the Gate is open.
+
+    Requirement 14 criterion 13 rejects a change adding such an entry while `DG-VID` holds no
+    accepted Closure_Record, because that entry is the silent fork the Gate exists to attach a fork
+    point, an owner and a drift-review cadence to. The entry *is* the fork, so the rule is the
+    absence of one.
+
+    **It reads the returned entry list, not the file.** The three legitimate mentions in the real
+    file are the reason: the function's own comment block, the count that compares an entry's tier
+    against the tier, and the enumerator's declaration in the header. Comments are blanked and the
+    span is the list, so each of the three is left where it is.
+
+    The guard the acceptance would release is `AeroraQmlOverrides::populatedFileOverrideCount()`,
+    whose value is ``guard-value``'s to read against the register and whose change permission is
+    ``guard-registry``'s to derive. This rule reads neither: it reads the list the count counts, in
+    the state the count reports, so a list that gained an entry is rejected here before the count
+    could report it and whether the recorded value followed is reported there.
+    """
+    gates, findings = _standing(premises, POPULATED_FILE_OVERRIDE)
+    if findings or not gates:
+        return findings
+
+    subject = f"a {POPULATED_FILE_TIER} entry"
+    tree = _source_tree(premises.root)
+    findings = _unsearched(tree, POPULATED_FILE_OVERRIDE, gates, subject)
+    lists, unreadable = _allow_lists(tree)
+    findings.extend(
+        _unreadable_allow_list(POPULATED_FILE_OVERRIDE, gates, path, subject) for path in unreadable
+    )
+    if tree.walked and not lists and not unreadable:
+        findings.append(_no_allow_list(POPULATED_FILE_OVERRIDE, gates, subject))
+
+    for allow_list in lists:
+        entry = _POPULATED_FILE.search(allow_list.tiers)
+        if entry is None:
+            continue
+        findings.append(
+            Finding(
+                POPULATED_FILE_OVERRIDE,
+                gates,
+                f"{allow_list.file}: the {OVERRIDE_ENTRIES} list carries a {POPULATED_FILE_TIER} "
+                f"entry at line {_entry_line(allow_list, entry.start())}, and the register holds "
+                f"no accepted Closure_Record for the Gate. Requirement 14 criterion 13 rejects the "
+                f"change before it enters the repository. Each such entry forks a populated "
+                f"upstream file silently, so it waits on the fork point, the named owner and the "
+                f"drift-review cadence the Closure_Record settles rather than on a review of this "
+                f"file",
+            )
+        )
+    return findings
+
+
+def check_action_seam(premises: Premises) -> list[Finding]:
+    """Neither pre-approved seam is in the override allow-list while the read-only Gate is open.
+
+    Requirement 5 criterion 4 rejects the addition of either seam, names the Gate the operator
+    actions each seam introduces wait on, and retains both as pre-approved and undeclared. Both
+    exist to introduce an *action*, which is why declaring one is rejected while nothing evaluates
+    an authorisation: the seam would put an action surface in front of an operator with no decision
+    behind it.
+
+    **The two seams are the criterion's, read from the data half's constant.** The register's
+    ``readOnly.preApprovedUndeclaredSeams`` is part of the document under check -- ``forbidden-until``
+    compares that list against this same constant, so reading the posture here would let a seam
+    dropped from the posture stop being watched by the rule *and* by the check that notices. This is
+    the division ``adr-016-pair`` draws: the subject it rejects is the text Requirement 7 criterion
+    17 names, and what it reads out of the register is the *owner label*, which is a Gate_Dossier's
+    to record and no criterion's to spell.
+
+    A seam is matched by its file name wherever it appears in the list, because the allow-list
+    carries a resource path and the criterion names a file: either spelling is the seam. The one
+    entry this build declares is a third seam the criterion does not name, so the rule reads a list
+    with an entry in it rather than an empty one.
+    """
+    gates, findings = _standing(premises, ACTION_SEAM)
+    if findings or not gates:
+        return findings
+
+    subject = "either pre-approved seam"
+    tree = _source_tree(premises.root)
+    findings = _unsearched(tree, ACTION_SEAM, gates, subject)
+    lists, unreadable = _allow_lists(tree)
+    findings.extend(
+        _unreadable_allow_list(ACTION_SEAM, gates, path, subject) for path in unreadable
+    )
+    if tree.walked and not lists and not unreadable:
+        findings.append(_no_allow_list(ACTION_SEAM, gates, subject))
+
+    for allow_list in lists:
+        for seam in PRE_APPROVED_SEAMS:
+            declared = allow_list.entries.find(seam)
+            if declared < 0:
+                continue
+            findings.append(
+                Finding(
+                    ACTION_SEAM,
+                    gates,
+                    f"{allow_list.file}: the {OVERRIDE_ENTRIES} list carries {seam} at line "
+                    f"{_entry_line(allow_list, declared)}, and the register holds no accepted "
+                    f"Closure_Record for the Gate. Requirement 5 criterion 4 rejects the addition "
+                    f"of the seam to the override allow-list and retains both seams as "
+                    f"pre-approved and undeclared, because the operator actions each one "
+                    f"introduces wait on this decision",
+                )
+            )
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# freshness-threshold
+# ---------------------------------------------------------------------------
+
+# The setter a call site calls. Requirement 8 criterion 13 rejects a change introducing a threshold
+# *value*, and a call is where a value is passed; the name is not a Contract_Value and no finding
+# here prints an argument, because a threshold value is one.
+THRESHOLD_SETTER: Final = "setThreshold"
+
+_THRESHOLD_CALL: Final = re.compile(rf"\b{THRESHOLD_SETTER}\s*\(")
+
+# What tells a call from a declaration, read backwards from the name over the statement it is in.
+# A member access reaches the setter through an object, a qualifier may precede either, a declarator
+# head ends in a type, and an expression keyword ends in neither.
+_MEMBER_ACCESS: Final = re.compile(r"(?:\.|->)\s*$")
+_QUALIFIER: Final = re.compile(r"(?:\b\w+\s*::\s*)+$")
+_DECLARATOR: Final = re.compile(r"[\w>&*\]]\s*$")
+_LAST_WORD: Final = re.compile(r"\w+\s*$")
+
+# Where the statement the name sits in begins, as far as this classification needs: a statement end,
+# a block brace, or the start of an argument or an initialiser list.
+_STATEMENT_START: Final = ";{}(,"
+
+# The words that may precede an expression and end in an identifier, which a declarator head also
+# ends in. Without them `return setThreshold(x);` would read as a declaration of a function whose
+# return type is `return`.
+_EXPRESSION_KEYWORDS: Final = frozenset(
+    {
+        "return",
+        "co_return",
+        "co_await",
+        "co_yield",
+        "throw",
+        "new",
+        "delete",
+        "sizeof",
+        "else",
+        "do",
+        "case",
+        "default",
+        "and",
+        "or",
+        "not",
+    }
+)
+
+
+def _is_call(code: str, start: int) -> bool:
+    """Whether the setter named at *start* of *code* is called there rather than declared.
+
+    **This is the whole difficulty of the rule.** The setter is declared and defined under the
+    overlay source tree today -- a declaration in `AeroraFreshness.h` and an out-of-line definition
+    in `AeroraFreshness.cc` -- and every call in the tree is in a suite. A rule that searched for
+    the name, or for the name and its parenthesis, would reject both of those and fail on a clean
+    tree, and a gate that fails on a clean tree is removed rather than obeyed.
+
+    The classification reads the statement backwards from the name:
+
+    - a member access (``.`` or ``->``) immediately before it is a call through an object, which is
+      how every call in the tree today is written;
+    - otherwise a qualifier (``Class::``) is dropped, because an out-of-line definition and a static
+      call both carry one and what divides them is what precedes it;
+    - what remains is a declarator head if it ends in a type -- an identifier, ``>``, ``&``, ``*``
+      or the ``]`` of an attribute -- which a declaration and an out-of-line definition do and an
+      expression does not;
+    - an expression keyword ending in an identifier is read as an expression rather than as a type.
+
+    It is a text classification and not a parse, and the bound is worth stating: an expression whose
+    last operator is ``*`` or ``&`` immediately before the name would read as a declarator, and a
+    macro expanding to a call would read as whatever it is spelled as. What the rule is for is the
+    call site a commit adds, which is written the way the tree writes one.
+    """
+    line = code[code.rfind("\n", 0, start) + 1 : start]
+    begins = max((line.rfind(char) for char in _STATEMENT_START), default=-1)
+    prefix = line[begins + 1 :]
+    if _MEMBER_ACCESS.search(prefix):
+        return True
+
+    head = _QUALIFIER.sub("", prefix)
+    keyword = _LAST_WORD.search(head)
+    if keyword is not None and keyword.group().strip() in _EXPRESSION_KEYWORDS:
+        return True
+    return _DECLARATOR.search(head) is None
+
+
+def _deferred_literal(gates: tuple[str, ...], premises: Premises) -> list[Finding]:
+    """The registry covers the guard whose literal this rule hands to ``guard-value``.
+
+    The task's two halves divide by subject rather than by duplication, which is the discipline
+    this spec has settled repeatedly -- ``check_partition`` leaves inventory coverage to
+    ``inventory-coverage``, ``closure-signatures`` leaves an amendment's own signatures to
+    ``closure-amendments``, and ``adr-016-pair`` leaves the guard's value to ``guard-value``.
+    `AeroraPowerModel::kDefinedThresholdCount` is a recorded guard, so ``guard-value`` already reads
+    its declaration against the recorded literal, in the one file the register names, with the
+    disagreement, the three-value case and the renamed declaration all reported there. Reading it
+    again here would be a second answer to one question, and the day the two disagreed a reviewer
+    would have to work out which rule owned it.
+
+    What a deferral owes is that it lands somewhere, so the one premise this rule does read is that
+    the registry records the guard at all. Without that entry ``guard-value`` reads nothing and the
+    deferral would be a silence.
+    """
+    if any(guard.symbol == THRESHOLD_COUNT_GUARD for guard in premises.register.guards):
+        return []
+    return [
+        Finding(
+            FRESHNESS_THRESHOLD,
+            gates,
+            f"{THRESHOLD_COUNT_GUARD}: the guard registry records no entry for it, so the literal "
+            f"this rule defers to {GUARD_VALUE} is compared against nothing. That the registry "
+            f"covers the guard is {GUARD_REGISTRY}'s finding in the data half; what is reported "
+            f"here is the deferral landing nowhere, because a count nothing pins is a threshold "
+            f"that can be defined without the Gate noticing",
+        )
+    ]
+
+
+def check_freshness_threshold(premises: Premises) -> list[Finding]:
+    """No threshold call site is under the overlay source tree while the Gate is open.
+
+    Requirement 8 criterion 13 rejects a change introducing a threshold value for a freshness class
+    while `DG-FRS` holds no accepted Closure_Record for it, and criterion 16 holds the Gate at
+    `OPEN`. A call to the setter is where a value is introduced: criterion 7 resolves every
+    evaluation to the unevaluated outcome while the Gate is open, which holds exactly while no class
+    carries a threshold.
+
+    The value `kDefinedThresholdCount` holds is ``guard-value``'s, deferred rather than re-read --
+    see :func:`_deferred_literal` for why, and for the one premise the deferral owes.
+
+    **No finding prints an argument.** The class a call site names and the threshold it passes are
+    both Decision_Content, and a threshold value is a Contract_Value outright, so a finding names
+    the file and the line and a reviewer reads the call. That is the bound ``mavlink-identifier``
+    works under for the same reason: a rule that printed what it found would make its own output the
+    place a Contract_Value is written down.
+    """
+    gates, findings = _standing(premises, FRESHNESS_THRESHOLD)
+    if findings or not gates:
+        return findings
+
+    subject = f"a {THRESHOLD_SETTER}( call site"
+    tree = _source_tree(premises.root)
+    findings = _deferred_literal(gates, premises)
+    findings.extend(_unsearched(tree, FRESHNESS_THRESHOLD, gates, subject))
+    for path, text in tree.sources:
+        code = _code(text)
+        called = [
+            found.start()
+            for found in _THRESHOLD_CALL.finditer(code)
+            if _is_call(code, found.start())
+        ]
+        if not called:
+            continue
+        further = "" if len(called) == 1 else f" and at {len(called) - 1} further site(s)"
+        findings.append(
+            Finding(
+                FRESHNESS_THRESHOLD,
+                gates,
+                f"{path}: calls {THRESHOLD_SETTER}() at line {_line_of(code, called[0])}"
+                f"{further}, so a "
+                f"threshold value is introduced where the register holds no accepted "
+                f"Closure_Record for the class. Requirement 8 criterion 13 rejects the change "
+                f"before it enters the repository and criterion 16 holds the Gate at "
+                f"{OPEN_STATUS}. The declaration and the out-of-line definition of the setter are "
+                f"not call sites and are not reported; the suites that configure a fixture are "
+                f"outside {SOURCE_TREE}/",
+            )
+        )
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# payload-command-sink
+# ---------------------------------------------------------------------------
+
+# The interface whose implementation is the subject, and what an implementation is: a class deriving
+# from it. The type name is not a Contract_Value -- requirements.md names it, and what an
+# implementation would carry is the payload Decision_Content the Gate withholds.
+PAYLOAD_COMMAND_SINK_TYPE: Final = "AeroraPayloadCommandSink"
+
+# A class head whose base-class list names the type. Neither the brace nor a semicolon may fall
+# between the `class` keyword and the name, which is what keeps the four legitimate mentions under
+# the overlay source tree out: the interface's own declaration carries no base clause, the pointer
+# member and the setter parameter are inside a class body the brace has already opened, and a
+# forward declaration ends at its semicolon. The doc comments naming the type are blanked first.
+_SINK_DERIVATION: Final = re.compile(
+    rf"\b(?:class|struct)\b[^;{{}}]*:\s*[^;{{}}]*\b{PAYLOAD_COMMAND_SINK_TYPE}\b"
+)
+
+
+def check_payload_command_sink(premises: Premises) -> list[Finding]:
+    """No implementation of the payload command sink is under the overlay source tree.
+
+    Requirement 10 criterion 18 rejects a change implementing it while `DG-PAY` or the read-only
+    Gate is open, names each of those two Gates that is open, and holds each named Gate at `OPEN`.
+    Two decisions hold it: the payload Decision_Content a request would have to carry, and the
+    authorisation scope a command path would have to be evaluated under. So the rule is in force
+    while either is open and the finding names the ones that are, which is why its Gates are read
+    as a set rather than as one Gate.
+
+    **An implementation is a derivation.** The interface is declared under the tree deliberately --
+    unimplemented is its recorded state, not an omission -- and the overlay holds the type's name in
+    a pointer member, a setter parameter, three doc comments, a module manifest and a README. None
+    of those is an implementation, and a rule that searched for the name would reject the interface
+    the Gate exists to leave unimplemented. The one implementation in the tree is a recording double
+    in `aerora/test/Payload/AeroraPayloadModelTest.cc`, whose own comment records it as the
+    instrument the prohibition tests need, and it is outside this rule's tree for that reason.
+
+    The other half of criterion 18 -- a change altering a guard criterion 17 records -- is
+    ``guard-value``'s, which reads each of those five guards against its recorded literal, and
+    ``guard-registry``'s, which derives whether an acceptance permitted one to move. This rule reads
+    no guard.
+    """
+    gates, findings = _standing(premises, PAYLOAD_COMMAND_SINK)
+    if findings or not gates:
+        return findings
+
+    subject = f"an implementation of {PAYLOAD_COMMAND_SINK_TYPE}"
+    tree = _source_tree(premises.root)
+    findings = _unsearched(tree, PAYLOAD_COMMAND_SINK, gates, subject)
+    for path, text in tree.sources:
+        code = _code(text)
+        findings.extend(
+            Finding(
+                PAYLOAD_COMMAND_SINK,
+                gates,
+                f"{path}: derives from {PAYLOAD_COMMAND_SINK_TYPE} at line "
+                f"{_line_of(code, derived.start())}, which implements the one outbound payload "
+                f"seam while the register holds no accepted Closure_Record for the Gates named "
+                f"here. Requirement 10 criterion 18 rejects the change before it enters the "
+                f"repository and holds each named Gate at {OPEN_STATUS}. The interface's own "
+                f"declaration, a pointer member, a parameter and a doc comment are not "
+                f"implementations and are not reported",
+            )
+            # One finding per derivation rather than per file: two classes deriving from the
+            # interface are two implementations, and a reviewer withdrawing them needs both lines.
+            for derived in _SINK_DERIVATION.finditer(code)
+        )
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 
@@ -1083,6 +1779,10 @@ _CHECKS: Final = (
     check_guard_assertion,
     check_adr_016_pair,
     check_mavlink_identifier,
+    check_populated_file_override,
+    check_action_seam,
+    check_freshness_threshold,
+    check_payload_command_sink,
 )
 
 
@@ -1104,19 +1804,27 @@ def _established(premises: Premises, files: int) -> str:
     The baseline is reported as a measurement for the same reason: the identifiers the allow-listed
     sites hold are read out of the tree on every run and recorded nowhere, so an allow-list whose
     sites have stopped holding any is visible as a number rather than as a silence.
+
+    The four absence rules are counted for that reason too, and it is the sharper case. Each is
+    conditional on a Gate the register records, so a rule that is not in force reports nothing --
+    and a run in which four rules reported nothing because four Gates closed must not read as a run
+    in which four rules looked and found nothing.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
     posture = premises.register.mavlink_identifiers
     baseline = _baseline(premises.root, posture)
+    in_force = _in_force(premises)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
         f"assertion sites compared against the files the register names, and the ADR-016 pair "
         f"against {CORE_HEADER} and {OVERLAY_MANIFEST}; every file under {OVERLAY_TREE}/ searched "
         f"against {len(posture.allow_list)} allow-listed sites holding "
-        f"{len(baseline.identifiers)} identifiers; no rule read a file because it was among the "
-        f"{files} selected source files\n"
+        f"{len(baseline.identifiers)} identifiers; {in_force} of the four absence rules in force "
+        f"over {SOURCE_TREE}/ and {len(ABSENCE_GATES) - in_force} standing down on a Gate the "
+        f"derivation records closed; no rule read a file because it was among the {files} selected "
+        f"source files\n"
     )
 
 
