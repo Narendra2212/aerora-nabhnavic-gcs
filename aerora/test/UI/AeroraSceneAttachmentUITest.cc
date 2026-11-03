@@ -421,6 +421,12 @@ void AeroraSceneAttachmentUITest::_onlyTheRecordedControlIsActionableOnAnAeroraP
         {kProvenanceEntryButton, kProvenanceFlickable, {}},
     };
 
+    // Every actionable control this sweep saw, accumulated across all four pages. The
+    // non-emptiness check after the loop reads this rather than re-finding one page's content:
+    // the loop leaves the *last* page current, so looking up an earlier page's flickable finds
+    // nothing and would report navigation order rather than anything about the walk.
+    QStringList found;
+
     for (const Page& page : pages) {
         const QString entry = QString::fromUtf8(page.entryButton);
         QVERIFY2(clickButtonScrolled(entry, QString::fromUtf8(kAnalyzeListFlickable)),
@@ -436,6 +442,7 @@ void AeroraSceneAttachmentUITest::_onlyTheRecordedControlIsActionableOnAnAeroraP
         // not about discovery order.
         QStringList actionable = AeroraActionableControls::actionableControls(content);
         actionable.sort();
+        found += actionable;
 
         QStringList recorded = page.recorded;
         recorded.sort();
@@ -455,13 +462,17 @@ void AeroraSceneAttachmentUITest::_onlyTheRecordedControlIsActionableOnAnAeroraP
     }
 
     // The walk must actually find something, or every assertion above passes by walking an empty
-    // tree. The recorded exception is that something: it exists today, on the page this loop just
-    // visited, so a walk that reached nothing fails here rather than reporting four clean pages.
-    QQuickItem* const excepted =
-        findVisibleItem(_rootItem, QString::fromUtf8(kErrorReportFlickable), TestTimeout::mediumMs());
-    QVERIFY2(excepted, "the error report page content must still be in the scene");
-    QVERIFY2(AeroraActionableControls::actionableControls(excepted)
-                 == QStringList{QString::fromUtf8(kRecordedExceptionControl)},
-             "the recorded exception must be found by the walk; a walk that finds nothing would "
-             "satisfy every negative assertion above for the wrong reason");
+    // tree. Asserted over the whole sweep: exactly one actionable control across every Aerora
+    // Analyze page this suite reaches, which is Requirement 5 criterion 1's claim read end to end.
+    //
+    // Accumulated rather than re-found. An earlier draft looked the error report page's content up
+    // again after the loop, which fails for a reason that has nothing to do with the posture: the
+    // loop ends on the provenance page, so the error report content is no longer in the scene.
+    found.sort();
+    QVERIFY2(found == QStringList{QString::fromUtf8(kRecordedExceptionControl)},
+             qPrintable(QStringLiteral("the sweep must find exactly the one recorded exception, "
+                                       "and it found: %1. A walk that reached nothing would "
+                                       "satisfy every set-equality assertion above for the wrong "
+                                       "reason.")
+                            .arg(found.join(QStringLiteral(", ")))));
 }
