@@ -13,6 +13,16 @@ repos:
         files: ^(\.github/build-config.*\.json|\.lychee\.toml|\.pre-commit-config\.yaml|tools/(validate_configs\.py|uv\.lock|pyproject\.toml))$
         pass_filenames: false
 
+      # The data half of the Aerora Gate_Review. Gating on purpose: Requirement 4 criterion 2 asks
+      # for the change to be rejected *before* it enters the repository, and an advisory check
+      # rejects nothing. Non-zero exit, no `stages: [manual]`, no `--advisory`.
+      - id: gate-register
+        name: Validate the Aerora Gate_Register against the screen inventory
+        entry: uv run --frozen --project tools --group lint python tools/validate_gate_register.py
+        language: system
+        files: ^(\.kiro/specs/aerora-decision-gate-closure/(gate-register\.json|.*\.schema\.json|closures/.*)|\.kiro/specs/05-product-completion/03-gui-information-architecture-and-screens\.md|tools/(validate_gate_register\.py|common/gate_register\.py))$
+        pass_filenames: false
+
       - id: qt-translation-placeholders
         name: Check changed Qt translation placeholders
         entry: uv run --frozen --directory tools --group scripts python -m translations.check_placeholders
@@ -146,6 +156,16 @@ repos:
         name: Validate .github/build-config.json
         files: ^\.github/build-config(?:\.schema)?\.json$
         args: ['--schemafile', '.github/build-config.schema.json', '.github/build-config.json']
+        pass_filenames: false
+
+      - id: check-jsonschema
+        alias: gate-register-schema
+        name: Validate the Aerora Gate_Register
+        files: ^\.kiro/specs/aerora-decision-gate-closure/(gate-register(?:\.schema)?\.json|closures/.*\.json)$
+        args:
+          - '--schemafile'
+          - '.kiro/specs/aerora-decision-gate-closure/gate-register.schema.json'
+          - '.kiro/specs/aerora-decision-gate-closure/gate-register.json'
         pass_filenames: false
 
       - id: check-jsonschema
@@ -322,6 +342,19 @@ repos:
         language: system
         types: [c++]
         exclude: ^(build/|libs/|test/)
+        pass_filenames: true
+
+      # The source half of the Aerora Gate_Review. Gating for the reason `gate-register` is.
+      #
+      # No `types: [c++]`, unlike its neighbours: the rules read QML documents, a CMake manifest and
+      # two markdown files as well, and a type filter would drop the file that carries the subject.
+      # `src/Vehicle/Vehicle.h` is in the pattern because `adr-016-pair` reads it -- the one file
+      # outside the overlay any of these rules opens, and it is read and never written.
+      - id: gate-guards
+        name: Check the Aerora source against the guards the Gate_Register records
+        entry: uv run --frozen --project tools --group lint python tools/analyzers/gate_guard_check.py
+        language: system
+        files: ^(aerora/(src|test)/.*|aerora/CMakeLists\.txt|src/Vehicle/Vehicle\.h|\.kiro/specs/aerora-decision-gate-closure/gate-register\.json)$
         pass_filenames: true
 
 exclude: ^build/

@@ -680,15 +680,15 @@ Constraints every task inherits:
       criterion 11, the nine guards of Requirement 4 criterion 5, and the `FORBIDDEN-UNTIL` rows
     - _Requirements: 2.7, 2.8, 2.11, 4.5, 5.8, 9.16_
 
-- [ ] 10. Wire the three gating hooks into `.pre-commit-config.yaml`
+- [x] 10. Wire the three gating hooks into `.pre-commit-config.yaml`
 
-  - [ ] 10.1 Add `gate-register-schema` to the `check-jsonschema` block
+  - [x] 10.1 Add `gate-register-schema` to the `check-jsonschema` block
     - Follows the `.github/build-config.json` precedent in the same block, with `pass_filenames: false`
       and a `files` pattern covering the register, its schema and the closures directory
     - _Requirements: 1.1, 2.1, 5.11_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --schemafile <schema> <register>`
 
-  - [ ] 10.2 Add the `gate-register` local hook
+  - [x] 10.2 Add the `gate-register` local hook
     - In the `repo: local` block beside `validate-configs`, same invocation shape, `language: system`,
       `pass_filenames: false`, and a `files` pattern covering the register JSON, the closures
       directory, the screen inventory, `tools/validate_gate_register.py` and
@@ -701,7 +701,7 @@ Constraints every task inherits:
     - _Requirements: 1.6, 2.10, 3.1, 3.2, 4.2_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [ ] 10.3 Add the `gate-guards` local hook
+  - [x] 10.3 Add the `gate-guards` local hook
     - Beside the other repo-local ratchets, `pass_filenames: true`, with a `files` pattern covering
       `aerora/src/**`, `aerora/test/**`, `aerora/CMakeLists.txt`, `src/Vehicle/Vehicle.h` and the
       register
