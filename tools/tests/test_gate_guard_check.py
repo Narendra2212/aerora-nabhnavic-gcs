@@ -173,6 +173,7 @@ from .test_validate_gate_register import (
     MISSION_GATE,
     PAYLOAD_GATE,
     POWER_GUARD,
+    PREDICATE_EXPRESSION,
     REPLAY_GUARD,
     ROLE_GATE,
     SEAM_DIRECTORY,
@@ -285,8 +286,17 @@ def _declares(symbol: str, value: str) -> str:
 
 
 def _declaring(guards: Sequence[Guard]) -> str:
-    """The header the register names as declaring *guards*, each carrying its recorded literal."""
-    declarations = "\n".join(_declares(guard.symbol, guard.recorded_value) for guard in guards)
+    """The header the register names as declaring *guards*, each carrying its recorded literal.
+
+    A guard recording no value declares nothing here, which is what a `check`-kind guard is: it is
+    held by a rule, so no file declares it and there is no literal to write. `_guard_sources` leaves
+    it out for the same reason, stated from the other side.
+    """
+    declarations = "\n".join(
+        _declares(guard.symbol, guard.recorded_value)
+        for guard in guards
+        if guard.recorded_value is not None
+    )
     return f"#pragma once\n\n{declarations}"
 
 
@@ -763,6 +773,18 @@ def _recorded(register: GateRegister, symbol: str) -> Guard:
     return guard
 
 
+def _literal(register: GateRegister, symbol: str) -> str:
+    """The value *register* records for *symbol*, which has to be a literal to have one.
+
+    Asserted rather than coerced: only a `literal` carries a value, so a case reading one is a case
+    about a literal, and a registry entry that stopped being one should fail here rather than hand a
+    `None` to a fixture writer.
+    """
+    recorded = _recorded(register, symbol).recorded_value
+    assert recorded is not None
+    return recorded
+
+
 def _resurfaced(register: GateRegister, *, drops: str = "", adds: str = "") -> GateRegister:
     """*register* with the surface entry for *drops* withdrawn and one for *adds* recorded.
 
@@ -1170,7 +1192,7 @@ def test_guard_value_rejects_a_renamed_guard_whose_declaration_keeps_the_recorde
     register = _resurfaced(
         _alone(_register(), REPLAY_GUARD), drops=REPLAY_GUARD, adds=RENAMED_GUARD
     )
-    recorded = _recorded(register, REPLAY_GUARD).recorded_value
+    recorded = _literal(register, REPLAY_GUARD)
     root = _tree(tmp_path / "repo", register)
     _write(root / SOLO_DECLARATION, _declares(RENAMED_GUARD, recorded))
 
@@ -3341,21 +3363,22 @@ def test_contract_surface_reads_the_real_source_tree_and_qualifies_every_symbol(
 # rule whose existence is resolved rather than trusted.
 # ---------------------------------------------------------------------------
 
-# The expression a predicate guard pins, in the shape the two real ones have: a body that delegates
-# or derives rather than returning a literal. A fixture expression, because the real two are
-# `AeroraCommandAuthorizer::instance()->isFullyConfigured()` and `!_fleetIdentity.isEmpty()` and
-# recording either here would make this file a second place they are written.
-PREDICATE_EXPRESSION = "return aFixtureDelegate()->isFullyConfigured();"
+# A second expression, which is what a changed body carries. The recorded one is the data half's
+# `PREDICATE_EXPRESSION`, imported rather than respelled so both halves pin one string.
 ANOTHER_EXPRESSION = "return aFixtureDelegate()->isSomethingElse();"
 
 
 def _predicate(register: GateRegister, symbol: str, expression: str) -> GateRegister:
-    """*register* with *symbol* recorded as a predicate pinning *expression*."""
+    """*register* with *symbol* recorded as a predicate pinning *expression*.
+
+    The recorded *value* stays whatever criterion 5 names for the symbol, because that is the field
+    the data half reads and the predicate shape does not change it. Only the expression moves.
+    """
     return _with_guard(
         register,
         symbol,
         kind=PREDICATE_GUARD,
-        recorded_value=expression,
+        declared_expression=expression,
         declared_in=SOLO_DECLARATION,
         asserted_in=[SOLO_SITE],
     )
@@ -3468,8 +3491,11 @@ def test_guard_value_rejects_a_guard_held_by_a_rule_that_does_not_exist(tmp_path
         _register(),
         REPLAY_GUARD,
         kind=CHECK_GUARD,
-        recorded_value="a-rule-this-module-does-not-carry",
+        recorded_value=None,
+        held_by="a-rule-this-module-does-not-carry",
         asserted_in=[],
+        asserted_nowhere=True,
+        remedy=ASSERTION_REMEDY,
     )
     root = _tree(tmp_path / "repo", register)
 

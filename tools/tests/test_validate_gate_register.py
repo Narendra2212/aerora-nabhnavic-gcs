@@ -63,6 +63,7 @@ from common.gate_register import (
     CHECK_GUARD,
     INVENTORY_COLUMNS,
     LITERAL_GUARD,
+    PREDICATE_GUARD,
     ActionableControlSite,
     Amendment,
     BlockingEntry,
@@ -415,6 +416,11 @@ FIXTURE_GUARD_VALUE = "a fixture literal"
 # two is task 11.3's to state, and writing it here would be this file deciding it.
 ASSERTION_REMEDY = "a fixture remedy that adds the assertion"
 
+# The expression a predicate guard pins. Separate from the value criterion 5 names, which is the
+# whole point of the two fields: the real predicate guards are held "at false" and their bodies
+# carry no false at all.
+PREDICATE_EXPRESSION = "return aFixtureDelegate()->isFullyConfigured();"
+
 # The contract-surface kind and no-Gate marker the baseline records its entries under. Spelled here
 # rather than imported from the analyzer, so the fixture states the vocabulary independently of the
 # rule that reads it.
@@ -464,15 +470,18 @@ def _guard(
     sites = (
         [] if held_by_a_rule else [GUARD_ASSERTION] if asserted_in is None else list(asserted_in)
     )
+    shape = CHECK_GUARD if held_by_a_rule else kind
     return Guard(
         symbol=symbol,
-        kind=CHECK_GUARD if held_by_a_rule else kind,
+        kind=shape,
         declared_in=GUARD_DECLARATION,
         recorded_value=(
-            MAVLINK_IDENTIFIER_GUARD
-            if held_by_a_rule
+            None
+            if shape == CHECK_GUARD
             else recorded_value or MECHANICAL_GUARDS.get(symbol) or FIXTURE_GUARD_VALUE
         ),
+        declared_expression=PREDICATE_EXPRESSION if shape == PREDICATE_GUARD else None,
+        held_by=MAVLINK_IDENTIFIER_GUARD if shape == CHECK_GUARD else None,
         asserted_in=sites,
         asserted_nowhere=None if sites else True,
         remedy=(remedy or ASSERTION_REMEDY) if not sites else None,

@@ -490,17 +490,28 @@ def _expression(guard: Guard, declaration: _Declaration) -> list[Finding]:
     observed value against a recorded one, and there is no value here for the two to differ on.
     """
     gates = tuple(guard.holds_open)
-    recorded = guard.recorded_value
+    expression = guard.declared_expression
 
+    if expression is None:
+        return [
+            Finding(
+                GUARD_VALUE,
+                gates,
+                f"{guard.symbol}: the register records it as a predicate and records no declared "
+                f"expression for it, so there was nothing to compare the declaration against. The "
+                f"schema requires one beside the recorded value, so a register carrying none has "
+                f"not passed the schema",
+            )
+        ]
     if declaration.unreadable:
         return [
             Finding(
                 GUARD_VALUE,
                 gates,
                 f"{guard.symbol}: {guard.declared_in} {declaration.unreadable}, so the expression "
-                f"the register records at {recorded!r} was compared against nothing. A declaration "
-                f'this check cannot read is a failure rather than a pass: "not found" is not '
-                f'"unchanged"',
+                f"the register records at {expression!r} was compared against nothing. A "
+                f'declaration this check cannot read is a failure rather than a pass: "not found" '
+                f'is not "unchanged"',
             )
         ]
     if not declaration.named:
@@ -509,21 +520,23 @@ def _expression(guard: Guard, declaration: _Declaration) -> list[Finding]:
                 GUARD_VALUE,
                 gates,
                 f"{guard.symbol}: {guard.declared_in} declares no symbol of that name, so the "
-                f"expression the register records at {recorded!r} was compared against nothing. A "
-                f'renamed or withdrawn predicate is a failure rather than a pass: "not found" is '
+                f"expression the register records at {expression!r} was compared against nothing. "
+                f'A renamed or withdrawn predicate is a failure rather than a pass: "not found" is '
                 f'not "unchanged"',
             )
         ]
-    if recorded in declaration.text:
+    if expression in declaration.text:
         return []
     return [
         Finding(
             GUARD_VALUE,
             gates,
             f"{guard.symbol}: {guard.declared_in} no longer carries the expression the register "
-            f"records for it, {recorded!r}. This guard holds no literal, so what was reviewed is "
-            f"the expression itself and a change to it has not been reviewed. Requirement 4 "
-            f"criterion 7 rejects the change and holds the Gate at {OPEN_STATUS}",
+            f"records for it, {expression!r}. This guard holds no literal -- the register records "
+            f"it at {guard.recorded_value!r}, which is the value Requirement 4 criterion 5 names "
+            f"and not text the source carries -- so what was reviewed is the expression itself and "
+            f"a change to it has not been reviewed. Criterion 7 rejects the change and holds the "
+            f"Gate at {OPEN_STATUS}",
         )
     ]
 
@@ -538,6 +551,16 @@ def _value(guard: Guard, declaration: _Declaration) -> list[Finding]:
     """
     gates = tuple(guard.holds_open)
     recorded = guard.recorded_value
+    if recorded is None:
+        return [
+            Finding(
+                GUARD_VALUE,
+                gates,
+                f"{guard.symbol}: the register records it as a literal and records no value for "
+                f"it, so the declaration was compared against nothing. The schema requires a value "
+                f"on this kind, so a register carrying none has not passed the schema",
+            )
+        ]
 
     if declaration.unreadable:
         return [
@@ -633,12 +656,12 @@ def check_guard_value(premises: Premises) -> list[Finding]:
             GUARD_VALUE,
             tuple(guard.holds_open),
             f"{guard.symbol}: the register records it as held by a rule named "
-            f"{guard.recorded_value!r}, and this module carries no rule of that name. A guard held "
-            f"by a rule is only held if the rule exists, so a name that resolves to nothing leaves "
-            f"the guard unenforced while reading as covered",
+            f"{guard.held_by!r}, and this module carries no rule of that name. A guard held by a "
+            f"rule is only held if the rule exists, so a name that resolves to nothing leaves the "
+            f"guard unenforced while reading as covered",
         )
         for guard in premises.register.guards
-        if guard.kind == CHECK_GUARD and guard.recorded_value not in RULE_NAMES
+        if guard.kind == CHECK_GUARD and guard.held_by not in RULE_NAMES
     )
     for guard in _registry(premises):
         findings.extend(_hand_on_row(guard))

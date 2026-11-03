@@ -373,6 +373,13 @@ class Guard:
     check rather than a symbol. Recording one shape for all three would have forced the two function
     guards to record a value their source does not hold. See :data:`GUARD_KINDS`.
 
+    Three fields carry what each kind needs, and each has exactly one reader, because making one
+    field serve every kind was the error this shape replaces. ``recorded_value`` is the value
+    criterion 5 names and the data half reads it; ``declared_expression`` is the text a reviewer read
+    and the source half matches it; ``held_by`` names the rule holding a ``check`` and the source
+    half resolves it. ``AeroraCorePlugin::isAuthorizationEnforced()`` is why they are separate: it is
+    held *at false* in the criterion's sense, and its body contains no ``false`` at all.
+
     ``asserted_nowhere`` follows the same discipline as ``holds_no_gate_open``: two of the nine are
     asserted by nothing under ``aerora/test/**`` today, and an empty ``asserted_in`` read as
     satisfied would be indistinguishable from one whose sites were deleted. ``remedy`` carries the
@@ -382,7 +389,9 @@ class Guard:
     symbol: str
     kind: str
     declared_in: str
-    recorded_value: str
+    recorded_value: str | None
+    declared_expression: str | None
+    held_by: str | None
     asserted_in: list[str]
     asserted_nowhere: bool | None
     remedy: str | None
@@ -898,7 +907,9 @@ def _read_guard(value: Any, path: str) -> Guard:
         symbol=reader.text("symbol"),
         kind=reader.member("kind", GUARD_KINDS, _GUARD_KIND_DESCRIPTION),
         declared_in=reader.text("declaredIn"),
-        recorded_value=reader.text("recordedValue"),
+        recorded_value=reader.optional_text("recordedValue"),
+        declared_expression=reader.optional_text("declaredExpression"),
+        held_by=reader.optional_text("heldBy"),
         asserted_in=reader.text_list("assertedIn"),
         asserted_nowhere=reader.optional_flag("assertedNowhere"),
         remedy=reader.optional_text("remedy"),
@@ -1278,7 +1289,9 @@ def _dump_guard(guard: Guard) -> dict[str, Any]:
         ("symbol", guard.symbol),
         ("kind", guard.kind),
         ("declaredIn", guard.declared_in),
-        ("recordedValue", guard.recorded_value),
+        ("recordedValue", _or_omit(guard.recorded_value)),
+        ("declaredExpression", _or_omit(guard.declared_expression)),
+        ("heldBy", _or_omit(guard.held_by)),
         ("assertedIn", list(guard.asserted_in)),
         ("assertedNowhere", _or_omit(guard.asserted_nowhere)),
         ("remedy", _or_omit(guard.remedy)),

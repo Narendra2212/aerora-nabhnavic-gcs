@@ -875,7 +875,6 @@
         "symbol",
         "kind",
         "declaredIn",
-        "recordedValue",
         "assertedIn",
         "holdsOpen",
         "permittedToChangeBy"
@@ -898,7 +897,15 @@
         },
         "recordedValue": {
           "$ref": "#/$defs/nonEmptyString",
-          "description": "For a literal, the value the declaring source must carry. For a predicate, the text of the reviewed expression. For a check, the name of the rule that enforces it. Recorded as text in every case, because the check compares text."
+          "description": "The value this guard holds, as Requirement 4 criterion 5 states it. The data half reads this and nothing else: criterion 5 says each guard is held 'at' a value, and that claim is about what the station reports rather than about the text of a declaration. Required for a literal and for a predicate; forbidden on a check, because criterion 5 names no value for the one guard that is a check and there is none to record."
+        },
+        "declaredExpression": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The text of the expression a reviewer read, for a predicate guard only. The source half reads this and nothing else.\n\nIt is a separate field from recordedValue because the two answer different questions, and making one field serve both was the error this replaces. AeroraCorePlugin::isAuthorizationEnforced() is held 'at false' in criterion 5's sense -- the station reports authorization as not enforced -- while its body reads 'return AeroraCommandAuthorizer::instance()->isFullyConfigured();' and contains no false at all. One field would have had to record either the value, which no text comparison can find, or the expression, which is not the value the criterion names."
+        },
+        "heldBy": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The name of the rule that holds this guard, for a check guard only. Resolved by the source half against the rules it carries, because a guard held by a rule that does not exist is not held at all."
         },
         "assertedIn": {
           "type": "array",
@@ -1020,6 +1027,89 @@
               ]
             },
             "description": "A disagreement pins an observed value against a recorded one, which only a literal has. A predicate or a check carrying one would claim a value comparison nothing performed."
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "predicate"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "recordedValue",
+              "declaredExpression"
+            ],
+            "description": "A predicate records both: the value criterion 5 names, which the data half reads, and the expression a reviewer read, which the source half matches."
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "literal"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "recordedValue"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "declaredExpression"
+                  ]
+                },
+                {
+                  "required": [
+                    "heldBy"
+                  ]
+                }
+              ]
+            },
+            "description": "A literal's recorded value is both the value and the text, so a separate expression would be a second spelling of one thing."
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "check"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "heldBy"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "recordedValue"
+                  ]
+                },
+                {
+                  "required": [
+                    "declaredExpression"
+                  ]
+                }
+              ]
+            },
+            "description": "Criterion 5 names no value for the guard that is a check, so a check carrying one would record a value nothing holds."
           }
         }
       ]
