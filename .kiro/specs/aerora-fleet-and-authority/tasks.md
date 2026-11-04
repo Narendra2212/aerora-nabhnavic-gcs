@@ -167,7 +167,7 @@ Three standing constraints apply to every task:
   - [ ]* 3.4 Write tests for the hazard-citation resolution
     - **Validates: Requirements 10.9**
 
-- [~] 4. Checkpoint — the Python half proves itself on this host
+- [x] 4. Checkpoint — the Python half proves itself on this host
   - Run all four `tools/tests/` files, both entry points, `ruff`, `pyright`, `markdownlint` and both
     schema validations
   - This is the last point before a hook gates a commit on the new blocks, and the only evidence
