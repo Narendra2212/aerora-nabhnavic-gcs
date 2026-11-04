@@ -75,7 +75,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py -k profile`
 
-  - [~] 1.3 Implement the derivation interface and its absent-value semantics
+  - [x] 1.3 Implement the derivation interface and its absent-value semantics
     - Every figure returns an optional and **none is stored**, so a profile change cannot leave a
       stale copy behind
     - A profile carrying no values yields no figure, and the caller reports unknown rather than a

@@ -32,11 +32,13 @@ from common.gate_register import (
     GATE_IDS,
     INVENTORY_COLUMNS,
     BlockingEntry,
+    DerivedFigure,
     GateDossier,
     GatePart,
     GateRegister,
     GateRegisterError,
     InventoryReference,
+    LinkProfile,
     MavlinkIdentifierPosture,
     OpenStateReading,
     RationaleReference,
@@ -44,9 +46,11 @@ from common.gate_register import (
     ScreenInventoryError,
     ScreenRecord,
     blocking_gates,
+    derive_link_figure,
     dump_gate_register,
     gate_open,
     is_entry_id,
+    link_profile,
     load_gate_register,
     parse_screen_inventory,
     release_sets,
@@ -1068,3 +1072,119 @@ def test_the_inventory_row_parser_round_trips_through_the_markdown_form(
         assert row.blocking_tokens == frozenset(
             token for token in _TOKEN_PATTERN.findall(blocked_by) if is_entry_id(token)
         )
+
+
+# ---------------------------------------------------------------------------
+# The Link_Profile derivation
+#
+# Requirement 5 criteria 5 to 9. The arithmetic is held by Q-015, so every case here supplies its
+# own formula: what is under test is the shape around the arithmetic, which is the half that
+# decides whether an operator is shown unknown or shown a number that is wrong.
+# ---------------------------------------------------------------------------
+
+LINK_CLASS = "a-fixture-link-class"
+ANOTHER_LINK_CLASS = "another-fixture-link-class"
+PROFILE_REVISION = "a-fixture-revision"
+PARAMETER = "a-fixture-parameter"
+
+
+def _profile(
+    *, parameters: dict[str, int] | None = None, revision: str = PROFILE_REVISION
+) -> LinkProfile:
+    """A profile for LINK_CLASS carrying *parameters*, or carrying none at all."""
+    return LinkProfile(
+        link_class=LINK_CLASS,
+        parameters={} if parameters is None else parameters,
+        held_by="Q-015",
+        revision=revision,
+    )
+
+
+def _refuses(parameters: Mapping[str, object]) -> int | None:
+    """A formula that must not be asked, so a case can assert that it was not."""
+    message = f"the formula was asked with {dict(parameters)}"
+    raise AssertionError(message)
+
+
+def _parameter(parameters: Mapping[str, object]) -> int | None:
+    """A stand-in formula: the one parameter, read back. Not the real arithmetic, which Q-015 holds."""
+    value = parameters[PARAMETER]
+    return value if isinstance(value, int) else None
+
+
+def test_derivation_yields_no_figure_from_a_profile_carrying_no_values() -> None:
+    """Every profile is in this state until Q-015 closes, so it is the case that matters most.
+
+    The formula raises if it is asked, and that is the sharp part. Criterion 9 is satisfied by
+    returning unknown *before* the arithmetic rather than by the arithmetic happening to yield
+    nothing, because a formula written against a parameter set that does not exist could return
+    anything at all, including a plausible zero.
+    """
+    assert derive_link_figure(_profile(), _refuses) is None
+
+
+def test_derivation_carries_the_revision_the_values_came_from() -> None:
+    """Criterion 8: a derived figure reports the Link_Profile it was derived from.
+
+    The revision is asserted as part of the value rather than alongside it, because a figure that
+    can be held without its provenance is one a reader will assume is current.
+    """
+    figure = derive_link_figure(_profile(parameters={PARAMETER: 7}), _parameter)
+
+    assert figure == DerivedFigure(value=7, revision=PROFILE_REVISION)
+
+
+def test_derivation_asks_the_formula_only_where_the_profile_carries_values() -> None:
+    """Both cases report unknown, and the difference is which of them the arithmetic decided.
+
+    A profile with no values waits on Q-015 and the formula is never asked. A profile whose values
+    yield no figure is a link that cannot sustain what was asked of it, and the formula is what
+    establishes that. Both reach the operator as unknown, which is right; they reach whoever has to
+    repair it as two different problems, which is why the call is made in one case and not the
+    other.
+    """
+    asked: list[Mapping[str, object]] = []
+
+    def recording(parameters: Mapping[str, object]) -> int | None:
+        asked.append(parameters)
+        return None
+
+    assert derive_link_figure(_profile(parameters={PARAMETER: 3}), recording) is None
+    assert derive_link_figure(_profile(), recording) is None
+    assert asked == [{PARAMETER: 3}]
+
+
+def test_derivation_stores_nothing_so_a_changed_profile_yields_a_changed_figure() -> None:
+    """Criterion 7: a profile change re-derives every figure that depends on it.
+
+    What this rules out is a cache, and the way it rules one out is that there is nowhere for one
+    to live: the second call cannot return the first answer because the function holds no state
+    between them, and the first figure is unchanged by the second call because it is frozen.
+    """
+    first = derive_link_figure(_profile(parameters={PARAMETER: 1}), _parameter)
+    second = derive_link_figure(
+        _profile(parameters={PARAMETER: 2}, revision="another-fixture-revision"), _parameter
+    )
+
+    assert first == DerivedFigure(value=1, revision=PROFILE_REVISION)
+    assert second == DerivedFigure(value=2, revision="another-fixture-revision")
+
+
+def test_link_profile_finds_the_recorded_class_and_reports_the_others_absent() -> None:
+    """Criterion 9 needs two absences told apart, so the lookup reports one and the figure the other.
+
+    A Link_Class the register records no profile for is a missing record. A recorded profile with
+    no values is a record waiting on Q-015. The first is repaired by recording a profile and the
+    second by closing the question, so a caller seeing only unknown would not know which to do.
+    """
+    recorded = _profile()
+    register = replace(_register(), link_profiles=[recorded])
+
+    assert link_profile(register, LINK_CLASS) is recorded
+    assert link_profile(register, ANOTHER_LINK_CLASS) is None
+    assert derive_link_figure(recorded, _refuses) is None
+
+
+def test_link_profile_reports_absent_where_the_register_records_no_profiles() -> None:
+    """The state the register is in until task 1.5, which must read as absent rather than raise."""
+    assert link_profile(_register(), LINK_CLASS) is None

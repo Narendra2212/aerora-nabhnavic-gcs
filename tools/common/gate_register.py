@@ -39,12 +39,18 @@ half rejects an acceptance that recorded no verdict for a guard mapped to it, an
 reads the same verdict to decide whether a guard's value in source is allowed to have moved. It is
 a pure function over the register and the Closure_Records, so it belongs beside the five rather
 than inside either checker.
+
+The Requirement 5 link derivation is here too, and on different terms. :func:`derive_link_figure`
+is a pure function like the others, but its arithmetic is not written: `Q-015` has not settled
+which parameters a Link_Class records, so the formula arrives as an argument, and what this module
+fixes is the shape around it -- an optional return, nothing stored, and the Link_Profile revision
+carried with the value.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Final, TypeVar
@@ -52,7 +58,7 @@ from typing import TYPE_CHECKING, Any, Final, TypeVar
 from .markdown import parse_md_tables
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection
+    from collections.abc import Collection
 
     from .markdown import MarkdownRow
 
@@ -82,6 +88,7 @@ __all__ = [
     "ClosureRecord",
     "ContractSurfaceElement",
     "DecisionContentElement",
+    "DerivedFigure",
     "Disagreement",
     "ExcludedAcceptanceCriterion",
     "ForbiddenUntil",
@@ -97,6 +104,7 @@ __all__ = [
     "InventoryArea",
     "InventoryReference",
     "InventoryRow",
+    "LinkFigureFormula",
     "LinkProfile",
     "MavlinkIdentifierPosture",
     "MavlinkIdentifierSite",
@@ -117,11 +125,13 @@ __all__ = [
     "SignOffConditionVerdict",
     "Signature",
     "blocking_gates",
+    "derive_link_figure",
     "dump_closure_record",
     "dump_gate_register",
     "gate_open",
     "guard_freedom",
     "is_entry_id",
+    "link_profile",
     "load_closure_record",
     "load_gate_register",
     "parse_screen_inventory",
@@ -2175,3 +2185,68 @@ def guard_freedom(
             withholding_parts=tuple(withholding),
         )
     return freedom
+
+
+# ---------------------------------------------------------------------------
+# The Link_Profile derivation
+#
+# Requirement 5 criteria 5 to 9. Unlike the equations above, which are complete, this one is
+# deliberately not: Q-015 has not settled which parameters a Link_Class records, so the arithmetic
+# cannot be written yet. What can be written, and is the half that is easy to get wrong, is the
+# shape around it: an optional return, nothing stored, and the revision carried with the value.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DerivedFigure:
+    """One figure derived from a Link_Profile, and the revision of the values it came from.
+
+    Requirement 5 criterion 8: the station reports, with each derived figure, the Link_Profile it
+    was derived from. The revision travels inside the figure rather than beside it, because the
+    two are read together and a value separated from its provenance is one a reader assumes is
+    current.
+    """
+
+    value: int
+    revision: str
+
+
+# A figure as a function of a Link_Profile parameter set, yielding None where none follows from it.
+LinkFigureFormula = Callable[[Mapping[str, Any]], int | None]
+
+
+def link_profile(register: GateRegister, link_class: str) -> LinkProfile | None:
+    """The profile *register* records for *link_class*, or ``None`` where it records none.
+
+    Requirement 5 criterion 9 turns on this absence being representable separately from the other
+    one. A Link_Class holding no recorded profile reports unknown figures, and so does one whose
+    profile holds no values, but the repairs differ: one is to record a profile and the other is to
+    close Q-015, so a caller has to be able to tell them apart.
+    """
+    for profile in register.link_profiles or ():
+        if profile.link_class == link_class:
+            return profile
+    return None
+
+
+def derive_link_figure(profile: LinkProfile, formula: LinkFigureFormula) -> DerivedFigure | None:
+    """*formula* over the parameters of *profile*, carrying its revision, or ``None``.
+
+    Nothing is stored. Criterion 7 re-derives every dependent figure when a profile changes, and
+    the cheapest way to be certain no stale figure survives the change is to leave nowhere for one
+    to survive: this is a function of its arguments and holds no cache, so a caller wanting a
+    current figure derives it, and a caller keeping one has chosen to.
+
+    ``None`` where the profile carries no parameter values, which is every profile until Q-015
+    closes. Criterion 9 is explicit that no default is presented, and here is where that is
+    decided: a zero returned from here would reach an operator as a measured zero, which is worse
+    than unknown because it is actionable and wrong.
+
+    The arithmetic arrives as *formula* rather than being written here, because Q-015 has not
+    settled the parameter set and a formula written now would be written against parameters that do
+    not exist. Passing it in is what lets the shape be reviewed and tested before the numbers are.
+    """
+    if not profile.parameters:
+        return None
+    value = formula(profile.parameters)
+    return None if value is None else DerivedFigure(value=value, revision=profile.revision)
