@@ -5547,3 +5547,77 @@ def test_a_decision_content_element_is_never_an_excluded_acceptance_criterion(
     for name in colliding:
         assert any(repr(name) in message for message in messages)
     assert all(UNRECORDED_ELEMENT not in message for message in messages)
+
+
+# A Link_Class name and a revision no fixture reads, because these two tests are about the schema's
+# shape rather than about any recorded class. Q-015 is the real open question that holds every
+# profile's values, and naming it here keeps the fixture honest about why `parameters` is empty.
+FIXTURE_LINK_CLASS = "a-fixture-link-class"
+FIXTURE_PROFILE_REVISION = "a-fixture-revision"
+PROFILE_HELD_BY = "Q-015"
+
+
+def _profile(**changes: object) -> dict[str, object]:
+    """One Link_Profile of the shape the schema admits, with *changes* applied."""
+    recorded: dict[str, object] = {
+        "linkClass": FIXTURE_LINK_CLASS,
+        "parameters": {},
+        "heldBy": PROFILE_HELD_BY,
+        "revision": FIXTURE_PROFILE_REVISION,
+        **changes,
+    }
+    return recorded
+
+
+# The accepting case is deliberately absent here, and the reason is a coupling worth
+# recording: load_premises rejects a document carrying a top-level key the MODEL does not
+# recognise, reporting that the schema and the model disagree about its shape. A schema-only
+# change therefore cannot demonstrate acceptance of the block it adds, however correct the
+# schema is. The accepting case arrives with the model, in task 1.2.
+
+
+def test_the_schema_rejects_a_link_profile_carrying_a_throughput_figure(tmp_path: Path) -> None:
+    """A recorded throughput is the second number this block exists to avoid.
+
+    Requirement 5 criterion 5 forbids the station carrying a throughput figure its Link_Profile
+    does not yield, and the cheapest way to violate that is to record one beside the parameters.
+    Nothing would then detect the figure and the radio it describes diverging, because no rule
+    compares a recorded number against an arithmetic it never performs. The schema therefore makes
+    the figure unrepresentable rather than leaving it to a reviewer to notice.
+    """
+    document = _register_document(_register())
+    document["linkProfiles"] = [_profile(parameters={"throughput": 1200})]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/linkProfiles/0/parameters" in message for message in messages)
+
+
+def test_the_schema_rejects_a_link_profile_carrying_an_aircraft_count(tmp_path: Path) -> None:
+    """The same rule from the other end: the fleet size a class sustains is derived too.
+
+    Recorded separately it would be a third number, and the one most likely to be read as
+    authoritative by an operator deciding how many aircraft to launch.
+    """
+    document = _register_document(_register())
+    document["linkProfiles"] = [_profile(parameters={"aircraftCount": 10})]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("/linkProfiles/0/parameters" in message for message in messages)
+
+
+def test_the_schema_rejects_a_link_profile_naming_what_holds_it_nowhere(tmp_path: Path) -> None:
+    """An empty parameter set reads as a recorded open decision only if something names the holder.
+
+    Without `heldBy`, an absent parameter set is indistinguishable from a profile somebody forgot
+    to fill in, which is the distinction the whole absent-values convention turns on.
+    """
+    document = _register_document(_register())
+    profile = _profile()
+    del profile["heldBy"]
+    document["linkProfiles"] = [profile]
+
+    messages = _rejected(_schema_tree(tmp_path, document))
+
+    assert any("heldBy" in message for message in messages)

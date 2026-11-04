@@ -388,8 +388,15 @@
       "items": {
         "$ref": "#/$defs/contractSurfaceElement"
       }
-    }
-  },
+    },
+    "linkProfiles": {
+      "type": "array",
+      "description": "One recorded parameter profile per Link_Class, from which the station DERIVES that class's sustained throughput, the aircraft count it supports at a telemetry tier, and its achievable update interval (Requirement 5 criteria 4 and 5). No throughput figure is recorded here, and the profile shape forbids one: a recorded figure would be a second number to keep in step with the radio it describes, and nothing would detect the two diverging. A profile whose parameters object is empty is the recorded state of a Link_Class whose values are unsettled, which is what lets the shape be reviewed before the numbers exist (criterion 12).",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/linkProfile"
+      }
+    }  },
   "$defs": {
     "nonEmptyString": {
       "type": "string",
@@ -466,7 +473,49 @@
         "mapping"
       ]
     },
-    "gateDossier": {
+    "linkProfile": {
+      "type": "object",
+      "description": "One Link_Class's recorded parameters and the revision they were recorded at. The parameter SET is register content and is not constrained here: naming the parameters would settle part of the decision Q-015 holds, and this schema records shapes rather than values.",
+      "additionalProperties": false,
+      "required": [
+        "linkClass",
+        "parameters",
+        "heldBy",
+        "revision"
+      ],
+      "properties": {
+        "linkClass": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "The Link_Class this profile describes. A non-empty string rather than an enum, because enumerating the link classes is itself a decision; the data half establishes the set by comparing the profiles against the classes the register references."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "The class's parameters and the value of each. MAY be empty, which records a Link_Class whose values are unsettled and is the state every profile carries until Q-015 closes. The keys are deliberately unconstrained, with two exceptions: a throughput or aircraftCount key is rejected, because both are DERIVED and recording either would create the second number this block exists to avoid.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "throughput"
+                ]
+              },
+              {
+                "required": [
+                  "aircraftCount"
+                ]
+              }
+            ]
+          }
+        },
+        "heldBy": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "What settles this profile's parameter values, named so that an empty parameters object reads as a recorded open decision rather than as an omission. Q-015 holds every profile today."
+        },
+        "revision": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Identifies which profile a derived figure came from, so a reported throughput can be traced to the parameters it was derived from (Requirement 5 criterion 8)."
+        }
+      }
+    },    "gateDossier": {
       "type": "object",
       "description": "One Gate's dossier: its status, Decision_Content as element names, the signing owner of each part, the implementing owner, the Sign_Off_Conditions, the Release_Set and the excluded Acceptance_Criteria (Requirement 1 criterion 2).",
       "additionalProperties": false,

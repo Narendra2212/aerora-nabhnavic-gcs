@@ -69,13 +69,13 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4, 5.12_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [ ] 1.2 Add the model and the parser
+  - [~] 1.2 Add the model and the parser
     - `LinkProfile` in `tools/common/gate_register.py`, read and dumped like every other block, so
       the round-trip property covers it without a new test
     - _Requirements: 5.4_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py -k profile`
 
-  - [ ] 1.3 Implement the derivation interface and its absent-value semantics
+  - [~] 1.3 Implement the derivation interface and its absent-value semantics
     - Every figure returns an optional and **none is stored**, so a profile change cannot leave a
       stale copy behind
     - A profile carrying no values yields no figure, and the caller reports unknown rather than a
@@ -86,7 +86,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.5, 5.7, 5.8, 5.9_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py -k derivation`
 
-  - [ ] 1.4 Implement the `link-profile` data-half check
+  - [~] 1.4 Implement the `link-profile` data-half check
     - Every Link_Class the register references carries exactly one profile, in both directions
     - A profile with empty `parameters` names a `heldBy`; a profile with parameters does not
     - No profile carries a throughput or aircraft-count figure, which is the schema rule read again
@@ -94,7 +94,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4, 5.9, 5.12_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k link_profile`
 
-  - [ ] 1.5 Record one profile per Link_Class, with values absent
+  - [~] 1.5 Record one profile per Link_Class, with values absent
     - Values absent and `heldBy` naming `Q-015`, so the shape is reviewable before the numbers exist
     - _Requirements: 5.12_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
@@ -106,7 +106,7 @@ Three standing constraints apply to every task:
 
 - [ ] 2. The overlay-isolation ratchet
 
-  - [ ] 2.1 Add `overlayEdits` to the register schema
+  - [~] 2.1 Add `overlayEdits` to the register schema
     - One entry per file outside `aerora/` that carries an Aerora identifier, with its path, the
       reason and the owner who authorised it
     - Same ratchet shape as `mavlinkIdentifiers.allowList`, for the same reason: an
@@ -114,12 +114,12 @@ Three standing constraints apply to every task:
     - _Requirements: 10.10_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [ ] 2.2 Add the model, the parser and the data-half check
+  - [~] 2.2 Add the model, the parser and the data-half check
     - Every recorded entry names a path, a reason and an owner from `OWNER_LABELS`
     - _Requirements: 10.10_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k overlay`
 
-  - [ ] 2.3 Implement the `overlay-isolation` source-half rule
+  - [~] 2.3 Implement the `overlay-isolation` source-half rule
     - Walk every tracked file outside `aerora/` and match `Aerora[A-Z]` and `AERORA_`
     - Set equality in both directions: an unrecorded site is unassigned Decision_Content naming the
       file, and a recorded site the tree no longer carries is a removal, so the surface can grow and
@@ -130,7 +130,7 @@ Three standing constraints apply to every task:
     - _Requirements: 10.10, 10.11_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k overlay_isolation`
 
-  - [ ] 2.4 Record the five sites the tree carries today
+  - [~] 2.4 Record the five sites the tree carries today
     - `src/Vehicle/Vehicle.h`, `test/Vehicle/MavCommandAuthorizationTest.cc`, `cmake/QGCTest.cmake`,
       and the two Aerora CI workflows
     - Each with its reason. The `Vehicle.h` entry notes that `adr-016-pair` already gates its content
@@ -143,19 +143,19 @@ Three standing constraints apply to every task:
 
 - [ ] 3. The hazard log
 
-  - [ ] 3.1 Add `hazards` to the register schema
+  - [~] 3.1 Add `hazards` to the register schema
     - An identifier, the statement, the severity, the mitigation and the owner who accepted it
     - _Requirements: 10.9_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [ ] 3.2 Add the model, the parser and the data-half check
+  - [~] 3.2 Add the model, the parser and the data-half check
     - Every hazard names an owner from `OWNER_LABELS` and a non-empty mitigation
     - Every rejection that cites a hazard record resolves to a recorded hazard, so a rule cannot
       cite a hazard that does not exist
     - _Requirements: 10.9, 2.9, 11.3_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k hazard`
 
-  - [ ] 3.3 Record the two hazards this design carries
+  - [~] 3.3 Record the two hazards this design carries
     - Manual control input through a general-purpose operating system has unbounded worst-case
       latency; mitigated by sticks reaching the aircraft directly under a station-granted mode
     - A tether supply interruption long enough to brown out an ESC stops the motors; mitigated by the
@@ -167,7 +167,7 @@ Three standing constraints apply to every task:
   - [ ]* 3.4 Write tests for the hazard-citation resolution
     - **Validates: Requirements 10.9**
 
-- [ ] 4. Checkpoint — the Python half proves itself on this host
+- [~] 4. Checkpoint — the Python half proves itself on this host
   - Run all four `tools/tests/` files, both entry points, `ruff`, `pyright`, `markdownlint` and both
     schema validations
   - This is the last point before a hook gates a commit on the new blocks, and the only evidence
@@ -175,7 +175,7 @@ Three standing constraints apply to every task:
   - Ensure all tests pass, ask the user if questions arise
 - [ ] 5. The addressing axis
 
-  - [ ] 5.1 Separate `AeroraGatedOperation` into an address and a subject
+  - [~] 5.1 Separate `AeroraGatedOperation` into an address and a subject
     - Today's flat command fields move into `AeroraCommandSubject`; today's single `vehicle` becomes
       an `AeroraOperationAddress` carrying one member
     - `AeroraCorePlugin::authorizeMavCommand()` assembles the new shape from the core hook's
@@ -185,13 +185,13 @@ Three standing constraints apply to every task:
     - _Requirements: 3.1_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 5.2 Implement `AeroraOperationAddress`
+  - [~] 5.2 Implement `AeroraOperationAddress`
     - A vehicle list, an all-or-nothing flag, and an opaque required-capability string carried for
       the reason `mavCommand` is carried as an int: no capability identifier is invented here
     - _Requirements: 3.1, 3.2, 4.1_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 5.3 Implement `AeroraFleetDecision` and the all-or-nothing evaluation
+  - [~] 5.3 Implement `AeroraFleetDecision` and the all-or-nothing evaluation
     - Authorization applies to every addressed member or to none, and a refusal names every member
       refused
     - **This evaluates and does not transmit.** Evaluation is not origination, which is why it is
@@ -202,7 +202,7 @@ Three standing constraints apply to every task:
     - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 5.4 Implement capability resolution, with exclusion distinct from refusal
+  - [~] 5.4 Implement capability resolution, with exclusion distinct from refusal
     - An aircraft reporting no satisfying capability is removed from the addressed set **before**
       authorization and reported as excluded, never as refused
     - No capability is inferred from an airframe type, a firmware identifier or a product family
@@ -219,7 +219,7 @@ Three standing constraints apply to every task:
 
 - [ ] 6. The manual authority grant
 
-  - [ ] 6.1 Implement `AeroraManualAuthorityGrant` and its expiry
+  - [~] 6.1 Implement `AeroraManualAuthorityGrant` and its expiry
     - A grant carries an opaque operator identifier, an issue time and an expiry, and reports
       whether it is in force at a given monotonic time
     - **The type carries no stick value.** Requirement 2 criterion 1 forbids the station from being
@@ -228,12 +228,12 @@ Three standing constraints apply to every task:
     - _Requirements: 2.2, 2.3_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 6.2 Record every grant transition in the audit trail
+  - [~] 6.2 Record every grant transition in the audit trail
     - Issued, refused, refreshed and expired, each with the operator identity and the time
     - _Requirements: 2.8_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 6.3 Implement the mirrored-input read path
+  - [~] 6.3 Implement the mirrored-input read path
     - The flight controller reports stick positions and grant state as telemetry, and the station
       displays them. This is how the station observes manual control without carrying it
     - _Requirements: 2.7_
@@ -241,19 +241,19 @@ Three standing constraints apply to every task:
 
 - [ ] 7. The tether endpoint, read side
 
-  - [ ] 7.1 Report attachment and supply as distinct observations
+  - [~] 7.1 Report attachment and supply as distinct observations
     - An attached tether that has stopped supplying is neither absent nor healthy, so neither value
       is derived from the other and no combination collapses into one
     - _Requirements: 8.11_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 7.2 Derive Power_Mode from the capability inventory
+  - [~] 7.2 Derive Power_Mode from the capability inventory
     - Never from the presence or absence of a tether link. A station that inferred mode from link
       presence would report battery mode for a tethered aircraft whose link had merely dropped
     - _Requirements: 8.7, 8.8_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 7.3 Report tether values `UNAVAILABLE` where no unit is attached
+  - [~] 7.3 Report tether values `UNAVAILABLE` where no unit is attached
     - Never `UNKNOWN`, and never a numeric default. `UNAVAILABLE` is producible only from a
       capability report, which is the State_Vocabulary rule unchanged
     - _Requirements: 8.9_
@@ -265,19 +265,19 @@ Three standing constraints apply to every task:
 
 - [ ] 8. Tier and freshness mechanism
 
-  - [ ] 8.1 Report the live Telemetry_Tier and the not-carried distinction
+  - [~] 8.1 Report the live Telemetry_Tier and the not-carried distinction
     - A value absent because the live tier omits it is reported as not carried by that tier, and
       never as `UNKNOWN`. A value retained from a tier no longer live carries its age
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 8.2 Derive which tiers a Link_Class can carry
+  - [~] 8.2 Derive which tiers a Link_Class can carry
     - From the Link_Profile and the recorded tier memberships, so a tier the link cannot sustain is
       never offered
     - _Requirements: 6.9, 5.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ] 8.3 Implement the unachievable-threshold check
+  - [~] 8.3 Implement the unachievable-threshold check
     - A recorded freshness threshold shorter than the interval the profile yields is reported
       unachievable on that class, rather than marking every value it carries `STALE`
     - This is the check that stops a low-rate link under thresholds written for a high-rate one from
@@ -289,7 +289,7 @@ Three standing constraints apply to every task:
     - **Property 7: An unachievable threshold is named, not applied**
     - **Validates: Requirements 7.8**
 
-- [ ] 9. Checkpoint — CI proves the C++ half
+- [~] 9. Checkpoint — CI proves the C++ half
   - Push and confirm the **Aerora Lint**, **Aerora Linux** and **Aerora Windows** legs are green
   - Confirm the new suites ran rather than being silently unregistered, by reading the test counts
     in the leg output rather than only its conclusion
