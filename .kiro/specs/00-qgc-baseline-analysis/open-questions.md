@@ -252,18 +252,45 @@ hint, and a firmware-flash tool. **There is no `TypeSiKRadio` link type.**
 If an Aerora radio presents as a serial or USB-serial device to the GCS, Aerora may need only
 identification and configuration work rather than a new transport — eliminating all six core edits.
 
-### Q-015 What is the worst-case concurrent link count?
+### Q-015 What are the Link_Class parameters the channel budget derives from?
 
 | Field | Value |
 | --- | --- |
-| Status | `OPEN` |
+| Status | `OPEN` -- restated; the original asked for a single worst-case count |
 | Owner | Aerora systems architecture |
-| Blocks | Channel budget validation |
+| Blocks | Every derived link figure. The shape is built and the values are absent |
 | Evidence | R-013 |
 
-Fifteen MAVLink channels are allocatable per QGC instance. One per link, plus one consumed by
-ArduPilot v1 re-encoding if the APM plugin is active. Required: links per vehicle times vehicles
-per GCS instance, worst case.
+This question originally asked for the worst-case concurrent link count as one number. That is the
+wrong shape of answer and recording it would be the mistake: the count is a consequence of the
+radios, the airframe and the firmware, all three of which change per product family. A recorded
+number would be a second figure to keep in step with the hardware, and nothing would detect the two
+diverging.
+
+What is required instead, as three separate inputs:
+
+| Input | Granularity | Who supplies it |
+| --- | --- | --- |
+| The parameter set of each Link_Class, and the value of each parameter | Per Link_Class: `lora`, `wifi`, `tether` | Bench measurement against the real radios |
+| The links an airframe requires | Per product family, through `AeroraProductProfile` | Firmware and frame design |
+| The channel ceiling | Read from the MAVLink build, never recorded | Nobody: see below |
+
+The ceiling is not an input to settle. `MAVLINK_COMM_NUM_BUFFERS` is a compile-time constant of the
+MAVLink C library, channel 0 is reserved, and one further channel is consumed by ArduPilot v1
+re-encoding where the APM plugin is active. Aerora therefore reads the ceiling from the build
+rather than authoring it, so that raising it is a build-configuration decision that the station
+picks up without a code change -- and so that there is never a second number to keep in step.
+
+Everything else follows by derivation and nothing is stored: sustained throughput per Link_Class,
+the aircraft count a class sustains at a Telemetry_Tier, and whether a recorded freshness threshold
+is achievable on that class. A Link_Profile change re-derives all of them, which is why
+`derive_link_figure` holds no cache.
+
+One consequence is worth stating because it is a product limit rather than a software one. At
+fifteen allocatable channels, one link per aircraft supports ten aircraft with five to spare, and
+two links per aircraft supports seven. Ten aircraft on two links each needs twenty channels and is
+therefore a core edit with a memory cost, which Requirement 5 criterion 13 of the
+aerora-fleet-and-authority specification requires to be recorded with its owner.
 
 ## Vehicle and fleet
 
