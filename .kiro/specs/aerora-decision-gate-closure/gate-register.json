@@ -3240,6 +3240,26 @@
       "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
     }
   ],
+  "linkProfiles": [
+    {
+      "linkClass": "lora",
+      "parameters": {},
+      "heldBy": "Q-015",
+      "revision": "r0-values-absent"
+    },
+    {
+      "linkClass": "wifi",
+      "parameters": {},
+      "heldBy": "Q-015",
+      "revision": "r0-values-absent"
+    },
+    {
+      "linkClass": "tether",
+      "parameters": {},
+      "heldBy": "Q-015",
+      "revision": "r0-values-absent"
+    }
+  ],
   "overlayEdits": [
     {
       "path": "src/Vehicle/Vehicle.h",

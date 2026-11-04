@@ -56,7 +56,7 @@ Three standing constraints apply to every task:
 
 ## Tasks
 
-- [ ] 1. The Link_Profile, end to end
+- [x] 1. The Link_Profile, end to end
 
   - [x] 1.1 Add `linkProfiles` to the register schema
     - One entry per Link_Class, each carrying `linkClass`, `parameters`, `heldBy` and `revision`
@@ -94,7 +94,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4, 5.9, 5.12_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k link_profile`
 
-  - [~] 1.5 Record one profile per Link_Class, with values absent
+  - [x] 1.5 Record one profile per Link_Class, with values absent
     - Values absent and `heldBy` naming `Q-015`, so the shape is reviewable before the numbers exist
     - _Requirements: 5.12_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
