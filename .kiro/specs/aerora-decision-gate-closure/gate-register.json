@@ -581,7 +581,8 @@
         "kAutomaticSourceTransitionImplemented",
         "kRemainingEnergyEstimationImplemented",
         "kGroundStationActuatorPathImplemented",
-        "kAutonomousPayloadActionImplemented"
+        "kAutonomousPayloadActionImplemented",
+        "kCapabilityVocabularyAccepted"
       ],
       "restsOnReviewAlone": false,
       "openStateReading": {
@@ -2137,6 +2138,22 @@
       "permittedToChangeBy": [
         "DG-VID:fork-point"
       ]
+    },
+    {
+      "symbol": "kCapabilityVocabularyAccepted",
+      "kind": "literal",
+      "declaredIn": "aerora/src/Security/AeroraAuthorization.h",
+      "recordedValue": "false",
+      "assertedIn": [
+        "aerora/test/Security/AeroraFleetAuthorizationTest.cc"
+      ],
+      "holdsOpen": [
+        "DG-PAY"
+      ],
+      "holdsNoGateOpen": false,
+      "permittedToChangeBy": [
+        "DG-PAY:capability"
+      ]
     }
   ],
   "readOnly": {
@@ -2257,6 +2274,10 @@
         "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
       },
       {
+        "path": "aerora/test/Security/AeroraFleetAuthorizationTest.cc",
+        "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
+      },
+      {
         "path": "aerora/test/Security/AeroraSecurityStatusTest.cc",
         "reason": "an Aerora suite's own fixture, which builds the upstream plan items and commands the production code reads. The instrument proving a prohibition names what it exercises"
       },
@@ -2359,6 +2380,12 @@
     },
     {
       "symbol": "AeroraSigningKeyStore::kProtectedKeySubgroup",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "kCapabilityVocabularyAccepted",
       "kind": "constant",
       "gate": "none",
       "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
@@ -2497,6 +2524,42 @@
     },
     {
       "symbol": "AeroraCalibrationRequestKind::Start",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCapabilityResolutionState::NotAddressedByCapability",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCapabilityResolutionState::Resolved",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraCapabilityResolutionState::Unresolvable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraFleetTransmissionOutcome::Delivered",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraFleetTransmissionOutcome::Failed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraFleetTransmissionOutcome::NotAttempted",
       "kind": "enumerator",
       "gate": "none",
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"

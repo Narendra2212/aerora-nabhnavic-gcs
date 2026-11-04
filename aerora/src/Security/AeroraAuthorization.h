@@ -149,6 +149,121 @@ struct AeroraAuthorizationDecision {
     static QString outcomeToString(AeroraAuthorizationOutcome outcome);
 };
 
+/// \brief Whether one addressed vehicle received a transmitted Fleet_Operation.
+///
+/// Separate from the authorization outcome, and the separation is the whole point. Authorization is
+/// atomic - Requirement 3 criterion 3 applies an operation to every addressed aircraft or to none -
+/// and transmission cannot be, because a link can fail after the decision was reached. Folding the
+/// two into one value would make a partial delivery read as a partial authorization, which is the
+/// state Requirement 3 criterion 7 exists to name.
+///
+enum class AeroraFleetTransmissionOutcome {
+    NotAttempted,  ///< Nothing was sent. The state of every member while DG-ROL is open
+    Delivered,     ///< The link accepted the operation for this vehicle
+    Failed,        ///< Transmission was attempted and the link did not accept it
+};
+
+/// \brief The outcome of authorizing one Fleet_Operation.
+///
+/// \c permitted is the all-or-nothing verdict of Requirement 3 criterion 3. \c perVehicle carries
+/// one decision per addressed vehicle so that a refusal names which, per criterion 4.
+///
+/// \c excludedByCapability is distinct from a refusal and must stay distinct. An aircraft reporting
+/// no satisfying capability is removed from the addressed set *before* authorization and reported,
+/// which Requirement 4 criterion 3 requires: it was not refused, it was never addressed. Each entry
+/// is a rendered MAVLink system id rather than an integer, because the exclusion is reported to an
+/// operator and \c mavlinkSystemId is not a durable fleet identity for a consumer to key on.
+///
+struct AeroraFleetDecision {
+    bool permitted = false;
+    QList<AeroraAuthorizationDecision> perVehicle;
+    QStringList excludedByCapability;
+};
+
+/// \brief The per-vehicle transmission result of an authorized Fleet_Operation.
+///
+/// One outcome per addressed vehicle, in the order the address carried them. Nothing produces a
+/// value other than \c NotAttempted today: while DG-ROL holds no accepted Closure_Record the
+/// station originates no command, so this type records the shape a transmit path must report
+/// against rather than any transmission that happened.
+///
+struct AeroraFleetTransmission {
+    QList<AeroraFleetTransmissionOutcome> perVehicle;
+
+    /// Whether every addressed vehicle received the operation.
+    ///
+    /// False for an empty list. An operation transmitted to nobody did not reach everybody, and
+    /// the vacuous-truth reading would report a fleet of none as fully delivered.
+    [[nodiscard]] bool deliveredToEvery() const
+    {
+        if (perVehicle.isEmpty()) {
+            return false;
+        }
+        for (const AeroraFleetTransmissionOutcome outcome : perVehicle) {
+            if (outcome != AeroraFleetTransmissionOutcome::Delivered) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+/// \brief Whether the recorded capability vocabulary is accepted.
+///
+/// False, and pinned false by the Gate_Register. The capability part of `DG-PAY` settles the form
+/// of a capability identifier and the means by which a vehicle reports capability presence
+/// separately from capability state, and it holds no accepted Closure_Record.
+///
+/// Requirement 4 criterion 7 then requires a Capability_Address to report unresolvable rather than
+/// to address every aircraft. That direction is not a detail: resolving an unsettled vocabulary to
+/// everything would send a hover command to a fixed wing, which is the exact failure addressing by
+/// capability exists to prevent.
+///
+constexpr bool kCapabilityVocabularyAccepted = false;
+
+/// \brief What resolving a Capability_Address against the reported inventories produced.
+///
+/// Three states, because collapsing any two loses the repair. An address naming no capability was
+/// never resolved; an address that could not be resolved waits on a signature; a resolved address
+/// has an answer. Reporting the first two the same way would tell an operator that an explicitly
+/// addressed fleet was blocked by a Gate it never touched.
+///
+enum class AeroraCapabilityResolutionState {
+    NotAddressedByCapability,  ///< The address names no capability, so every member stays addressed
+    Unresolvable,              ///< The vocabulary is unaccepted, so no inventory can be matched
+    Resolved,                  ///< Every member was matched against its reported inventory
+};
+
+/// \brief The result of resolving one Capability_Address.
+///
+/// \c excluded is populated only in the \c Resolved state. An unresolvable address excludes
+/// nobody: it is not a claim that every aircraft lacks the capability, it is the absence of any
+/// basis for the claim, and excluding the whole fleet would be indistinguishable from resolving it.
+///
+struct AeroraCapabilityResolution {
+    AeroraCapabilityResolutionState state = AeroraCapabilityResolutionState::Unresolvable;
+    QStringList excluded;
+};
+
+/// Resolve the Capability_Address \a address carries, if it carries one.
+///
+/// Inline beside the types for the reason `soleVehicle()` is: while the vocabulary is unaccepted
+/// there is no matching to do, and a translation unit of its own would carry one branch. It moves
+/// to a source file when `DG-PAY:capability` closes and matching becomes real work.
+[[nodiscard]] inline AeroraCapabilityResolution resolveCapabilityAddress(
+    const AeroraOperationAddress& address)
+{
+    AeroraCapabilityResolution resolution;
+    if (address.capabilityRequired.isEmpty()) {
+        resolution.state = AeroraCapabilityResolutionState::NotAddressedByCapability;
+        return resolution;
+    }
+    resolution.state = kCapabilityVocabularyAccepted
+                           ? AeroraCapabilityResolutionState::Resolved
+                           : AeroraCapabilityResolutionState::Unresolvable;
+    return resolution;
+}
+
 /// \brief Supplies the current operator identity. Replaceable.
 class AeroraIdentityProvider
 {
