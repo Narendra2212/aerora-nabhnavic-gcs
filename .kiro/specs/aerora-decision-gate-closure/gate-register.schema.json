@@ -404,7 +404,8 @@
       "items": {
         "$ref": "#/$defs/overlayEdit"
       }
-    }  },
+    }
+  },
   "$defs": {
     "nonEmptyString": {
       "type": "string",
@@ -501,10 +502,11 @@
         },
         "owner": {
           "$ref": "#/$defs/ownerLabel",
-          "description": "The owner who authorised this reach into the tree outside the overlay."
+          "description": "The owner accountable for this reach: the one whose authorisation a change to it requires. Where the file also carries Decision_Content, the signature itself is tracked by the Gate part that records that content rather than by this entry -- src/Vehicle/Vehicle.h is the only such file today, and adr-016-pair is what decides whether the edit is applied."
         }
       }
-    },    "linkProfile": {
+    },
+    "linkProfile": {
       "type": "object",
       "description": "One Link_Class's recorded parameters and the revision they were recorded at. The parameter SET is register content and is not constrained here: naming the parameters would settle part of the decision Q-015 holds, and this schema records shapes rather than values.",
       "additionalProperties": false,
@@ -546,7 +548,8 @@
           "description": "Identifies which profile a derived figure came from, so a reported throughput can be traced to the parameters it was derived from (Requirement 5 criterion 8)."
         }
       }
-    },    "gateDossier": {
+    },
+    "gateDossier": {
       "type": "object",
       "description": "One Gate's dossier: its status, Decision_Content as element names, the signing owner of each part, the implementing owner, the Sign_Off_Conditions, the Release_Set and the excluded Acceptance_Criteria (Requirement 1 criterion 2).",
       "additionalProperties": false,

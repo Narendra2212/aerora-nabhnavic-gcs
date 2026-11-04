@@ -104,7 +104,7 @@ Three standing constraints apply to every task:
     - **Property 4: A profile carrying no values yields no figure**
     - **Validates: Requirements 5.5, 5.7, 5.9**
 
-- [ ] 2. The overlay-isolation ratchet
+- [x] 2. The overlay-isolation ratchet
 
   - [x] 2.1 Add `overlayEdits` to the register schema
     - One entry per file outside `aerora/` that carries an Aerora identifier, with its path, the
@@ -130,7 +130,7 @@ Three standing constraints apply to every task:
     - _Requirements: 10.10, 10.11_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_guard_check.py -k overlay_isolation`
 
-  - [~] 2.4 Record the five sites the tree carries today
+  - [x] 2.4 Record the five sites the tree carries today
     - `src/Vehicle/Vehicle.h`, `test/Vehicle/MavCommandAuthorizationTest.cc`, `cmake/QGCTest.cmake`,
       and the two Aerora CI workflows
     - Each with its reason. The `Vehicle.h` entry notes that `adr-016-pair` already gates its content

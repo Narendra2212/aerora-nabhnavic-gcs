@@ -3239,5 +3239,32 @@
       "gate": "none",
       "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
     }
+  ],
+  "overlayEdits": [
+    {
+      "path": "src/Vehicle/Vehicle.h",
+      "reason": "The ADR-016 core edit: the friend class AeroraVehicleFactGroupRegistrar declaration and the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP compile definition. The only one of these five that carries Decision_Content, and the only one whose content a rule already holds -- adr-016-pair reads both halves against DG-TLM, so this entry records that the reach exists and that rule records whether it is applied. Requirement 7 criterion 17 names Tab 1 as the owner whose signature the edit requires.",
+      "owner": "Tab 1"
+    },
+    {
+      "path": "test/Vehicle/MavCommandAuthorizationTest.cc",
+      "reason": "The regression guard for the ADR-012 command-authorization hook, registered by test/Vehicle/CMakeLists.txt as Unit Vehicle. It sits in the upstream test tree because half of what it asserts is that stock QGC is unaffected: the default hook authorizes and never dereferences its Vehicle pointer, which needs the upstream QGCCorePlugin base implementation rather than an overlay type. The rest stubs the identity provider, the role resolver, the policy and the audit sink and asserts the chain denies by default. It names overlay types and carries no withheld value.",
+      "owner": "Tab 1"
+    },
+    {
+      "path": "cmake/QGCTest.cmake",
+      "reason": "A comment and nothing else: it points at the AeroraSceneAttachmentUITest registration in aerora/CMakeLists.txt so a reader of the upstream test macro can find where the overlay registers a suite that macro does not. Recorded because overlay-isolation matches an identifier wherever it appears, which is deliberate over-approximation -- a rule that exempted comments would exempt the place a reach is most easily hidden. Withdrawing the comment is the removal this entry would then report.",
+      "owner": "the process owner"
+    },
+    {
+      "path": ".github/workflows/aerora-linux.yml",
+      "reason": "The Linux CI leg for the overlay. It configures the build with CUSTOMCLASS=AeroraCorePlugin and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP, and asserts that AeroraSceneAttachmentUITest is registered as an Integration test, which is why this leg names a suite and the Windows one does not. A new file rather than an edit to an upstream workflow, so it carries no rebase conflict.",
+      "owner": "the process owner"
+    },
+    {
+      "path": ".github/workflows/aerora-windows.yml",
+      "reason": "The Windows CI leg for the overlay, configuring CUSTOMCLASS=AeroraCorePlugin and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP. It names no suite: the scene-attachment test is registered off Windows, so this leg has no registration to assert. A new file rather than an edit to an upstream workflow.",
+      "owner": "the process owner"
+    }
   ]
 }
