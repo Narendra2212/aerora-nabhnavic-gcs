@@ -173,11 +173,13 @@ public:
 AeroraGatedOperation makeOperation(int systemId, bool vehicleResolved)
 {
     AeroraGatedOperation operation;
-    operation.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
-    operation.targetCompId = MAV_COMP_ID_AUTOPILOT1;
-    operation.param1 = 1.0f;  // arm
-    operation.vehicle.mavlinkSystemId = systemId;
-    operation.vehicle.resolved = vehicleResolved;
+    operation.command.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
+    operation.command.targetCompId = MAV_COMP_ID_AUTOPILOT1;
+    operation.command.param1 = 1.0f;  // arm
+    AeroraVehicleContext addressed;
+    addressed.mavlinkSystemId = systemId;
+    addressed.resolved = vehicleResolved;
+    operation.address.vehicles.append(addressed);
     return operation;
 }
 

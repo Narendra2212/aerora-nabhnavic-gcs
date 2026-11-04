@@ -28,17 +28,19 @@ AeroraGatedOperation calibrationOperation(double p1, double p2, double p3, doubl
                                           double p6, double p7)
 {
     AeroraGatedOperation operation;
-    operation.mavCommand = MAV_CMD_PREFLIGHT_CALIBRATION;
-    operation.targetCompId = MAV_COMP_ID_AUTOPILOT1;
-    operation.param1 = static_cast<float>(p1);
-    operation.param2 = static_cast<float>(p2);
-    operation.param3 = static_cast<float>(p3);
-    operation.param4 = static_cast<float>(p4);
-    operation.param5 = p5;
-    operation.param6 = p6;
-    operation.param7 = static_cast<float>(p7);
-    operation.vehicle.mavlinkSystemId = 1;
-    operation.vehicle.resolved = true;
+    operation.command.mavCommand = MAV_CMD_PREFLIGHT_CALIBRATION;
+    operation.command.targetCompId = MAV_COMP_ID_AUTOPILOT1;
+    operation.command.param1 = static_cast<float>(p1);
+    operation.command.param2 = static_cast<float>(p2);
+    operation.command.param3 = static_cast<float>(p3);
+    operation.command.param4 = static_cast<float>(p4);
+    operation.command.param5 = p5;
+    operation.command.param6 = p6;
+    operation.command.param7 = static_cast<float>(p7);
+    AeroraVehicleContext addressed;
+    addressed.mavlinkSystemId = 1;
+    addressed.resolved = true;
+    operation.address.vehicles.append(addressed);
     return operation;
 }
 
@@ -256,8 +258,8 @@ void AeroraCalibrationAuthorizationTest::_testClassification()
 void AeroraCalibrationAuthorizationTest::_testNonCalibrationCommandIsNotClassified()
 {
     AeroraGatedOperation operation;
-    operation.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
-    operation.param1 = 1.0f;
+    operation.command.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
+    operation.command.param1 = 1.0f;
 
     const AeroraCalibrationRequest request = AeroraCalibrationAuthorization::classify(operation);
 

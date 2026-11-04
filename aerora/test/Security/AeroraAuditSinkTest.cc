@@ -45,11 +45,13 @@ QRegularExpression auditFailureWarningPattern()
 AeroraGatedOperation armOperation()
 {
     AeroraGatedOperation operation;
-    operation.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
-    operation.targetCompId = MAV_COMP_ID_AUTOPILOT1;
-    operation.param1 = 1.0f;
-    operation.vehicle.mavlinkSystemId = 1;
-    operation.vehicle.resolved = true;
+    operation.command.mavCommand = MAV_CMD_COMPONENT_ARM_DISARM;
+    operation.command.targetCompId = MAV_COMP_ID_AUTOPILOT1;
+    operation.command.param1 = 1.0f;
+    AeroraVehicleContext addressed;
+    addressed.mavlinkSystemId = 1;
+    addressed.resolved = true;
+    operation.address.vehicles.append(addressed);
     return operation;
 }
 

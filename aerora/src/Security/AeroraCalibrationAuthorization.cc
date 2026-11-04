@@ -22,19 +22,19 @@ AeroraCalibrationRequest classify(const AeroraGatedOperation& operation)
 {
     AeroraCalibrationRequest request;
 
-    if (operation.mavCommand != MAV_CMD_PREFLIGHT_CALIBRATION) {
+    if (operation.command.mavCommand != MAV_CMD_PREFLIGHT_CALIBRATION) {
         request.kind = AeroraCalibrationRequestKind::NotCalibration;
         return request;
     }
 
     const std::array<double, 7> params = {
-        static_cast<double>(operation.param1),
-        static_cast<double>(operation.param2),
-        static_cast<double>(operation.param3),
-        static_cast<double>(operation.param4),
-        operation.param5,
-        operation.param6,
-        static_cast<double>(operation.param7),
+        static_cast<double>(operation.command.param1),
+        static_cast<double>(operation.command.param2),
+        static_cast<double>(operation.command.param3),
+        static_cast<double>(operation.command.param4),
+        operation.command.param5,
+        operation.command.param6,
+        static_cast<double>(operation.command.param7),
     };
 
     int setCount = 0;
@@ -58,7 +58,7 @@ AeroraCalibrationRequest classify(const AeroraGatedOperation& operation)
 
 bool isDeclaredGatedOperation(const AeroraGatedOperation& operation)
 {
-    return operation.mavCommand == MAV_CMD_PREFLIGHT_CALIBRATION;
+    return operation.command.mavCommand == MAV_CMD_PREFLIGHT_CALIBRATION;
 }
 
 bool denialWouldBlockCancel(const AeroraCalibrationRequest& request)

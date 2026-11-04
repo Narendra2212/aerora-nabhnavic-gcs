@@ -64,7 +64,7 @@ enum class AeroraCalibrationRequestKind {
 ///     so there is no single "motor" parameter to test.
 ///
 /// A policy that needs to distinguish those cases must therefore read the parameter **values** from
-/// `AeroraGatedOperation`, which it already receives in full. This type intentionally exposes only
+/// the `AeroraCommandSubject` the operation carries, which it already receives in full. This type intentionally exposes only
 /// the structure; it is not sufficient on its own for a motor-relevance decision, and it does not
 /// pretend to be.
 ///

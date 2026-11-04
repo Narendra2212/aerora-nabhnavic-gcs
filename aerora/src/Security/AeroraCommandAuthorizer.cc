@@ -125,23 +125,24 @@ void AeroraCommandAuthorizer::_audit(AeroraAuditEventType type, const QString& o
 
     event.operatorId = operatorId;
     event.reasonCode = reasonCode;
-    event.vehicleMavlinkSystemId = operation.vehicle.mavlinkSystemId;
-    event.vehicleResolved = operation.vehicle.resolved;
-    event.detail.insert(QStringLiteral("mavCommand"), operation.mavCommand);
-    event.detail.insert(QStringLiteral("targetCompId"), operation.targetCompId);
-    event.detail.insert(QStringLiteral("commandInt"), operation.commandInt);
+    const AeroraVehicleContext addressed = operation.address.soleVehicle();
+    event.vehicleMavlinkSystemId = addressed.mavlinkSystemId;
+    event.vehicleResolved = addressed.resolved;
+    event.detail.insert(QStringLiteral("mavCommand"), operation.command.mavCommand);
+    event.detail.insert(QStringLiteral("targetCompId"), operation.command.targetCompId);
+    event.detail.insert(QStringLiteral("commandInt"), operation.command.commandInt);
 
     // All seven, not just param1. For several commands the parameter vector *is* the operation:
     // MAV_CMD_PREFLIGHT_CALIBRATION start/cancel differ only in the parameters, and the ESC
     // variant is carried in param7 alone - so a record holding param1 could not identify what was
     // refused. ADR-017.
-    event.detail.insert(QStringLiteral("param1"), operation.param1);
-    event.detail.insert(QStringLiteral("param2"), operation.param2);
-    event.detail.insert(QStringLiteral("param3"), operation.param3);
-    event.detail.insert(QStringLiteral("param4"), operation.param4);
-    event.detail.insert(QStringLiteral("param5"), operation.param5);
-    event.detail.insert(QStringLiteral("param6"), operation.param6);
-    event.detail.insert(QStringLiteral("param7"), operation.param7);
+    event.detail.insert(QStringLiteral("param1"), operation.command.param1);
+    event.detail.insert(QStringLiteral("param2"), operation.command.param2);
+    event.detail.insert(QStringLiteral("param3"), operation.command.param3);
+    event.detail.insert(QStringLiteral("param4"), operation.command.param4);
+    event.detail.insert(QStringLiteral("param5"), operation.command.param5);
+    event.detail.insert(QStringLiteral("param6"), operation.command.param6);
+    event.detail.insert(QStringLiteral("param7"), operation.command.param7);
 
     const AeroraAuditWriteOutcome outcome = _auditSink->record(event);
     if (!AeroraAuditSink::isLoss(outcome)) {
@@ -226,11 +227,13 @@ AeroraAuthorizationDecision AeroraCommandAuthorizer::authorize(const AeroraGated
                                        ? QString()
                                        : AeroraCalibrationAuthorization::describe(calibration);
 
-        qCWarning(AeroraAuthorizationLog) << "denied mavCommand:" << operation.mavCommand
+        const AeroraVehicleContext denied = operation.address.soleVehicle();
+
+        qCWarning(AeroraAuthorizationLog) << "denied mavCommand:" << operation.command.mavCommand
                                           << "operation:" << descriptor
-                                          << "targetCompId:" << operation.targetCompId
-                                          << "vehicleResolved:" << operation.vehicle.resolved
-                                          << "mavlinkSystemId:" << operation.vehicle.mavlinkSystemId
+                                          << "targetCompId:" << operation.command.targetCompId
+                                          << "vehicleResolved:" << denied.resolved
+                                          << "mavlinkSystemId:" << denied.mavlinkSystemId
                                           << "outcome:" << outcomeText
                                           << "reasonCode:" << decision.reasonCode;
         _audit(AeroraAuditEventType::CommandDenied, operatorId, decision.reasonCode, operation);

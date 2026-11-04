@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QtCore/QList>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
@@ -75,19 +76,48 @@ struct AeroraVehicleContext {
     bool resolved = false;
 };
 
-/// \brief The operation being gated.
+/// \brief To whom a gated operation applies. This axis grows independently of what is done.
 ///
-/// Mirrors the core hook's parameters. \c mavCommand is a MAV_CMD value carried as int:
-/// no MAVLink identifier is invented, declared or redefined by Aerora. Parameters are
-/// included because they carry the operation's meaning - for example arm versus disarm
-/// is distinguished only by param1 - and a policy that cannot see them cannot decide
-/// correctly.
+/// A single member is an Independent_Operation. More than one member with \c allOrNothing set is
+/// a Fleet_Operation, whose authorization applies to every member or to none.
 ///
-struct AeroraGatedOperation {
+struct AeroraOperationAddress {
+    QList<AeroraVehicleContext> vehicles;
+    bool allOrNothing = false;
+
+    /// The capability a Fleet_Operation requires, resolved against each vehicle reported
+    /// inventory. Carried as an opaque string for the reason \c mavCommand is carried as an int:
+    /// no capability identifier is invented, declared or redefined by Aerora. Empty for an
+    /// operation addressed directly rather than by capability.
+    QString capabilityRequired;
+
+    /// The one addressed vehicle, for a reader that handles a single vehicle only.
+    ///
+    /// An address carrying no vehicle yields an unresolved context, which is the state the gate
+    /// is in on paths holding no vehicle and is what this struct replaced. An address carrying
+    /// more than one yields unresolved too, deliberately: a single-vehicle reader must not report
+    /// one member of an addressed set as though it were the whole operation, and unresolved is
+    /// visibly wrong where a first member would be quietly wrong.
+    [[nodiscard]] AeroraVehicleContext soleVehicle() const
+    {
+        return vehicles.size() == 1 ? vehicles.constFirst() : AeroraVehicleContext{};
+    }
+};
+
+/// \brief What a gated operation does. Exactly one form today.
+///
+/// Mirrors the core hook parameters. \c mavCommand is a MAV_CMD value carried as int: no MAVLink
+/// identifier is invented, declared or redefined by Aerora. Parameters are included because they
+/// carry the operation meaning - arm versus disarm is distinguished only by param1 - and a policy
+/// that cannot see them cannot decide correctly.
+///
+/// ADR-014 may add a second form for a parameter write. It would sit beside this one and touch no
+/// addressing code, which is the whole purpose of the separation.
+///
+struct AeroraCommandSubject {
     int mavCommand = 0;
     int targetCompId = 0;
     bool commandInt = false;
-    AeroraVehicleContext vehicle;
     float param1 = 0.0f;
     float param2 = 0.0f;
     float param3 = 0.0f;
@@ -95,6 +125,16 @@ struct AeroraGatedOperation {
     double param5 = 0.0;
     double param6 = 0.0;
     float param7 = 0.0f;
+};
+
+/// \brief The operation being gated: whom it applies to, and what it does.
+///
+/// The two axes vary independently. Addressing grows from one vehicle to a set without the
+/// subject changing, and ADR-014 may add a subject form without the addressing changing.
+///
+struct AeroraGatedOperation {
+    AeroraOperationAddress address;
+    AeroraCommandSubject command;
 };
 
 /// \brief A decision, with the cause retained for audit.

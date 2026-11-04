@@ -236,23 +236,30 @@ bool AeroraCorePlugin::authorizeMavCommand(Vehicle *vehicle, int targetCompId, i
         return true;
     }
 
+    AeroraCommandSubject subject;
+    subject.mavCommand = command;
+    subject.targetCompId = targetCompId;
+    subject.commandInt = commandInt;
+    subject.param1 = param1;
+    subject.param2 = param2;
+    subject.param3 = param3;
+    subject.param4 = param4;
+    subject.param5 = param5;
+    subject.param6 = param6;
+    subject.param7 = param7;
+
     AeroraGatedOperation operation;
-    operation.mavCommand = command;
-    operation.targetCompId = targetCompId;
-    operation.commandInt = commandInt;
-    // The gate is reached on paths that may hold no vehicle. An unresolved vehicle is recorded
-    // as unresolved rather than defaulted, so a denial never names a vehicle it did not concern.
+    operation.command = subject;
+
+    // The gate is reached on paths that may hold no vehicle. An address carrying none is recorded
+    // as carrying none rather than as carrying a defaulted vehicle, so a denial never names a
+    // vehicle it did not concern.
     if (vehicle) {
-        operation.vehicle.mavlinkSystemId = vehicle->id();
-        operation.vehicle.resolved = true;
+        AeroraVehicleContext addressed;
+        addressed.mavlinkSystemId = vehicle->id();
+        addressed.resolved = true;
+        operation.address.vehicles.append(addressed);
     }
-    operation.param1 = param1;
-    operation.param2 = param2;
-    operation.param3 = param3;
-    operation.param4 = param4;
-    operation.param5 = param5;
-    operation.param6 = param6;
-    operation.param7 = param7;
 
     return authorizer->isAuthorized(operation);
 }

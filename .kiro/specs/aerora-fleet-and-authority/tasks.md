@@ -175,7 +175,7 @@ Three standing constraints apply to every task:
   - Ensure all tests pass, ask the user if questions arise
 - [ ] 5. The addressing axis
 
-  - [~] 5.1 Separate `AeroraGatedOperation` into an address and a subject
+  - [-] 5.1 Separate `AeroraGatedOperation` into an address and a subject
     - Today's flat command fields move into `AeroraCommandSubject`; today's single `vehicle` becomes
       an `AeroraOperationAddress` carrying one member
     - `AeroraCorePlugin::authorizeMavCommand()` assembles the new shape from the core hook's
