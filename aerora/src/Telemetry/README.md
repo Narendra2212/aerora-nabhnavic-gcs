@@ -356,7 +356,7 @@ concrete implementation holds `friend`ship with `Vehicle`.
 Five findings, all source-verified at `9459a4b5`:
 
 | # | Finding | Location |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Upstream grants `friend class` to two types **specifically** so they can call `_addFactGroup` per vehicle, with the comment `// Allow call _addFactGroup` | `src/Vehicle/Vehicle.h:108, 115` |
 | 2 | Both friends register groups **dynamically, at message-handling time** — long after construction | `FactGroupListModel.cc:44`, `GimbalController.cc:475` |
 | 3 | `_addFactGroup()` stores a raw pointer, does **not** reparent, and emits `factGroupNamesChanged()` | `FactGroup.cc:133-146` |
@@ -471,7 +471,7 @@ reaches the vehicle map is correct and should be inverted as part of the same ch
 ### Consequences
 
 | Area | Consequence |
-|---|---|
+| --- | --- |
 | **Multi-vehicle** | Correct by construction. Each vehicle has its own set, evaluator and group objects; the registrar is per vehicle. `_twoSetsShareNoGroupsOrEvaluator` asserts it |
 | **Lifetime** | Unchanged. Groups stay owned by the `AeroraTelemetrySet`, which is a child of the vehicle's service graph. `_addFactGroup` does not reparent, so no ownership moves to `Vehicle` |
 | **Shared state** | None. No static, no cache, no plugin member |

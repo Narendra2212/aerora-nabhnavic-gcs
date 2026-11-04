@@ -86,6 +86,20 @@ jobs:
           archives: qtbase qtdeclarative icu
 
       - name: Run pre-commit over the overlay
+        env:
+          # clang-format is held out of this leg, and the reason is a measurement rather
+          # than a preference. pre-commit passes whole files, so clang-format checks each
+          # one in full, while the hook own contract is to check changed C++ regions and
+          # only new files in full. The overlay has never been formatted, so a full-file
+          # check rewrites 108 of its 148 C++ sources: 1674 insertions and 1932 deletions,
+          # measured at aaa3a7d08. That is a bulk reformat of other tabs code and a
+          # decision for their owners rather than one a lint leg makes silently, and this
+          # repository carries no .git-blame-ignore-revs, so it has never sanctioned one.
+          #
+          # New code is still formatted. The hook runs unchanged in the local commit gate
+          # and in pre-commit.yml on pull requests, both in changed-files mode. Remove this
+          # line in the same change that formats the overlay.
+          SKIP: clang-format
         run: |
           mapfile -t overlay < <(git ls-files -- aerora)
           if [ "${#overlay[@]}" -eq 0 ]; then

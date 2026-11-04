@@ -5,7 +5,7 @@ validation foundation that serves them.
 
 Everything below was read from this repository at `7e41a529e`. Where a Phase 7 planning document
 and the current source disagree, the source wins and the difference is recorded under
-[Corrections to the Phase 7 plan](#corrections-to-the-phase-7-plan).
+[Corrections to the Phase 7 plan](#7-corrections-to-the-phase-7-plan).
 
 ## Status
 

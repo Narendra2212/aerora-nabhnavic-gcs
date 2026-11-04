@@ -15,6 +15,17 @@ extend-ignore-re = [
     # Same rule: the literal P7- prefix and the three-digit suffix bound the match, so the three- or
     # four-letter area code is exempt only inside a whole identifier.
     "\\bP7-[A-Z]{3,4}-[0-9]{3}\\b",
+    # Interface identifiers from the ICDs (IF-MIS-004, IF-LOG-014), which the overlay
+    # READMEs cite by ID. Same anchoring as the three above: the literal IF- prefix and the
+    # three-digit suffix bound the match, so the area code is exempt only inside a whole
+    # identifier and a bare MIS is still reported.
+    "\\bIF-[A-Z]{3}-[0-9]{3}\\b",
+    # Upstream spells this word this way, and the overlay quotes it verbatim with
+    # attribution: aerora/src/Mission/coverage-mission-contract.md quotes
+    # src/MissionManager/CameraCalc.h:36. Correcting it inside the quotation marks would
+    # falsify the quote, and exempting the word globally would hide a real misspelling
+    # elsewhere, so the exemption is anchored on upstream own phrase.
+    "simplifies code and persistance",
 ]
 extend-ignore-identifiers-re = [
     # 0x-prefixed hex literals and hash-like bare hex (SHAs). Must stay anchored and
