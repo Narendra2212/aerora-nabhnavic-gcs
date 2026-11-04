@@ -56,7 +56,11 @@ value.
 - **Link_Class**: a category of communication link distinguished by its sustained throughput and its
   latency characteristics.
 - **Telemetry_Tier**: a named subset of the telemetry dialect sized to a Link_Class.
-- **Power_Mode**: either tether or battery. In battery Power_Mode no Tether_Unit is present.
+- **Power_Source_Failover**: the transfer of an aircraft supply from tether to onboard
+  battery, performed by the aircraft power hardware without a software decision.
+- **Power_Mode**: which source presently supplies an aircraft, either tether or battery. It
+  describes supply and not attachment: an aircraft whose tether supply has failed is in battery
+  Power_Mode with its Tether_Unit still attached.
 
 ## Requirements
 
@@ -249,10 +253,13 @@ so that command authority is preserved without placing a ground station inside a
 7. THE Aerora_Station SHALL report the Power_Mode of each aircraft.
 8. THE Aerora_Station SHALL derive Power_Mode from the capability inventory the aircraft reports,
    and SHALL NOT infer it from the presence or absence of a tether link.
-9. WHILE an aircraft is in battery Power_Mode, THE Aerora_Station SHALL report every tether value as
-   `UNAVAILABLE`, and SHALL NOT report it as `UNKNOWN` or as a numeric default.
+9. WHILE no Tether_Unit is attached to an aircraft, THE Aerora_Station SHALL report every tether
+   value as `UNAVAILABLE`, and SHALL NOT report it as `UNKNOWN` or as a numeric default.
 10. WHERE a Tether_Unit speaks a protocol other than MAVLink, THE Aerora_Station SHALL allocate it
     no MAVLink channel.
+11. THE Aerora_Station SHALL report Tether_Unit attachment and tether supply state as distinct
+    values, so that an attached tether that has stopped supplying is neither reported absent nor
+    reported healthy.
 
 ### Requirement 9: An extensible product and mission namespace
 
@@ -308,6 +315,58 @@ the defence option kept open, so that the first market is served without foreclo
     who authorised it, so that the overlay's separability stays measurable.
 11. IF a proposed repository change places Aerora logic outside `aerora/`, THEN THE Gate_Review
     SHALL reject the change unless the Gate_Register records the authorisation.
+
+### Requirement 11: Power-source failover is a hardware function the station supervises
+
+**User Story:** As a flight-safety reviewer, I want the aircraft to survive a tether power failure
+on its own, and the station to turn the survived failure into a bounded, visible and recorded
+condition, so that an unbounded tethered flight becomes a managed battery flight rather than an
+unnoticed one.
+
+A hexacopter at hover draws kilowatts, and an interruption of the DC bus long enough to brown out an
+ESC is long enough to stop the motors. No software path meets that deadline: not the station over a
+link, and not the flight controller in firmware. The transfer is therefore electrical, and the
+station's contribution is everything around it rather than the transfer itself.
+
+#### Acceptance Criteria
+
+1. THE Aerora_Station SHALL NOT participate in a Power_Source_Failover.
+2. THE Gate_Register SHALL record that a Power_Source_Failover is performed by the aircraft's power
+   hardware without a software decision, together with the owner who authorised that design.
+3. IF a proposed repository change places a Power_Source_Failover under a station command, a station
+   timeout or a flight-controller software decision, THEN THE Gate_Review SHALL reject the change
+   and SHALL name the hazard record that rejects it.
+4. THE Gate_Register SHALL record the onboard battery reserve a tethered flight requires, which the
+   power part of `DG-PAY` settles.
+5. WHILE an aircraft is in tether Power_Mode, THE Aerora_Station SHALL report the onboard battery's
+   reported state of charge and whether it meets the recorded reserve.
+6. IF an aircraft's reported battery state of charge is below the recorded reserve, THEN THE
+   Aerora_Station SHALL report the aircraft as not ready for tethered flight and SHALL name the
+   reserve it falls short of.
+7. WHEN an aircraft reports a Power_Source_Failover, THE Aerora_Station SHALL report the condition as
+   a degraded flight and SHALL NOT present it as a routine mode change.
+8. WHEN an aircraft reports a Power_Source_Failover, THE Aerora_Station SHALL report the remaining
+   flight time the onboard battery sustains, and SHALL report that time as unknown where the
+   consumption model holds no accepted Closure_Record.
+9. THE Gate_Register SHALL record the recovery action an aircraft performs on a
+   Power_Source_Failover, which `DG-ROL` settles, and SHALL record that the aircraft performs it
+   without waiting for the Aerora_Station.
+10. WHERE a communication path runs through the tether, THE Gate_Register SHALL record that a tether
+    fault is a simultaneous power and communication fault, and the recorded recovery action SHALL
+    require no link to the Aerora_Station.
+11. IF tether supply returns after a Power_Source_Failover, THEN THE Aerora_Station SHALL report the
+    return and SHALL NOT report the aircraft as supplied by tether until the aircraft reports the
+    transfer.
+12. WHERE an aircraft reports more than one Power_Source_Failover within a flight, THE Aerora_Station
+    SHALL report the count, because an intermittent tether fault is a different condition from a
+    single failure.
+13. THE Aerora_Station SHALL refuse to originate a command that removes tether supply from an
+    airborne aircraft unless that aircraft reports a battery state of charge at or above the recorded
+    reserve.
+14. IF the Aerora_Station cannot read an airborne aircraft's battery state of charge, THEN THE
+    Aerora_Station SHALL refuse to originate a command that removes tether supply from it.
+15. THE Aerora_Station SHALL record each Power_Source_Failover in the audit trail with its time, the
+    reported battery state at that time, and the recovery action the aircraft performed.
 
 ## Source Material
 
