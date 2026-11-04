@@ -96,6 +96,7 @@ __all__ = [
     "InventoryArea",
     "InventoryReference",
     "InventoryRow",
+    "LinkProfile",
     "MavlinkIdentifierPosture",
     "MavlinkIdentifierSite",
     "Observation",
@@ -494,6 +495,26 @@ class ContractSurfaceElement:
 
 
 @dataclass(frozen=True)
+class LinkProfile:
+    """One Link_Class's recorded parameters, and the revision they were recorded at.
+
+    ``parameters`` is deliberately untyped beyond being a mapping. The parameter *set* is register
+    content settled by `Q-015`, so naming the parameters here would put part of that decision in
+    the model, and the model would then have to change every time the decision moved.
+
+    An empty mapping is a recorded open decision rather than an omission, which is what ``held_by``
+    is for. Nothing derived is stored: throughput, the aircraft count a class sustains and the
+    achievable update interval are all computed on read from these parameters, so a profile change
+    cannot leave a stale figure behind.
+    """
+
+    link_class: str
+    parameters: dict[str, Any]
+    held_by: str
+    revision: str
+
+
+@dataclass(frozen=True)
 class GateRegister:
     """The single authoritative record of the ten Gates and the axes that read against them."""
 
@@ -505,6 +526,7 @@ class GateRegister:
     read_only: ReadOnlyPosture
     mavlink_identifiers: MavlinkIdentifierPosture
     contract_surface: list[ContractSurfaceElement]
+    link_profiles: list[LinkProfile] | None
 
 
 # ---------------------------------------------------------------------------
@@ -1008,6 +1030,31 @@ def _read_contract_surface_element(value: Any, path: str) -> ContractSurfaceElem
     return element
 
 
+def _read_link_profile(value: Any, path: str) -> LinkProfile:
+    """Read one Link_Profile, rejecting a parameters value that is not an object.
+
+    ``parameters`` is read through :meth:`_Reader.value_or_absent` rather than a typed accessor,
+    because the reader has no accessor for a free-form mapping and adding one would invite a typed
+    parameter set. The key is required by the schema, so absence is rejected here as well: a model
+    that defaulted it to empty would read a malformed document as a recorded open decision.
+    """
+    reader = _Reader(value, path)
+    link_class = reader.text("linkClass")
+    recorded = reader.value_or_absent("parameters")
+    if recorded is ABSENT:
+        raise GateRegisterError(f"{path}.parameters is required")
+    if not isinstance(recorded, Mapping):
+        raise GateRegisterError(f"{path}.parameters must be an object")
+    profile = LinkProfile(
+        link_class=link_class,
+        parameters=dict(recorded),
+        held_by=reader.text("heldBy"),
+        revision=reader.text("revision"),
+    )
+    reader.done()
+    return profile
+
+
 def load_gate_register(document: Any, *, path: str = "gate-register") -> GateRegister:
     """Read a Gate_Register document into the model, naming the key at fault on rejection.
 
@@ -1024,6 +1071,7 @@ def load_gate_register(document: Any, *, path: str = "gate-register") -> GateReg
         read_only=reader.child("readOnly", _read_read_only_posture),
         mavlink_identifiers=reader.child("mavlinkIdentifiers", _read_mavlink_identifier_posture),
         contract_surface=reader.children("contractSurface", _read_contract_surface_element),
+        link_profiles=reader.optional_children("linkProfiles", _read_link_profile),
     )
     reader.done()
     return register
@@ -1371,6 +1419,15 @@ def _dump_contract_surface_element(element: ContractSurfaceElement) -> dict[str,
     )
 
 
+def _dump_link_profile(profile: LinkProfile) -> dict[str, Any]:
+    return _object(
+        ("linkClass", profile.link_class),
+        ("parameters", dict(profile.parameters)),
+        ("heldBy", profile.held_by),
+        ("revision", profile.revision),
+    )
+
+
 def dump_gate_register(register: GateRegister) -> dict[str, Any]:
     """Write the model back as a JSON-ready object, in the key order the schema declares."""
     return _object(
@@ -1384,6 +1441,14 @@ def dump_gate_register(register: GateRegister) -> dict[str, Any]:
         (
             "contractSurface",
             [_dump_contract_surface_element(item) for item in register.contract_surface],
+        ),
+        (
+            "linkProfiles",
+            _or_omit(
+                None
+                if register.link_profiles is None
+                else [_dump_link_profile(item) for item in register.link_profiles]
+            ),
         ),
     )
 

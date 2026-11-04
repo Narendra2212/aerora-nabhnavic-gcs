@@ -379,6 +379,7 @@ def _register(
         ),
         mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=[],
+        link_profiles=None,
     )
 
 

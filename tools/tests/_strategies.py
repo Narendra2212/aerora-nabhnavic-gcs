@@ -51,6 +51,7 @@ from common.gate_register import (
     Guard,
     GuardPermission,
     InventoryReference,
+    LinkProfile,
     MavlinkIdentifierPosture,
     Observation,
     OpenStateReading,
@@ -317,6 +318,43 @@ def guards(draw: st.DrawFn, *, symbol: str | None = None, holds_open: Sequence[s
     )
 
 
+# Fictional link classes and parameter names. Naming a real parameter would settle part of what
+# `Q-015` holds, and this module's identifiers are fictional for that reason throughout.
+_LINK_CLASSES = ("a-fixture-link-class", "another-fixture-link-class")
+_LINK_PARAMETERS = ("aFixtureParameter", "anotherFixtureParameter")
+
+
+@st.composite
+def link_profiles(draw: st.DrawFn) -> list[LinkProfile] | None:
+    """A recorded Link_Profile set, or no profiles at all.
+
+    `None` is drawn as often as a list, because the register carries no `linkProfiles` key today and
+    the round trip has to hold over the absent key as well as the present one.
+
+    Parameter sets are drawn both empty and populated. Empty is the state every profile is in until
+    `Q-015` closes, and it is the state a reader is most likely to mishandle by treating an empty
+    mapping as a missing one.
+    """
+    if draw(st.booleans()):
+        return None
+    classes = draw(st.lists(st.sampled_from(_LINK_CLASSES), min_size=1, max_size=2, unique=True))
+    return [
+        LinkProfile(
+            link_class=name,
+            parameters=draw(
+                st.dictionaries(
+                    st.sampled_from(_LINK_PARAMETERS),
+                    st.integers(min_value=0, max_value=9),
+                    max_size=2,
+                )
+            ),
+            held_by="Q-015",
+            revision=draw(st.sampled_from(["a-fixture-revision", "another-fixture-revision"])),
+        )
+        for name in classes
+    ]
+
+
 @st.composite
 def registers(
     draw: st.DrawFn,
@@ -351,6 +389,7 @@ def registers(
         ),
         mavlink_identifiers=MavlinkIdentifierPosture(gate="DG-MIS", allow_list=[]),
         contract_surface=[],
+        link_profiles=draw(link_profiles()),
     )
 
 

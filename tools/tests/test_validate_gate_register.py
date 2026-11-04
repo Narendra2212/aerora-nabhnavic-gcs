@@ -620,6 +620,7 @@ def _register(
         # the file and records it with `_with_allow_list`.
         mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=_baseline_surface(registry),
+        link_profiles=None,
     )
 
 
@@ -5569,11 +5570,22 @@ def _profile(**changes: object) -> dict[str, object]:
     return recorded
 
 
-# The accepting case is deliberately absent here, and the reason is a coupling worth
-# recording: load_premises rejects a document carrying a top-level key the MODEL does not
-# recognise, reporting that the schema and the model disagree about its shape. A schema-only
-# change therefore cannot demonstrate acceptance of the block it adds, however correct the
-# schema is. The accepting case arrives with the model, in task 1.2.
+# The accepting case. It could not be written until the model recognised the key: until then
+# load_premises reported that the schema and the model disagreed about the document shape,
+# whatever the schema said.
+def test_the_schema_accepts_a_link_profile_whose_parameters_are_absent(tmp_path: Path) -> None:
+    """The state every profile is in until `Q-015` closes, and the reason the block exists now.
+
+    Requirement 5 criterion 12 carries the profile shape with its values absent so that the shape
+    is reviewable before the numbers exist. A schema that required a non-empty parameter set would
+    make the shape unrecordable until the decision closed, which is the opposite of the intent.
+    """
+    document = _register_document(_register())
+    document["linkProfiles"] = [_profile()]
+
+    premises = load_premises(_schema_tree(tmp_path, document))
+
+    assert not isinstance(premises, list), premises
 
 
 def test_the_schema_rejects_a_link_profile_carrying_a_throughput_figure(tmp_path: Path) -> None:

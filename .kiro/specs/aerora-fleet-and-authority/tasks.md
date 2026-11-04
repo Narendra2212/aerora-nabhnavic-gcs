@@ -58,7 +58,7 @@ Three standing constraints apply to every task:
 
 - [ ] 1. The Link_Profile, end to end
 
-  - [ ] 1.1 Add `linkProfiles` to the register schema
+  - [x] 1.1 Add `linkProfiles` to the register schema
     - One entry per Link_Class, each carrying `linkClass`, `parameters`, `heldBy` and `revision`
     - `parameters` is an object and **may be empty**, which is the recorded state of a profile whose
       values are unsettled. `heldBy` names what settles them
@@ -69,7 +69,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4, 5.12_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [~] 1.2 Add the model and the parser
+  - [-] 1.2 Add the model and the parser
     - `LinkProfile` in `tools/common/gate_register.py`, read and dumped like every other block, so
       the round-trip property covers it without a new test
     - _Requirements: 5.4_
