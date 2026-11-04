@@ -228,9 +228,7 @@ set(AERORA_UI_OVERRIDE_PREFIX "/Aerora/qml")
 # SCR-LIV-01. Stock path: /qml/QGroundControl/FlyView/FlyViewCustomLayer.qml
 set(AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER ${AERORA_UI_DIR}/Overrides/FlyViewCustomLayer.qml)
 
-set(AERORA_UI_OVERRIDE_QML_FILES
-    ${AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER}
-)
+set(AERORA_UI_OVERRIDE_QML_FILES ${AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER})
 
 # ----------------------------------------------------------------------------
 # Test sources
@@ -276,11 +274,8 @@ set(AERORA_UI_TEST_SOURCES
 # to drive the Configure view. Both .cc files are already compiled into the application target by
 # test/QmlUITests/CMakeLists.txt, so only the header path is needed here - the overlay builds no
 # second copy of the harness and modifies no core file to reach it.
-set(AERORA_UI_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_UI_TEST_DIR}
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
-    ${CMAKE_SOURCE_DIR}/test/QmlUITests
+set(AERORA_UI_TEST_INCLUDE_DIRECTORIES ${AERORA_UI_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
+                                       ${CMAKE_SOURCE_DIR}/test/UnitTestFramework ${CMAKE_SOURCE_DIR}/test/QmlUITests
 )
 
 set(AERORA_UI_TEST_NAMES

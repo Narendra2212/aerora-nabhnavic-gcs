@@ -117,10 +117,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraSigningKeyStoreTest.h
 )
 
-set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_SECURITY_TEST_DIR}
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES ${AERORA_SECURITY_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
+                                             ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
 )
 
 # ----------------------------------------------------------------------------
@@ -139,10 +137,6 @@ set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES
 # .kiro/specs/03-implementation-specification/34-audit-sink-and-security-status-contract.md.
 # ----------------------------------------------------------------------------
 
-set(AERORA_SECURITY_TEST_NAMES
-    AeroraAuditSinkTest
-    AeroraCalibrationAuthorizationTest
-    AeroraCalibrationEnforcementTest
-    AeroraSecurityStatusTest
-    AeroraSigningKeyStoreTest
+set(AERORA_SECURITY_TEST_NAMES AeroraAuditSinkTest AeroraCalibrationAuthorizationTest AeroraCalibrationEnforcementTest
+                               AeroraSecurityStatusTest AeroraSigningKeyStoreTest
 )

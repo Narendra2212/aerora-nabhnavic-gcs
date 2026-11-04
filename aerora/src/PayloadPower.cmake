@@ -130,10 +130,8 @@ set(AERORA_PAYLOAD_POWER_SOURCES
 # AeroraPayloadCommandSink.h is listed deliberately even though it has no translation unit: it
 # declares AeroraPayloadRequest, which is a Q_GADGET, so AUTOMOC has to see the header.
 
-set(AERORA_PAYLOAD_POWER_INCLUDE_DIRECTORIES
-    ${AERORA_PAYLOAD_POWER_DIR}/Supervisory
-    ${AERORA_PAYLOAD_POWER_DIR}/Payload
-    ${AERORA_PAYLOAD_POWER_DIR}/Power
+set(AERORA_PAYLOAD_POWER_INCLUDE_DIRECTORIES ${AERORA_PAYLOAD_POWER_DIR}/Supervisory
+                                             ${AERORA_PAYLOAD_POWER_DIR}/Payload ${AERORA_PAYLOAD_POWER_DIR}/Power
 )
 
 # QGC::Timing carries RuntimeScheduler.h and ScheduledTask.h as a PUBLIC header file set, and links
@@ -172,11 +170,8 @@ set(AERORA_PAYLOAD_POWER_TEST_SOURCES
 )
 
 set(AERORA_PAYLOAD_POWER_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Supervisory
-    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Payload
-    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Supervisory ${AERORA_PAYLOAD_POWER_TEST_DIR}/Payload
+    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power ${CMAKE_SOURCE_DIR}/test ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
     ${CMAKE_SOURCE_DIR}/test/Utilities/Timing/Support
 )
 
@@ -190,8 +185,4 @@ set(AERORA_PAYLOAD_POWER_TEST_INCLUDE_DIRECTORIES
 # alongside the two existing entries. Nothing else in the aggregation changes: the test sources and
 # the new Supervisory test include directory arrive through the variables above, which
 # aerora/CMakeLists.txt already appends wholesale.
-set(AERORA_PAYLOAD_POWER_TEST_NAMES
-    AeroraReportedValueTest
-    AeroraPayloadModelTest
-    AeroraPowerModelTest
-)
+set(AERORA_PAYLOAD_POWER_TEST_NAMES AeroraReportedValueTest AeroraPayloadModelTest AeroraPowerModelTest)

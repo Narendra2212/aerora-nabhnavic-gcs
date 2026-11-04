@@ -147,12 +147,8 @@ set(AERORA_VEHICLE_SRC_ROOT ${AERORA_VEHICLE_DIR}/..)
 cmake_path(NORMAL_PATH AERORA_VEHICLE_SRC_ROOT)
 
 set(AERORA_VEHICLE_INCLUDE_DIRECTORIES
-    ${AERORA_VEHICLE_DIR}
-    ${AERORA_VEHICLE_SRC_ROOT}/Telemetry
-    ${AERORA_VEHICLE_SRC_ROOT}/Payload
-    ${AERORA_VEHICLE_SRC_ROOT}/Power
-    ${AERORA_VEHICLE_SRC_ROOT}/Mission
-    ${AERORA_VEHICLE_SRC_ROOT}/Supervisory
+    ${AERORA_VEHICLE_DIR} ${AERORA_VEHICLE_SRC_ROOT}/Telemetry ${AERORA_VEHICLE_SRC_ROOT}/Payload
+    ${AERORA_VEHICLE_SRC_ROOT}/Power ${AERORA_VEHICLE_SRC_ROOT}/Mission ${AERORA_VEHICLE_SRC_ROOT}/Supervisory
 )
 
 # The modules this one must be aggregated with. Declared so the aggregation point can assert the
@@ -186,10 +182,8 @@ set(AERORA_VEHICLE_TEST_SOURCES
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleSetupTest.h
 )
 
-set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_VEHICLE_TEST_DIR}
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES ${AERORA_VEHICLE_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
+                                            ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
 )
 
 # CTest names, so the aggregation point can register them without reading this file.
@@ -198,9 +192,6 @@ set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES
 # label sets differ: the three Unit tests need no Vehicle, no link and no event loop, while
 # AeroraVehicleLifecycleTest drives a MockLink connection. See the integration snippet at the top
 # of this file for the exact calls.
-set(AERORA_VEHICLE_TEST_NAMES
-    AeroraVehicleIntegrationTest
-    AeroraVehicleSetupTest
-    AeroraProfileRegistryTest
-    AeroraVehicleLifecycleTest
+set(AERORA_VEHICLE_TEST_NAMES AeroraVehicleIntegrationTest AeroraVehicleSetupTest AeroraProfileRegistryTest
+                              AeroraVehicleLifecycleTest
 )

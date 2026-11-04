@@ -94,13 +94,10 @@ cmake_path(NORMAL_PATH AERORA_TELEMETRY_TEST_DIR)
 set(AERORA_TELEMETRY_TEST_SOURCES
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryAttachmentTest.cc
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryAttachmentTest.h
-    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.cc
-    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.h
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.cc ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.h
 )
 
 set(AERORA_TELEMETRY_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_TELEMETRY_TEST_DIR}
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+    ${AERORA_TELEMETRY_TEST_DIR} ${CMAKE_SOURCE_DIR}/test ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
     ${CMAKE_SOURCE_DIR}/test/Utilities/Timing/Support
 )

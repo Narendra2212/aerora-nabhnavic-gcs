@@ -166,10 +166,8 @@ set(AERORA_MISSION_TEST_SOURCES
     ${AERORA_MISSION_TEST_DIR}/AeroraPlanBridgeTest.h
 )
 
-set(AERORA_MISSION_TEST_INCLUDE_DIRECTORIES
-    ${AERORA_MISSION_TEST_DIR}
-    ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
+set(AERORA_MISSION_TEST_INCLUDE_DIRECTORIES ${AERORA_MISSION_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
+                                            ${CMAKE_SOURCE_DIR}/test/UnitTestFramework
 )
 
 # CTest names, so the aggregation point can register them without reading this file.

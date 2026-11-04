@@ -74,11 +74,7 @@ else()
     set(AERORA_BUILD_WORKING_TREE_DIRTY_LITERAL 0)
 endif()
 
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/aerora_provenance.h.in"
-    "${CMAKE_BINARY_DIR}/aerora_provenance.h"
-    @ONLY
-)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/aerora_provenance.h.in" "${CMAKE_BINARY_DIR}/aerora_provenance.h" @ONLY)
 
 # ----------------------------------------------------------------------------
 # Cross-module dependency assertion
@@ -94,29 +90,30 @@ configure_file(
 # explicit rather than derived from the name.
 # ----------------------------------------------------------------------------
 
-set(_aerora_module_sentinel_Telemetry   AERORA_TELEMETRY_SOURCES)
-set(_aerora_module_sentinel_Mission     AERORA_MISSION_SOURCES)
-set(_aerora_module_sentinel_Payload     AERORA_PAYLOAD_POWER_SOURCES)
-set(_aerora_module_sentinel_Power       AERORA_PAYLOAD_POWER_SOURCES)
+set(_aerora_module_sentinel_Telemetry AERORA_TELEMETRY_SOURCES)
+set(_aerora_module_sentinel_Mission AERORA_MISSION_SOURCES)
+set(_aerora_module_sentinel_Payload AERORA_PAYLOAD_POWER_SOURCES)
+set(_aerora_module_sentinel_Power AERORA_PAYLOAD_POWER_SOURCES)
 set(_aerora_module_sentinel_Supervisory AERORA_PAYLOAD_POWER_SOURCES)
 
 foreach(_required_module IN LISTS AERORA_VEHICLE_REQUIRED_MODULES)
     set(_sentinel_name "${_aerora_module_sentinel_${_required_module}}")
 
     if(NOT _sentinel_name)
-        message(FATAL_ERROR
-            "Aerora overlay: M-Vehicle requires module '${_required_module}', but this aggregation "
-            "point has no sentinel mapping for it. Add one above, or correct "
-            "AERORA_VEHICLE_REQUIRED_MODULES in aerora/src/Vehicle/Vehicle.cmake.")
+        message(FATAL_ERROR "Aerora overlay: M-Vehicle requires module '${_required_module}', but this aggregation "
+                            "point has no sentinel mapping for it. Add one above, or correct "
+                            "AERORA_VEHICLE_REQUIRED_MODULES in aerora/src/Vehicle/Vehicle.cmake."
+        )
     endif()
 
     if(NOT ${_sentinel_name})
-        message(FATAL_ERROR
-            "Aerora overlay: M-Vehicle requires module '${_required_module}', whose manifest was "
-            "not included or exported no sources (expected ${_sentinel_name} to be set). "
-            "AeroraFirmwarePlugin::initializeVehicle() composes that module into every vehicle, so "
-            "building without it would either fail to link or silently attach an incomplete set of "
-            "per-vehicle services.")
+        message(
+            FATAL_ERROR "Aerora overlay: M-Vehicle requires module '${_required_module}', whose manifest was "
+                        "not included or exported no sources (expected ${_sentinel_name} to be set). "
+                        "AeroraFirmwarePlugin::initializeVehicle() composes that module into every vehicle, so "
+                        "building without it would either fail to link or silently attach an incomplete set of "
+                        "per-vehicle services."
+        )
     endif()
 endforeach()
 
@@ -136,14 +133,11 @@ unset(_aerora_module_sentinel_Supervisory)
 # nothing else is listed inline here.
 # ----------------------------------------------------------------------------
 
-set(_aerora_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.h
+set(_aerora_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.cc
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/AeroraCorePlugin.h
 )
 
-set(_aerora_include_directories
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+set(_aerora_include_directories ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 set(_aerora_libraries "")
 
@@ -151,7 +145,9 @@ set(_aerora_libraries "")
 # Aggregate the domain modules
 # ----------------------------------------------------------------------------
 
-list(APPEND _aerora_sources
+list(
+    APPEND
+    _aerora_sources
     ${AERORA_SECURITY_SOURCES}
     ${AERORA_TELEMETRY_SOURCES}
     ${AERORA_VEHICLE_SOURCES}
@@ -160,7 +156,9 @@ list(APPEND _aerora_sources
     ${AERORA_UI_SOURCES}
 )
 
-list(APPEND _aerora_include_directories
+list(
+    APPEND
+    _aerora_include_directories
     ${AERORA_SECURITY_INCLUDE_DIRECTORIES}
     ${AERORA_TELEMETRY_INCLUDE_DIRECTORIES}
     ${AERORA_VEHICLE_INCLUDE_DIRECTORIES}
@@ -219,16 +217,13 @@ if(AERORA_UI_QML_FILES)
 
     qgc_set_qt_resource_alias(${AERORA_UI_QML_FILES})
 
-    qt_add_qml_module(AeroraControlsModule
+    qt_add_qml_module(
+        AeroraControlsModule
         URI ${AERORA_UI_QML_MODULE_URI}
         VERSION 1.0
         RESOURCE_PREFIX /qml
         QML_FILES ${AERORA_UI_QML_FILES}
-        IMPORTS
-            QGC
-            QGroundControl
-            QGroundControl.Controls
-            QGroundControl.AnalyzeView
+        IMPORTS QGC QGroundControl QGroundControl.Controls QGroundControl.AnalyzeView
         NO_PLUGIN
     )
 
@@ -252,18 +247,18 @@ if(AERORA_UI_OVERRIDE_QML_FILES)
     # stock path relative to the prefix, so the mirror lands exactly where
     # AeroraQmlOverrides::mirroredResourcePath() will look for it.
     set_source_files_properties(${AERORA_UI_OVERRIDE_FLY_VIEW_CUSTOM_LAYER}
-        PROPERTIES QT_RESOURCE_ALIAS "QGroundControl/FlyView/FlyViewCustomLayer.qml")
+                                PROPERTIES QT_RESOURCE_ALIAS "QGroundControl/FlyView/FlyViewCustomLayer.qml"
+    )
 
-    qt_add_resources(${CMAKE_PROJECT_NAME} aerora_qml_overrides
+    qt_add_resources(
+        ${CMAKE_PROJECT_NAME} aerora_qml_overrides
         PREFIX "${AERORA_UI_OVERRIDE_PREFIX}"
         FILES ${AERORA_UI_OVERRIDE_QML_FILES}
     )
 endif()
 
-list(APPEND _aerora_libraries
-    ${AERORA_TELEMETRY_LIBRARIES}
-    ${AERORA_MISSION_LIBRARIES}
-    ${AERORA_PAYLOAD_POWER_LIBRARIES}
+list(APPEND _aerora_libraries ${AERORA_TELEMETRY_LIBRARIES} ${AERORA_MISSION_LIBRARIES}
+     ${AERORA_PAYLOAD_POWER_LIBRARIES}
 )
 
 # ----------------------------------------------------------------------------
@@ -285,7 +280,9 @@ list(APPEND _aerora_libraries
 # ----------------------------------------------------------------------------
 
 if(QGC_BUILD_TESTING)
-    list(APPEND _aerora_sources
+    list(
+        APPEND
+        _aerora_sources
         ${AERORA_SECURITY_TEST_SOURCES}
         ${AERORA_TELEMETRY_TEST_SOURCES}
         ${AERORA_VEHICLE_TEST_SOURCES}
@@ -294,7 +291,9 @@ if(QGC_BUILD_TESTING)
         ${AERORA_UI_TEST_SOURCES}
     )
 
-    list(APPEND _aerora_include_directories
+    list(
+        APPEND
+        _aerora_include_directories
         ${AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES}
         ${AERORA_TELEMETRY_TEST_INCLUDE_DIRECTORIES}
         ${AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES}
@@ -323,7 +322,15 @@ if(QGC_BUILD_TESTING)
     # means "the scene booted" and cannot be moved by an unrelated assertion. UT_REGISTER_TEST is
     # what makes it reachable as --unittest:AeroraSceneBootOnlyTest; a CTest entry would run it a
     # second time for no added coverage.
-    add_qgc_test(AeroraSceneHarnessProbeTest LABELS Integration NoSanitizer SERIAL TIMEOUT 600)
+    add_qgc_test(
+        AeroraSceneHarnessProbeTest
+        LABELS
+        Integration
+        NoSanitizer
+        SERIAL
+        TIMEOUT
+        600
+    )
     add_qgc_test(AeroraUiFoundationTest LABELS Unit)
     add_qgc_test(AeroraUiSafetyTest LABELS Unit)
     # Loads the mission progress page on a real application engine, so it needs a connected
@@ -353,8 +360,24 @@ if(QGC_BUILD_TESTING)
     # parameter load each.
     if(NOT WIN32)
         add_qgc_test(AeroraSceneAttachmentUITest LABELS Integration NoSanitizer TIMEOUT 180)
-        add_qgc_test(AeroraVehicleConfigUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
-        add_qgc_test(AeroraFlyViewOverlayUITest LABELS Integration Vehicle NoSanitizer TIMEOUT 300)
+        add_qgc_test(
+            AeroraVehicleConfigUITest
+            LABELS
+            Integration
+            Vehicle
+            NoSanitizer
+            TIMEOUT
+            300
+        )
+        add_qgc_test(
+            AeroraFlyViewOverlayUITest
+            LABELS
+            Integration
+            Vehicle
+            NoSanitizer
+            TIMEOUT
+            300
+        )
     endif()
 
     # ----------------------------------------------------------------------------------------
@@ -403,9 +426,18 @@ endif()
 # Single PARENT_SCOPE set per variable, after every append above.
 # ----------------------------------------------------------------------------
 
-set(CUSTOM_SOURCES ${_aerora_sources} PARENT_SCOPE)
-set(CUSTOM_INCLUDE_DIRECTORIES ${_aerora_include_directories} PARENT_SCOPE)
-set(CUSTOM_LIBRARIES ${_aerora_libraries} PARENT_SCOPE)
+set(CUSTOM_SOURCES
+    ${_aerora_sources}
+    PARENT_SCOPE
+)
+set(CUSTOM_INCLUDE_DIRECTORIES
+    ${_aerora_include_directories}
+    PARENT_SCOPE
+)
+set(CUSTOM_LIBRARIES
+    ${_aerora_libraries}
+    PARENT_SCOPE
+)
 
 # ----------------------------------------------------------------------------
 # Custom build identification
@@ -421,10 +453,7 @@ set(CUSTOM_LIBRARIES ${_aerora_libraries} PARENT_SCOPE)
 # `friend class AeroraVehicleFactGroupRegistrar;` in src/Vehicle/Vehicle.h. Both halves are now
 # applied; defining this without the friend declaration would be a compile error. See ADR-016.
 set(CUSTOM_DEFINITIONS
-    QGC_CUSTOM_BUILD
-    CUSTOMHEADER="AeroraCorePlugin.h"
-    CUSTOMCLASS=AeroraCorePlugin
-    AERORA_VEHICLE_FACTGROUP_FRIENDSHIP
+    QGC_CUSTOM_BUILD CUSTOMHEADER="AeroraCorePlugin.h" CUSTOMCLASS=AeroraCorePlugin AERORA_VEHICLE_FACTGROUP_FRIENDSHIP
     PARENT_SCOPE
 )
 
