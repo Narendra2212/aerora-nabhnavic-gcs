@@ -173,9 +173,9 @@ Three standing constraints apply to every task:
   - This is the last point before a hook gates a commit on the new blocks, and the only evidence
     available without CI
   - Ensure all tests pass, ask the user if questions arise
-- [ ] 5. The addressing axis
+- [x] 5. The addressing axis
 
-  - [-] 5.1 Separate `AeroraGatedOperation` into an address and a subject
+  - [x] 5.1 Separate `AeroraGatedOperation` into an address and a subject
     - Today's flat command fields move into `AeroraCommandSubject`; today's single `vehicle` becomes
       an `AeroraOperationAddress` carrying one member
     - `AeroraCorePlugin::authorizeMavCommand()` assembles the new shape from the core hook's
@@ -185,13 +185,13 @@ Three standing constraints apply to every task:
     - _Requirements: 3.1_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 5.2 Implement `AeroraOperationAddress`
+  - [x] 5.2 Implement `AeroraOperationAddress`
     - A vehicle list, an all-or-nothing flag, and an opaque required-capability string carried for
       the reason `mavCommand` is carried as an int: no capability identifier is invented here
     - _Requirements: 3.1, 3.2, 4.1_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 5.3 Implement `AeroraFleetDecision` and the all-or-nothing evaluation
+  - [x] 5.3 Implement `AeroraFleetDecision` and the all-or-nothing evaluation
     - Authorization applies to every addressed member or to none, and a refusal names every member
       refused
     - **This evaluates and does not transmit.** Evaluation is not origination, which is why it is
@@ -202,7 +202,7 @@ Three standing constraints apply to every task:
     - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 5.4 Implement capability resolution, with exclusion distinct from refusal
+  - [x] 5.4 Implement capability resolution, with exclusion distinct from refusal
     - An aircraft reporting no satisfying capability is removed from the addressed set **before**
       authorization and reported as excluded, never as refused
     - No capability is inferred from an airframe type, a firmware identifier or a product family
