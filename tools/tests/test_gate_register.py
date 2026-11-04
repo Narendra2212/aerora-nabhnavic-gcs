@@ -381,6 +381,7 @@ def _register(
         contract_surface=[],
         link_profiles=None,
         overlay_edits=None,
+        hazards=None,
     )
 
 

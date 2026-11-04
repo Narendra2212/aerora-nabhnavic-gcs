@@ -93,6 +93,7 @@ __all__ = [
     "Guard",
     "GuardFreedom",
     "GuardPermission",
+    "Hazard",
     "InventoryArea",
     "InventoryReference",
     "InventoryRow",
@@ -529,6 +530,28 @@ class OverlayEdit:
     reason: str
     owner: str
 
+
+@dataclass(frozen=True)
+class Hazard:
+    """One recorded hazard, the mitigation accepted for it and the owner who accepted it.
+
+    Two criteria name a hazard record rather than a Gate as what rejects a change, and the
+    difference is the kind of decision each holds. A Gate holds one open until somebody signs it,
+    so a rejection citing a Gate says *not yet*. A hazard records one already closed, whose cost
+    is paid by never reopening it, so a rejection citing a hazard says *not this way*.
+
+    ``severity`` is a string rather than a member of an enumeration, for the reason ``link_class``
+    is one: fixing the scale picks a safety-assessment standard, which is a decision about the
+    agencies this programme certifies under rather than a shape the model should hold.
+    """
+
+    id: str
+    statement: str
+    severity: str
+    mitigation: str
+    accepted_by: str
+
+
 @dataclass(frozen=True)
 class GateRegister:
     """The single authoritative record of the ten Gates and the axes that read against them."""
@@ -543,6 +566,7 @@ class GateRegister:
     contract_surface: list[ContractSurfaceElement]
     link_profiles: list[LinkProfile] | None
     overlay_edits: list[OverlayEdit] | None
+    hazards: list[Hazard] | None
 
 
 # ---------------------------------------------------------------------------
@@ -1081,6 +1105,20 @@ def _read_overlay_edit(value: Any, path: str) -> OverlayEdit:
     reader.done()
     return edit
 
+
+def _read_hazard(value: Any, path: str) -> Hazard:
+    reader = _Reader(value, path)
+    hazard = Hazard(
+        id=reader.text("id"),
+        statement=reader.text("statement"),
+        severity=reader.text("severity"),
+        mitigation=reader.text("mitigation"),
+        accepted_by=reader.member("acceptedBy", OWNER_LABELS, _OWNER_DESCRIPTION),
+    )
+    reader.done()
+    return hazard
+
+
 def load_gate_register(document: Any, *, path: str = "gate-register") -> GateRegister:
     """Read a Gate_Register document into the model, naming the key at fault on rejection.
 
@@ -1099,6 +1137,7 @@ def load_gate_register(document: Any, *, path: str = "gate-register") -> GateReg
         contract_surface=reader.children("contractSurface", _read_contract_surface_element),
         link_profiles=reader.optional_children("linkProfiles", _read_link_profile),
         overlay_edits=reader.optional_children("overlayEdits", _read_overlay_edit),
+        hazards=reader.optional_children("hazards", _read_hazard),
     )
     reader.done()
     return register
@@ -1462,6 +1501,17 @@ def _dump_overlay_edit(edit: OverlayEdit) -> dict[str, Any]:
         ("owner", edit.owner),
     )
 
+
+def _dump_hazard(hazard: Hazard) -> dict[str, Any]:
+    return _object(
+        ("id", hazard.id),
+        ("statement", hazard.statement),
+        ("severity", hazard.severity),
+        ("mitigation", hazard.mitigation),
+        ("acceptedBy", hazard.accepted_by),
+    )
+
+
 def dump_gate_register(register: GateRegister) -> dict[str, Any]:
     """Write the model back as a JSON-ready object, in the key order the schema declares."""
     return _object(
@@ -1490,6 +1540,14 @@ def dump_gate_register(register: GateRegister) -> dict[str, Any]:
                 None
                 if register.overlay_edits is None
                 else [_dump_overlay_edit(item) for item in register.overlay_edits]
+            ),
+        ),
+        (
+            "hazards",
+            _or_omit(
+                None
+                if register.hazards is None
+                else [_dump_hazard(item) for item in register.hazards]
             ),
         ),
     )

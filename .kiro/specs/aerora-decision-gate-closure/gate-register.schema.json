@@ -404,6 +404,14 @@
       "items": {
         "$ref": "#/$defs/overlayEdit"
       }
+    },
+    "hazards": {
+      "type": "array",
+      "description": "The hazard log Requirement 10 criterion 9 requires, each entry carrying its statement, its severity, its mitigation and the owner who accepted the mitigation. Two criteria name a hazard record rather than a Gate as the thing that rejects a change: Requirement 2 criterion 9 on manual control input routed through the Aerora_Station, and Requirement 11 criterion 3 on a Power_Source_Failover placed under a station command, a station timeout or a flight-controller software decision. The difference from a Gate is the kind of decision each holds. A Gate holds one open until somebody signs it, so a rejection citing a Gate says not yet; a hazard records one already closed, whose cost is paid by never reopening it, so a rejection citing a hazard says not this way. Both mitigations recorded today are decisions to keep software OUT of a path rather than to put it in one.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/hazard"
+      }
     }
   },
   "$defs": {
@@ -503,6 +511,40 @@
         "owner": {
           "$ref": "#/$defs/ownerLabel",
           "description": "The owner accountable for this reach: the one whose authorisation a change to it requires. Where the file also carries Decision_Content, the signature itself is tracked by the Gate part that records that content rather than by this entry -- src/Vehicle/Vehicle.h is the only such file today, and adr-016-pair is what decides whether the edit is applied."
+        }
+      }
+    },
+    "hazard": {
+      "type": "object",
+      "description": "One recorded hazard, the mitigation accepted for it and the owner who accepted it.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "severity",
+        "mitigation",
+        "acceptedBy"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug",
+          "description": "The identifier a rejection cites. A slug for much the reason a Gate part id is one: it is a token that has to survive being written into prose, into a citation and into a test, so it stays unambiguous and typeable. Unique across the log, because a citation resolving to two records would name two mitigations and settle neither."
+        },
+        "statement": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "What can go wrong, stated as a condition rather than as a component. A hazard tied to a component stops applying the moment the component is replaced, which is the moment it matters most."
+        },
+        "severity": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Not an enumeration, for the reason linkClass is not one: fixing a severity scale picks a safety-assessment standard, which is a decision about the agencies this programme certifies under rather than a shape. The data half establishes the set in use instead."
+        },
+        "mitigation": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "What was accepted as reducing the hazard. Prose rather than a reference, because both mitigations recorded today are decisions to keep software out of a path and there is no component to point at."
+        },
+        "acceptedBy": {
+          "$ref": "#/$defs/ownerLabel",
+          "description": "The owner who accepted the mitigation. Acceptance is the point of the record: a hazard with no owner against it is a note, and this log exists so a rejection can cite something a person stands behind."
         }
       }
     },

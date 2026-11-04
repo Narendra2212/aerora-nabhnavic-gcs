@@ -85,6 +85,7 @@ from common.gate_register import (
     GateRegister,
     Guard,
     GuardPermission,
+    Hazard,
     InventoryReference,
     MavlinkIdentifierPosture,
     MavlinkIdentifierSite,
@@ -129,6 +130,8 @@ from validate_gate_register import (
     FORBIDDEN_UNTIL_ITEMS,
     GATE_STATUS_DERIVATION,
     GUARD_REGISTRY,
+    HAZARD_CITING_CRITERIA,
+    HAZARD_LOG,
     INVENTORY_COVERAGE,
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
@@ -179,6 +182,7 @@ from validate_gate_register import (
     check_forbidden_until,
     check_gate_status_derivation,
     check_guard_registry,
+    check_hazard_log,
     check_inventory_coverage,
     check_inventory_totals,
     check_overlay_edits,
@@ -634,6 +638,7 @@ def _register(
         contract_surface=_baseline_surface(registry),
         link_profiles=None,
         overlay_edits=[_edit(CORE_REACH)],
+        hazards=None,
     )
 
 
@@ -5724,3 +5729,82 @@ def test_overlay_edits_name_a_path_recorded_twice() -> None:
     assert message.startswith(f"{OUTSIDE_PATH}: ")
     assert "records the path 2 times" in message
     assert "nothing says which authorised it" in message
+
+
+# ---------------------------------------------------------------------------
+# hazard-log
+#
+# Requirement 10 criterion 9. Two criteria reject a change by naming a hazard record rather than a
+# Gate, so the log is what those rules cite. These cover what is checkable before either rule
+# exists: that a citation could resolve, and that there is something for it to resolve to.
+# ---------------------------------------------------------------------------
+
+HAZARD_ID = "a-fixture-hazard"
+ANOTHER_HAZARD_ID = "another-fixture-hazard"
+
+
+def _hazard(
+    recorded_id: str, *, severity: str = "a fixture severity", owner: str = "Tab 1"
+) -> Hazard:
+    return Hazard(
+        id=recorded_id,
+        statement="a fixture hazard statement",
+        severity=severity,
+        mitigation="a fixture mitigation",
+        accepted_by=owner,
+    )
+
+
+def _hazards(*recorded: Hazard) -> Premises:
+    return _premises(replace(_register(), hazards=list(recorded)))
+
+
+def _hazard_messages(premises: Premises) -> list[str]:
+    return _messages(check_hazard_log(premises), HAZARD_LOG)
+
+
+def test_hazard_log_accepts_two_recorded_hazards() -> None:
+    """The accepting case, and the evidence that recording a hazard disturbs no other check."""
+    assert run_checks(_hazards(_hazard(HAZARD_ID), _hazard(ANOTHER_HAZARD_ID))) == []
+
+
+def test_hazard_log_accepts_an_absent_log() -> None:
+    """The state the register is in until task 3.3, which must not read as a finding.
+
+    Absent and empty are different claims and this check separates them, so what this asserts is
+    the one that means a record nobody has written yet.
+    """
+    assert check_hazard_log(_premises(replace(_register(), hazards=None))) == []
+
+
+def test_hazard_log_rejects_a_log_recorded_as_empty() -> None:
+    """An empty list claims no hazard exists, which contradicts the two criteria that cite one.
+
+    The finding names both criteria rather than only reporting that the log is empty, because the
+    repair depends on which claim was meant: omit the key for a log nobody has written, or record
+    the hazard those rules need to cite.
+    """
+    (message,) = _hazard_messages(_hazards())
+
+    assert "recorded and empty" in message
+    assert all(criterion in message for criterion in HAZARD_CITING_CRITERIA)
+    assert "Omit the key" in message
+
+
+def test_hazard_log_names_an_id_recorded_twice() -> None:
+    """The id is the whole of what a citation carries, so two records under one settle nothing.
+
+    The schema rejects a verbatim duplicate through `uniqueItems`, so the pair that reaches here
+    differs in its severity or its owner -- and that is the pair a rejection would resolve
+    ambiguously while looking like it had cited something.
+    """
+    premises = _hazards(
+        _hazard(HAZARD_ID, severity="a fixture severity"),
+        _hazard(HAZARD_ID, severity="another fixture severity", owner="Product"),
+    )
+
+    (message,) = _hazard_messages(premises)
+
+    assert message.startswith(f"{HAZARD_ID}: ")
+    assert "records the id 2 times" in message
+    assert "settles none of them" in message

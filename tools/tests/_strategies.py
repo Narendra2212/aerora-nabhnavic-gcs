@@ -50,6 +50,7 @@ from common.gate_register import (
     GateRegister,
     Guard,
     GuardPermission,
+    Hazard,
     InventoryReference,
     LinkProfile,
     MavlinkIdentifierPosture,
@@ -381,6 +382,35 @@ def overlay_edits(draw: st.DrawFn) -> list[OverlayEdit] | None:
     ]
 
 
+# Hazard identifiers and severities, both fictional. A real severity would pick a safety-assessment
+# standard, so none is generated here: the data half establishes whatever set is in use, and task
+# 3.3 records the two the design carries.
+_HAZARD_IDS = ("a-fixture-hazard", "another-fixture-hazard", "a-third-fixture-hazard")
+_SEVERITIES = ("a fixture severity", "another fixture severity")
+
+
+@st.composite
+def hazards(draw: st.DrawFn) -> list[Hazard] | None:
+    """A recorded hazard log, or none at all.
+
+    `None` is drawn as often as a list, because the register carries no `hazards` key until task
+    3.3 and the round trip has to hold over the absent key too.
+    """
+    if draw(st.booleans()):
+        return None
+    recorded = draw(st.lists(st.sampled_from(_HAZARD_IDS), min_size=1, max_size=3, unique=True))
+    return [
+        Hazard(
+            id=name,
+            statement="a fixture hazard statement",
+            severity=draw(st.sampled_from(_SEVERITIES)),
+            mitigation="a fixture mitigation",
+            accepted_by=draw(st.sampled_from(sorted(OWNER_LABELS))),
+        )
+        for name in recorded
+    ]
+
+
 @st.composite
 def registers(
     draw: st.DrawFn,
@@ -417,6 +447,7 @@ def registers(
         contract_surface=[],
         link_profiles=draw(link_profiles()),
         overlay_edits=draw(overlay_edits()),
+        hazards=draw(hazards()),
     )
 
 

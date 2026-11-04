@@ -125,6 +125,7 @@ GUARD_REGISTRY: Final = "guard-registry"
 FORBIDDEN_UNTIL: Final = "forbidden-until"
 INVENTORY_TOTALS: Final = "inventory-totals"
 OVERLAY_EDITS: Final = "overlay-edits"
+HAZARD_LOG: Final = "hazard-log"
 
 # The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
 # RECORD_STATES: a part is `submitted` or `accepted` exactly when a record settles it, and the
@@ -3062,6 +3063,66 @@ def check_overlay_edits(premises: Premises) -> list[Finding]:
     return findings
 
 
+# The criteria that reject a change by naming a hazard record rather than by naming a Gate. Both are
+# requirements.md read out by hand, which is the standing this file already gives CONDITIONAL_GATES
+# and PRE_APPROVED_SEAMS. They are listed because they are what makes an empty log a contradiction
+# rather than a state: a rejection that must name a hazard record needs one to exist.
+HAZARD_CITING_CRITERIA: Final = (
+    "Requirement 2 criterion 9",
+    "Requirement 11 criterion 3",
+)
+
+
+def check_hazard_log(premises: Premises) -> list[Finding]:
+    """Every recorded hazard carries an id nothing else carries, and the log is not empty.
+
+    Neither rule is the one task 3.2 names in full -- that every rejection citing a hazard resolves
+    to a recorded hazard. Nothing in the register cites a hazard yet: the two criteria that will are
+    source-half rules nobody has built, so a check of citation resolution would quantify over an
+    empty set and pass by having nothing to look at. What is checkable now is the half that makes
+    those rules possible, and it is worth having first for that reason.
+
+    An id recorded twice is the failure that matters most, because the id is the whole of what a
+    citation carries. A rejection naming it would resolve to two records, name two mitigations and
+    settle neither -- and it would do so while looking like it had cited something.
+
+    An empty log is a finding and an absent one is not. That is the distinction `linkProfiles`
+    draws: an absent key is a record nobody has written, an empty list is a positive claim that
+    there are none. Two criteria reject a change by naming a hazard record rather than a Gate, so a
+    log claiming no hazard exists leaves both of them with nothing to cite.
+    """
+    recorded = premises.register.hazards
+    if recorded is None:
+        return []
+
+    findings: list[Finding] = []
+    citing = " and ".join(HAZARD_CITING_CRITERIA)
+    if not recorded:
+        findings.append(
+            Finding(
+                HAZARD_LOG,
+                f"the hazard log is recorded and empty, which claims that no hazard exists rather "
+                f"than that none has been written down yet. {citing} each reject a change by "
+                f"naming the hazard record that rejects it, so an empty log leaves both with "
+                f"nothing to cite. Omit the key to record a log nobody has written",
+            )
+        )
+
+    counted: dict[str, int] = {}
+    for hazard in recorded:
+        counted[hazard.id] = counted.get(hazard.id, 0) + 1
+    findings.extend(
+        Finding(
+            HAZARD_LOG,
+            f"{recorded_id}: the hazard log records the id {count} times, so a rejection citing it "
+            f"resolves to {count} records naming {count} mitigations and settles none of them",
+        )
+        for recorded_id, count in sorted(counted.items())
+        if count > 1
+    )
+    return findings
+
+
 def check_inventory_totals(premises: Premises) -> list[Finding]:
     """Every count the inventory declares agrees with the rows the inventory carries.
 
@@ -3169,6 +3230,7 @@ _CHECKS: Final = (
     check_forbidden_until,
     check_inventory_totals,
     check_overlay_edits,
+    check_hazard_log,
 )
 
 

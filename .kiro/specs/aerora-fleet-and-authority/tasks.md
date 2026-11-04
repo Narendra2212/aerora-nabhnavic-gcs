@@ -143,12 +143,12 @@ Three standing constraints apply to every task:
 
 - [ ] 3. The hazard log
 
-  - [~] 3.1 Add `hazards` to the register schema
+  - [x] 3.1 Add `hazards` to the register schema
     - An identifier, the statement, the severity, the mitigation and the owner who accepted it
     - _Requirements: 10.9_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [~] 3.2 Add the model, the parser and the data-half check
+  - [x] 3.2 Add the model, the parser and the data-half check
     - Every hazard names an owner from `OWNER_LABELS` and a non-empty mitigation
     - Every rejection that cites a hazard record resolves to a recorded hazard, so a rule cannot
       cite a hazard that does not exist
