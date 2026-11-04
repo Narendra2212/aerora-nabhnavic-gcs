@@ -55,6 +55,7 @@ from common.gate_register import (
     MavlinkIdentifierPosture,
     Observation,
     OpenStateReading,
+    OverlayEdit,
     RationaleReference,
     ReadOnlyPosture,
     ReleaseSetEntry,
@@ -355,6 +356,31 @@ def link_profiles(draw: st.DrawFn) -> list[LinkProfile] | None:
     ]
 
 
+# Paths outside the overlay, fictional so no test asserts against a real core edit. The real five
+# are recorded in the register by task 2.4 and read by the source half, not generated here.
+_OUTSIDE_PATHS = ("src/AFixtureCore.h", "test/AFixtureCoreTest.cc", "cmake/AFixture.cmake")
+
+
+@st.composite
+def overlay_edits(draw: st.DrawFn) -> list[OverlayEdit] | None:
+    """A recorded set of files outside the overlay, or none at all.
+
+    `None` is drawn as often as a list, because the register carries no `overlayEdits` key until
+    task 2.4 and the round trip has to hold over the absent key too.
+    """
+    if draw(st.booleans()):
+        return None
+    paths = draw(st.lists(st.sampled_from(_OUTSIDE_PATHS), min_size=1, max_size=3, unique=True))
+    return [
+        OverlayEdit(
+            path=path,
+            reason="a fixture reason",
+            owner=draw(st.sampled_from(sorted(OWNER_LABELS))),
+        )
+        for path in paths
+    ]
+
+
 @st.composite
 def registers(
     draw: st.DrawFn,
@@ -390,6 +416,7 @@ def registers(
         mavlink_identifiers=MavlinkIdentifierPosture(gate="DG-MIS", allow_list=[]),
         contract_surface=[],
         link_profiles=draw(link_profiles()),
+        overlay_edits=draw(overlay_edits()),
     )
 
 

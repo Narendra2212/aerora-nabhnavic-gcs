@@ -90,6 +90,7 @@ from common.gate_register import (
     MavlinkIdentifierSite,
     Observation,
     OpenStateReading,
+    OverlayEdit,
     RationaleReference,
     ReadOnlyException,
     ReadOnlyPosture,
@@ -137,6 +138,7 @@ from validate_gate_register import (
     MECHANICAL_GUARDS,
     NOT_DELIVERED_LABEL,
     OPEN_STATUS,
+    OVERLAY_EDITS,
     OVERLAY_TREE,
     PARTITION,
     PRE_APPROVED_SEAMS,
@@ -179,6 +181,7 @@ from validate_gate_register import (
     check_guard_registry,
     check_inventory_coverage,
     check_inventory_totals,
+    check_overlay_edits,
     check_partition,
     check_reclassifications,
     check_release_set_derivation,
@@ -621,6 +624,7 @@ def _register(
         mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=_baseline_surface(registry),
         link_profiles=None,
+        overlay_edits=None,
     )
 
 
@@ -5633,3 +5637,76 @@ def test_the_schema_rejects_a_link_profile_naming_what_holds_it_nowhere(tmp_path
     messages = _rejected(_schema_tree(tmp_path, document))
 
     assert any("heldBy" in message for message in messages)
+
+
+# ---------------------------------------------------------------------------
+# overlay-edits
+#
+# What is checkable from the register alone is whether the record is coherent. Comparing it against
+# the tree needs a walk and belongs to the source half's `overlay-isolation` rule, so these tests
+# assert the two rules that read nothing but the list.
+# ---------------------------------------------------------------------------
+
+OUTSIDE_PATH = "src/AFixtureCore.h"
+ANOTHER_OUTSIDE_PATH = "test/AFixtureCoreTest.cc"
+
+
+def _edit(path: str, *, reason: str = "a fixture reason", owner: str = "Tab 1") -> OverlayEdit:
+    return OverlayEdit(path=path, reason=reason, owner=owner)
+
+
+def _edits(*recorded: OverlayEdit) -> Premises:
+    return _premises(replace(_register(), overlay_edits=list(recorded)))
+
+
+def _edit_messages(premises: Premises) -> list[str]:
+    return _messages(check_overlay_edits(premises), OVERLAY_EDITS)
+
+
+def test_overlay_edits_accept_two_paths_outside_the_overlay() -> None:
+    """The accepting case, and the evidence that recording an edit disturbs no other check."""
+    assert run_checks(_edits(_edit(OUTSIDE_PATH), _edit(ANOTHER_OUTSIDE_PATH))) == []
+
+
+def test_overlay_edits_accept_a_register_recording_none() -> None:
+    """The state the register is in until task 2.4, which must not read as a finding."""
+    assert check_overlay_edits(_premises()) == []
+
+
+def test_overlay_edits_name_a_path_inside_the_overlay() -> None:
+    """A category error: the list records where Aerora reaches *outside* the overlay.
+
+    An entry inside it records no reach, and it inflates the count a reviewer reads when weighing
+    whether another reach is warranted -- which is the one number the list exists to keep small.
+    """
+    inside = f"{OVERLAY_TREE}/src/AeroraCorePlugin.cc"
+
+    (message,) = _edit_messages(_edits(_edit(inside)))
+    assert message.startswith(f"{inside}: ")
+    assert f"records a path under {OVERLAY_TREE}/" in message
+    assert "records no reach" in message
+
+
+def test_overlay_edits_name_the_overlay_tree_itself() -> None:
+    """The boundary case of the rule above, which a prefix test written as `startswith` alone
+    would pass over."""
+    (message,) = _edit_messages(_edits(_edit(OVERLAY_TREE)))
+    assert message.startswith(f"{OVERLAY_TREE}: ")
+
+
+def test_overlay_edits_name_a_path_recorded_twice() -> None:
+    """Two reasons and two owners for one file, with nothing saying which authorised it.
+
+    The schema's `uniqueItems` rejects a verbatim duplicate, so the pair that reaches here is the
+    one differing in its reason or its owner -- which is the pair that matters, because it is the
+    one a reviewer would read as two separate authorisations.
+    """
+    premises = _edits(
+        _edit(OUTSIDE_PATH, reason="a fixture reason"),
+        _edit(OUTSIDE_PATH, reason="another fixture reason", owner="Product"),
+    )
+
+    (message,) = _edit_messages(premises)
+    assert message.startswith(f"{OUTSIDE_PATH}: ")
+    assert "records the path 2 times" in message
+    assert "nothing says which authorised it" in message

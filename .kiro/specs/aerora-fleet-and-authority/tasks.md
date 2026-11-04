@@ -69,7 +69,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.4, 5.12_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [-] 1.2 Add the model and the parser
+  - [x] 1.2 Add the model and the parser
     - `LinkProfile` in `tools/common/gate_register.py`, read and dumped like every other block, so
       the round-trip property covers it without a new test
     - _Requirements: 5.4_
@@ -106,7 +106,7 @@ Three standing constraints apply to every task:
 
 - [ ] 2. The overlay-isolation ratchet
 
-  - [~] 2.1 Add `overlayEdits` to the register schema
+  - [-] 2.1 Add `overlayEdits` to the register schema
     - One entry per file outside `aerora/` that carries an Aerora identifier, with its path, the
       reason and the owner who authorised it
     - Same ratchet shape as `mavlinkIdentifiers.allowList`, for the same reason: an

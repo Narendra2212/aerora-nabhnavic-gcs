@@ -396,6 +396,14 @@
       "items": {
         "$ref": "#/$defs/linkProfile"
       }
+    },
+    "overlayEdits": {
+      "type": "array",
+      "description": "Every file OUTSIDE aerora/ that carries an Aerora identifier, each with the reason and the owner who authorised it (Requirement 10 criteria 10 and 11). A ratchet rather than a cliff, the same shape mavlinkIdentifiers.allowList takes and for the same reason: five such files exist today, so a blanket prohibition would reject the tree and be removed rather than obeyed. What this list protects is the overlay's separability. The Aerora tree reaches into upstream in exactly these places, which is what would let the overlay be re-hosted on another core if an assurance process ever demanded it; every unrecorded addition spends that option a little, and recording them makes a sixth a decision rather than a drift.",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/overlayEdit"
+      }
     }  },
   "$defs": {
     "nonEmptyString": {
@@ -473,7 +481,30 @@
         "mapping"
       ]
     },
-    "linkProfile": {
+    "overlayEdit": {
+      "type": "object",
+      "description": "One file outside aerora/ that carries an Aerora identifier, with why it does and who authorised it.",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason",
+        "owner"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Repository-relative path, which must NOT be under aerora/: an entry for a file inside the overlay is a category error rather than a recorded edit, and the data half rejects one."
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Why this file carries an Aerora identifier. A reason is required because the list is read by a reviewer deciding whether a sixth entry is warranted, and an unexplained entry gives them nothing to compare against."
+        },
+        "owner": {
+          "$ref": "#/$defs/ownerLabel",
+          "description": "The owner who authorised this reach into the tree outside the overlay."
+        }
+      }
+    },    "linkProfile": {
       "type": "object",
       "description": "One Link_Class's recorded parameters and the revision they were recorded at. The parameter SET is register content and is not constrained here: naming the parameters would settle part of the decision Q-015 holds, and this schema records shapes rather than values.",
       "additionalProperties": false,

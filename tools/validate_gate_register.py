@@ -124,6 +124,7 @@ VERIFIED_OBSERVATION: Final = "verified-observation"
 GUARD_REGISTRY: Final = "guard-registry"
 FORBIDDEN_UNTIL: Final = "forbidden-until"
 INVENTORY_TOTALS: Final = "inventory-totals"
+OVERLAY_EDITS: Final = "overlay-edits"
 
 # The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
 # RECORD_STATES: a part is `submitted` or `accepted` exactly when a record settles it, and the
@@ -3019,6 +3020,48 @@ def _declared_in_totals(table: MarkdownTable | None, label: str) -> int | None:
     return None
 
 
+def check_overlay_edits(premises: Premises) -> list[Finding]:
+    """Every recorded overlay edit names a file outside the overlay, and names it once.
+
+    Two rules, and neither is the set comparison against the tree: that one needs to walk the
+    repository and belongs to the source half's ``overlay-isolation`` rule. What is checkable from
+    the register alone is whether the record is coherent.
+
+    A path under ``aerora/`` is a category error rather than a recorded edit. The list exists to
+    record where Aerora reaches *outside* the overlay, so an entry inside it records nothing and
+    would inflate the count a reviewer reads when deciding whether another reach is warranted.
+
+    A path recorded twice leaves two reasons and two owners for one file, and nothing says which
+    authorised it. The schema's ``uniqueItems`` rejects a verbatim duplicate; this rejects the pair
+    that differs in its reason or its owner, which is the pair that matters.
+    """
+    recorded = premises.register.overlay_edits or []
+    findings = [
+        Finding(
+            OVERLAY_EDITS,
+            f"{edit.path}: the overlay-edit list records a path under {OVERLAY_TREE}/, and the "
+            f"list records where Aerora reaches outside the overlay. An entry inside it records "
+            f"no reach and inflates the count a reviewer reads when weighing another one",
+        )
+        for edit in recorded
+        if edit.path == OVERLAY_TREE or edit.path.startswith(f"{OVERLAY_TREE}/")
+    ]
+
+    counted: dict[str, int] = {}
+    for edit in recorded:
+        counted[edit.path] = counted.get(edit.path, 0) + 1
+    findings.extend(
+        Finding(
+            OVERLAY_EDITS,
+            f"{path}: the overlay-edit list records the path {count} times, so the file carries "
+            f"{count} reasons and {count} owners and nothing says which authorised it",
+        )
+        for path, count in sorted(counted.items())
+        if count > 1
+    )
+    return findings
+
+
 def check_inventory_totals(premises: Premises) -> list[Finding]:
     """Every count the inventory declares agrees with the rows the inventory carries.
 
@@ -3125,6 +3168,7 @@ _CHECKS: Final = (
     check_guard_registry,
     check_forbidden_until,
     check_inventory_totals,
+    check_overlay_edits,
 )
 
 

@@ -101,6 +101,7 @@ __all__ = [
     "MavlinkIdentifierSite",
     "Observation",
     "OpenStateReading",
+    "OverlayEdit",
     "RationaleReference",
     "ReadOnlyException",
     "ReadOnlyPosture",
@@ -515,6 +516,20 @@ class LinkProfile:
 
 
 @dataclass(frozen=True)
+class OverlayEdit:
+    """One file outside ``aerora/`` that carries an Aerora identifier, and who authorised it.
+
+    The list these belong to is what keeps the overlay's separability measurable. Aerora reaches
+    into the upstream tree in a small number of places, and that smallness is what would let the
+    overlay be re-hosted on another core if an assurance process ever demanded it. An unrecorded
+    addition spends that option quietly; a recorded one is a decision with an owner against it.
+    """
+
+    path: str
+    reason: str
+    owner: str
+
+@dataclass(frozen=True)
 class GateRegister:
     """The single authoritative record of the ten Gates and the axes that read against them."""
 
@@ -527,6 +542,7 @@ class GateRegister:
     mavlink_identifiers: MavlinkIdentifierPosture
     contract_surface: list[ContractSurfaceElement]
     link_profiles: list[LinkProfile] | None
+    overlay_edits: list[OverlayEdit] | None
 
 
 # ---------------------------------------------------------------------------
@@ -1055,6 +1071,16 @@ def _read_link_profile(value: Any, path: str) -> LinkProfile:
     return profile
 
 
+def _read_overlay_edit(value: Any, path: str) -> OverlayEdit:
+    reader = _Reader(value, path)
+    edit = OverlayEdit(
+        path=reader.text("path"),
+        reason=reader.text("reason"),
+        owner=reader.member("owner", OWNER_LABELS, _OWNER_DESCRIPTION),
+    )
+    reader.done()
+    return edit
+
 def load_gate_register(document: Any, *, path: str = "gate-register") -> GateRegister:
     """Read a Gate_Register document into the model, naming the key at fault on rejection.
 
@@ -1072,6 +1098,7 @@ def load_gate_register(document: Any, *, path: str = "gate-register") -> GateReg
         mavlink_identifiers=reader.child("mavlinkIdentifiers", _read_mavlink_identifier_posture),
         contract_surface=reader.children("contractSurface", _read_contract_surface_element),
         link_profiles=reader.optional_children("linkProfiles", _read_link_profile),
+        overlay_edits=reader.optional_children("overlayEdits", _read_overlay_edit),
     )
     reader.done()
     return register
@@ -1428,6 +1455,13 @@ def _dump_link_profile(profile: LinkProfile) -> dict[str, Any]:
     )
 
 
+def _dump_overlay_edit(edit: OverlayEdit) -> dict[str, Any]:
+    return _object(
+        ("path", edit.path),
+        ("reason", edit.reason),
+        ("owner", edit.owner),
+    )
+
 def dump_gate_register(register: GateRegister) -> dict[str, Any]:
     """Write the model back as a JSON-ready object, in the key order the schema declares."""
     return _object(
@@ -1448,6 +1482,14 @@ def dump_gate_register(register: GateRegister) -> dict[str, Any]:
                 None
                 if register.link_profiles is None
                 else [_dump_link_profile(item) for item in register.link_profiles]
+            ),
+        ),
+        (
+            "overlayEdits",
+            _or_omit(
+                None
+                if register.overlay_edits is None
+                else [_dump_overlay_edit(item) for item in register.overlay_edits]
             ),
         ),
     )
