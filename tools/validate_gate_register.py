@@ -126,6 +126,7 @@ FORBIDDEN_UNTIL: Final = "forbidden-until"
 INVENTORY_TOTALS: Final = "inventory-totals"
 OVERLAY_EDITS: Final = "overlay-edits"
 HAZARD_LOG: Final = "hazard-log"
+LINK_PROFILE: Final = "link-profile"
 
 # The part states a Closure_Record is in front of the Gate_Review in, which are the two members of
 # RECORD_STATES: a part is `submitted` or `accepted` exactly when a record settles it, and the
@@ -3123,6 +3124,87 @@ def check_hazard_log(premises: Premises) -> list[Finding]:
     return findings
 
 
+# The two parameter keys a profile may not carry, because both are DERIVED from the others and
+# recording either would create the second number the Link_Profile block exists to avoid. The schema
+# rejects both; this is the same rule read where it is applied, which is not redundant because the
+# source half and every test build the model in code and reach no schema on the way.
+DERIVED_PARAMETER_KEYS: Final = ("throughput", "aircraftCount")
+
+
+def check_link_profile(premises: Premises) -> list[Finding]:
+    """Each recorded Link_Class carries one profile, and no profile records a derived figure.
+
+    Not the whole of what Requirement 5 criterion 4 asks. The other direction -- every Link_Class
+    the register references carries a profile -- needs the register to reference one somewhere other
+    than in the profile list, and nothing does yet: the freshness thresholds of Requirement 7 and
+    the tier memberships of Requirement 6 are what will, and both are later tasks. Checking it now
+    would compare the profiles against the classes named by the profiles.
+
+    A class recorded twice is the failure that survives the schema. ``uniqueItems`` rejects a
+    verbatim duplicate, so the pair that reaches here differs in its parameters or its revision --
+    two answers for one class, from which a derivation would take whichever came first.
+
+    An empty list is a finding and an absent key is not, which is the distinction the hazard log
+    draws for the same reason. Absent is a record nobody has written; empty is a claim that the
+    station has no Link_Class, and a station with no link class has no link.
+
+    A profile carrying no values must still name what holds them. The schema requires ``heldBy``
+    non-empty, so this catches the model-built register rather than the document, and it is worth
+    catching there because an empty parameter set with nothing named reads as an omission instead
+    of as the recorded open decision criterion 12 asks for.
+    """
+    recorded = premises.register.link_profiles
+    if recorded is None:
+        return []
+
+    findings: list[Finding] = []
+    if not recorded:
+        findings.append(
+            Finding(
+                LINK_PROFILE,
+                "the Link_Profile list is recorded and empty, which claims the station has no "
+                "Link_Class rather than that none has been written down yet. Omit the key to "
+                "record a list nobody has written",
+            )
+        )
+
+    counted: dict[str, int] = {}
+    for profile in recorded:
+        counted[profile.link_class] = counted.get(profile.link_class, 0) + 1
+    findings.extend(
+        Finding(
+            LINK_PROFILE,
+            f"{name}: the register records {count} profiles for the Link_Class, so the class "
+            f"carries {count} parameter sets and {count} revisions, and a derivation would take "
+            f"whichever came first",
+        )
+        for name, count in sorted(counted.items())
+        if count > 1
+    )
+    findings.extend(
+        Finding(
+            LINK_PROFILE,
+            f"{profile.link_class}: the profile records no parameter value and names nothing as "
+            f"holding them, so an unsettled Link_Class is indistinguishable from an omitted one. "
+            f"Requirement 5 criterion 12 asks for the open decision to be recorded, not left out",
+        )
+        for profile in recorded
+        if not profile.parameters and not profile.held_by
+    )
+    findings.extend(
+        Finding(
+            LINK_PROFILE,
+            f"{profile.link_class}: the profile records a {key} parameter, and that figure is "
+            f"derived from the others. Recording it creates a second number to keep in step with "
+            f"the radio it describes, and nothing would detect the two diverging",
+        )
+        for profile in recorded
+        for key in DERIVED_PARAMETER_KEYS
+        if key in profile.parameters
+    )
+    return findings
+
+
 def check_inventory_totals(premises: Premises) -> list[Finding]:
     """Every count the inventory declares agrees with the rows the inventory carries.
 
@@ -3231,6 +3313,7 @@ _CHECKS: Final = (
     check_inventory_totals,
     check_overlay_edits,
     check_hazard_log,
+    check_link_profile,
 )
 
 

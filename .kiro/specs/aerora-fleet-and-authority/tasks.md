@@ -86,7 +86,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.5, 5.7, 5.8, 5.9_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_gate_register.py -k derivation`
 
-  - [~] 1.4 Implement the `link-profile` data-half check
+  - [x] 1.4 Implement the `link-profile` data-half check
     - Every Link_Class the register references carries exactly one profile, in both directions
     - A profile with empty `parameters` names a `heldBy`; a profile with parameters does not
     - No profile carries a throughput or aircraft-count figure, which is the schema rule read again

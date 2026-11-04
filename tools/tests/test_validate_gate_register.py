@@ -87,6 +87,7 @@ from common.gate_register import (
     GuardPermission,
     Hazard,
     InventoryReference,
+    LinkProfile,
     MavlinkIdentifierPosture,
     MavlinkIdentifierSite,
     Observation,
@@ -124,6 +125,7 @@ from validate_gate_register import (
     CLOSURE_SIGNATURES,
     CONTENT_EXCLUSION,
     DELIVERED_OUTSIDE,
+    DERIVED_PARAMETER_KEYS,
     ENTRY_CLASSIFICATION,
     ENTRY_COMMIT,
     FORBIDDEN_UNTIL,
@@ -136,6 +138,7 @@ from validate_gate_register import (
     INVENTORY_OWNER,
     INVENTORY_TOTALS,
     KEYED_SHAPE,
+    LINK_PROFILE,
     MAPPING_SHAPE,
     MAVLINK_IDENTIFIER_GUARD,
     MECHANICAL_GUARDS,
@@ -185,6 +188,7 @@ from validate_gate_register import (
     check_hazard_log,
     check_inventory_coverage,
     check_inventory_totals,
+    check_link_profile,
     check_overlay_edits,
     check_partition,
     check_reclassifications,
@@ -5808,3 +5812,98 @@ def test_hazard_log_names_an_id_recorded_twice() -> None:
     assert message.startswith(f"{HAZARD_ID}: ")
     assert "records the id 2 times" in message
     assert "settles none of them" in message
+
+
+# ---------------------------------------------------------------------------
+# link-profile
+#
+# Requirement 5 criteria 4, 9 and 12. Every profile is empty until Q-015 closes, so the cases that
+# matter are about the record rather than the values: one profile per class, nothing derived
+# recorded as a parameter, and an unsettled class recorded as unsettled rather than left out.
+# ---------------------------------------------------------------------------
+
+PROFILE_CLASS = "a-fixture-link-class"
+ANOTHER_PROFILE_CLASS = "another-fixture-link-class"
+
+
+def _model_profile(
+    link_class: str = PROFILE_CLASS,
+    *,
+    parameters: dict[str, object] | None = None,
+    held_by: str = "Q-015",
+    revision: str = "a-fixture-revision",
+) -> LinkProfile:
+    return LinkProfile(
+        link_class=link_class,
+        parameters={} if parameters is None else parameters,
+        held_by=held_by,
+        revision=revision,
+    )
+
+
+def _profiles(*recorded: LinkProfile) -> Premises:
+    return _premises(replace(_register(), link_profiles=list(recorded)))
+
+
+def _profile_messages(premises: Premises) -> list[str]:
+    return _messages(check_link_profile(premises), LINK_PROFILE)
+
+
+def test_link_profile_accepts_one_empty_profile_per_class() -> None:
+    """The state task 1.5 records, and the evidence that recording it disturbs no other check."""
+    assert run_checks(_profiles(_model_profile(), _model_profile(ANOTHER_PROFILE_CLASS))) == []
+
+
+def test_link_profile_accepts_an_absent_list() -> None:
+    """The state the register is in until task 1.5, which must not read as a finding."""
+    assert check_link_profile(_premises(replace(_register(), link_profiles=None))) == []
+
+
+def test_link_profile_rejects_a_list_recorded_as_empty() -> None:
+    """An empty list claims the station has no Link_Class, and a station with none has no link."""
+    (message,) = _profile_messages(_profiles())
+
+    assert "recorded and empty" in message
+    assert "Omit the key" in message
+
+
+def test_link_profile_names_a_class_recorded_twice() -> None:
+    """Two parameter sets for one class, from which a derivation takes whichever came first.
+
+    The schema rejects a verbatim duplicate through uniqueItems, so the pair that reaches here
+    differs in its parameters or its revision, which is the pair that matters: both look like
+    answers and nothing says which is the one.
+    """
+    premises = _profiles(_model_profile(), _model_profile(revision="another-fixture-revision"))
+
+    (message,) = _profile_messages(premises)
+
+    assert message.startswith(f"{PROFILE_CLASS}: ")
+    assert "records 2 profiles for the Link_Class" in message
+
+
+def test_link_profile_names_an_unsettled_profile_naming_nothing_that_holds_it() -> None:
+    """Criterion 12 asks for the open decision to be recorded, not for it to be left out.
+
+    The schema requires heldBy non-empty, so what this catches is the register built in code, which
+    is how the source half and every test here build one. That makes it the path which actually
+    reaches this rule rather than the document path.
+    """
+    (message,) = _profile_messages(_profiles(_model_profile(held_by="")))
+
+    assert message.startswith(f"{PROFILE_CLASS}: ")
+    assert "names nothing as holding them" in message
+
+
+@pytest.mark.parametrize("key", DERIVED_PARAMETER_KEYS)
+def test_link_profile_names_a_profile_recording_a_derived_figure(key: str) -> None:
+    """Both derived keys, because a rule catching one would leave the other free to drift.
+
+    Recording either creates a second number to keep in step with the radio it describes, and
+    nothing would detect the two diverging. That is the whole reason this block records parameters
+    and not figures.
+    """
+    (message,) = _profile_messages(_profiles(_model_profile(parameters={key: 1})))
+
+    assert message.startswith(f"{PROFILE_CLASS}: ")
+    assert f"records a {key} parameter" in message
