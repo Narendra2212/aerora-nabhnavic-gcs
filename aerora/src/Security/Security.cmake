@@ -140,6 +140,5 @@ set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES ${AERORA_SECURITY_TEST_DIR} ${CMAKE
 # ----------------------------------------------------------------------------
 
 set(AERORA_SECURITY_TEST_NAMES AeroraAuditSinkTest AeroraCalibrationAuthorizationTest AeroraCalibrationEnforcementTest
-                               AeroraFleetAuthorizationTest
-                               AeroraSecurityStatusTest AeroraSigningKeyStoreTest
+                               AeroraFleetAuthorizationTest AeroraSecurityStatusTest AeroraSigningKeyStoreTest
 )
