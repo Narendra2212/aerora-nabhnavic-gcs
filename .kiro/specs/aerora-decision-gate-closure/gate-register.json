@@ -3266,5 +3266,21 @@
       "reason": "The Windows CI leg for the overlay, configuring CUSTOMCLASS=AeroraCorePlugin and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP. It names no suite: the scene-attachment test is registered off Windows, so this leg has no registration to assert. A new file rather than an edit to an upstream workflow.",
       "owner": "the process owner"
     }
+  ],
+  "hazards": [
+    {
+      "id": "manual-control-latency",
+      "statement": "Manual control input carried on a path through a general-purpose operating system has no bounded worst-case latency. A host that stalls, swaps or schedules the station late does not fall back to a slower path: it delivers stick positions late or not at all, and an operator holding the sticks has no way to tell which of those is happening.",
+      "severity": "loss of manual control authority in flight",
+      "mitigation": "Manual control input reaches the Flight_Controller directly and never traverses the Aerora_Station. The station issues a Manual_Authority_Grant which the Flight_Controller itself enforces, which carries an expiry, which requires refresh to stay in force, and which expires without refresh when the link drops. That makes the station a single point of authority rather than a single point of control: a stalled host withdraws permission to fly manually and never withdraws the ability to.",
+      "acceptedBy": "Architecture"
+    },
+    {
+      "id": "tether-supply-interruption",
+      "statement": "A hexacopter at hover draws kilowatts, and an interruption of the tether DC bus long enough to brown out an ESC is long enough to stop the motors. No software path meets that deadline: not the Aerora_Station over a link, and not the Flight_Controller in firmware.",
+      "severity": "loss of all thrust in flight",
+      "mitigation": "The transfer from tether supply to onboard battery is performed by the power hardware of the aircraft without a software decision, and the Aerora_Station is forbidden from participating in it. The contribution of the station is everything around the transfer and never the transfer itself: reporting the onboard reserve before flight, reporting a failover as a degraded flight rather than as a routine mode change, and reporting the flight time the battery sustains. Requirement 11 criterion 2 is the record of that design and this entry carries it.",
+      "acceptedBy": "Architecture"
+    }
   ]
 }

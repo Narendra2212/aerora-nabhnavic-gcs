@@ -141,7 +141,7 @@ Three standing constraints apply to every task:
     - **Property 9: Aerora logic stays inside the overlay**
     - **Validates: Requirements 10.10, 10.11**
 
-- [ ] 3. The hazard log
+- [x] 3. The hazard log
 
   - [x] 3.1 Add `hazards` to the register schema
     - An identifier, the statement, the severity, the mitigation and the owner who accepted it
@@ -155,7 +155,7 @@ Three standing constraints apply to every task:
     - _Requirements: 10.9, 2.9, 11.3_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k hazard`
 
-  - [~] 3.3 Record the two hazards this design carries
+  - [x] 3.3 Record the two hazards this design carries
     - Manual control input through a general-purpose operating system has unbounded worst-case
       latency; mitigated by sticks reaching the aircraft directly under a station-granted mode
     - A tether supply interruption long enough to brown out an ESC stops the motors; mitigated by the
