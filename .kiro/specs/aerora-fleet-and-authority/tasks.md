@@ -106,7 +106,7 @@ Three standing constraints apply to every task:
 
 - [ ] 2. The overlay-isolation ratchet
 
-  - [-] 2.1 Add `overlayEdits` to the register schema
+  - [x] 2.1 Add `overlayEdits` to the register schema
     - One entry per file outside `aerora/` that carries an Aerora identifier, with its path, the
       reason and the owner who authorised it
     - Same ratchet shape as `mavlinkIdentifiers.allowList`, for the same reason: an
@@ -114,12 +114,12 @@ Three standing constraints apply to every task:
     - _Requirements: 10.10_
     - **Local**: `uv run --quiet --with check-jsonschema check-jsonschema --check-metaschema .kiro/specs/aerora-decision-gate-closure/gate-register.schema.json`
 
-  - [~] 2.2 Add the model, the parser and the data-half check
+  - [x] 2.2 Add the model, the parser and the data-half check
     - Every recorded entry names a path, a reason and an owner from `OWNER_LABELS`
     - _Requirements: 10.10_
     - **Local**: `uv run --quiet --with pytest --with hypothesis --with jsonschema python -m pytest -q tools/tests/test_validate_gate_register.py -k overlay`
 
-  - [~] 2.3 Implement the `overlay-isolation` source-half rule
+  - [x] 2.3 Implement the `overlay-isolation` source-half rule
     - Walk every tracked file outside `aerora/` and match `Aerora[A-Z]` and `AERORA_`
     - Set equality in both directions: an unrecorded site is unassigned Decision_Content naming the
       file, and a recorded site the tree no longer carries is a removal, so the surface can grow and

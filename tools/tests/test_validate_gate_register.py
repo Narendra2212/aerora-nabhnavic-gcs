@@ -430,6 +430,15 @@ GUARD_DECLARATION = "aerora/src/AFixtureGuard.h"
 GUARD_ASSERTION = f"{TEST_TREE}/AFixtureGuardTest.cc"
 FIXTURE_GUARD_VALUE = "a fixture literal"
 
+# The one file outside the overlay that the fixture repository carries. The source half writes
+# `src/Vehicle/Vehicle.h` into every tree it builds, because `adr-016-pair` reads that exact path,
+# so the fixture reaches outside the overlay whether or not a test applies the pair -- and the
+# baseline records the reach for the same reason the real register records it in task 2.4. It is
+# recorded here rather than in the source half because this is where the baseline register is
+# built, and a fixture repository whose own reach went unrecorded would fail `overlay-isolation`
+# on every tree-based test in that module.
+CORE_REACH = "src/Vehicle/Vehicle.h"
+
 # What the fixture records as closing an assertion gap. A fixture string: which task closes the real
 # two is task 11.3's to state, and writing it here would be this file deciding it.
 ASSERTION_REMEDY = "a fixture remedy that adds the assertion"
@@ -624,7 +633,7 @@ def _register(
         mavlink_identifiers=MavlinkIdentifierPosture(gate=MISSION_GATE, allow_list=[]),
         contract_surface=_baseline_surface(registry),
         link_profiles=None,
-        overlay_edits=None,
+        overlay_edits=[_edit(CORE_REACH)],
     )
 
 
@@ -5669,8 +5678,13 @@ def test_overlay_edits_accept_two_paths_outside_the_overlay() -> None:
 
 
 def test_overlay_edits_accept_a_register_recording_none() -> None:
-    """The state the register is in until task 2.4, which must not read as a finding."""
-    assert check_overlay_edits(_premises()) == []
+    """The state the register is in until task 2.4, which must not read as a finding.
+
+    The baseline records one reach, so the absent key is written in rather than read off the
+    baseline: what this asserts is that a register carrying no `overlayEdits` at all is accepted,
+    and the baseline no longer carries that state.
+    """
+    assert check_overlay_edits(_premises(replace(_register(), overlay_edits=None))) == []
 
 
 def test_overlay_edits_name_a_path_inside_the_overlay() -> None:

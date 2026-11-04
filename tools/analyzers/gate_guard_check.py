@@ -119,6 +119,7 @@ Exit codes:
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -2701,6 +2702,162 @@ def check_contract_surface(premises: Premises) -> list[Finding]:
 
 # The rules, in the order the design's table lists them. Each reports findings carrying its own
 # check name, so the registry needs no name of its own.
+# ---------------------------------------------------------------------------
+# overlay-isolation
+#
+# Requirement 10 criteria 10 and 11: every file outside the overlay that carries an Aerora
+# identifier is recorded, with a reason and an owner. Set equality in both directions, so the
+# surface can grow and shrink only deliberately, which is the shape `contract-surface` already uses.
+#
+# What this protects is not correctness but an option. Aerora reaches into the upstream tree in a
+# small number of places, and that smallness is what would let the overlay be re-hosted on a
+# different core if an assurance process ever demanded it. Nothing fails today when a sixth reach
+# appears; the option just gets quietly more expensive, which is exactly the kind of cost a rule has
+# to make visible because no test will.
+#
+# The finding names no Gate and renders UNASSIGNED. Overlay isolation is unconditional rather than
+# held open by a Gate, and `contract-surface` already sets the precedent for a rule whose subject no
+# Gate_Dossier records.
+#
+# Three trees are deliberately not walked, and the reason is the same for each: they are about
+# Aerora by construction, so every file in them carries Aerora identifiers and a rule that read them
+# would report hundreds of findings and be removed rather than obeyed.
+#
+#   * `aerora/` is the overlay itself, which is the thing being isolated.
+#   * `tools/` holds the Gate_Register model and both checkers, including this rule.
+#   * `.kiro/` holds the specifications, which name Aerora in every paragraph.
+#
+# The pattern matches an IDENTIFIER and not the word. `Aerora[A-Z]` and `AERORA_` catch a symbol or
+# a macro; prose mentioning Aerora is not a reach into the tree and is not reported. That is why
+# `.github/workflows/aerora-lint.yml` is absent from the recorded set while its two sibling legs are
+# present: those two name suites, and it names none.
+# ---------------------------------------------------------------------------
+
+OVERLAY_ISOLATION: Final = "overlay-isolation"
+
+_ISOLATION_EXCLUDED: Final = (OVERLAY_TREE, "tools", ".kiro")
+
+# Suffixes that can carry a code identifier or a build declaration. Documentation and translation
+# catalogues are left out: a mention there costs no separability, and the translation catalogues are
+# large enough to make the walk slow for no evidence.
+_ISOLATION_SUFFIXES: Final = (
+    ".h",
+    ".hpp",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cmake",
+    ".txt",
+    ".qml",
+    ".yml",
+    ".yaml",
+)
+
+_AERORA_IDENTIFIER: Final = re.compile(r"Aerora[A-Z]\w*|AERORA_\w+")
+
+
+def _isolation_candidates(root: Path) -> tuple[list[str], list[str], list[tuple[str, str]]]:
+    """Files examined, files carrying an Aerora identifier, and files that could not be read.
+
+    All three in path order, so a caller comparing them against a recorded list reads one order.
+
+    The walk prunes rather than filters, which departs from the `rglob` every other walk in this
+    file uses, and the reason is the size of this one. Those read 22 allow-listed sites and 87
+    overlay files; this one examines 2964 across the whole repository, and enumerating everything
+    to discard the result afterwards reached 22813 paths -- it spent longer deciding to ignore
+    `.git/` than the rest of this rule takes. So `_SKIP_DIRS` and the three
+    Aerora-by-construction trees are pruned where the walk would otherwise descend into them.
+    """
+    examined: list[str] = []
+    carrying: list[str] = []
+    unreadable: list[tuple[str, str]] = []
+    for parent, directories, files in os.walk(root):
+        here = Path(parent)
+        base = here.relative_to(root)
+        directories[:] = [
+            name
+            for name in directories
+            if name not in _SKIP_DIRS and (base / name).as_posix() not in _ISOLATION_EXCLUDED
+        ]
+        for name in files:
+            path = here / name
+            if path.suffix not in _ISOLATION_SUFFIXES:
+                continue
+            posix = (base / name).as_posix()
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError as error:  # pragma: no cover - a readable tree is the normal case
+                unreadable.append((posix, str(error)))
+                continue
+            examined.append(posix)
+            if _AERORA_IDENTIFIER.search(text):
+                carrying.append(posix)
+    return sorted(examined), sorted(carrying), sorted(unreadable)
+
+
+def check_overlay_isolation(premises: Premises) -> list[Finding]:
+    """Every file outside the overlay carrying an Aerora identifier is one the register records.
+
+    Both directions. An unrecorded file is a reach nobody authorised, and a recorded file that no
+    longer carries one is a record that has outlived its subject -- which matters because the list
+    is read as a count, and a stale entry inflates the number a reviewer weighs the next reach
+    against.
+
+    A walk that examined nothing is a failure rather than a pass. The two are indistinguishable from
+    the findings alone: an empty set equals an empty set, and a rule that had stopped walking would
+    look exactly like a tree with no reaches in it.
+    """
+    examined, carrying, unreadable = _isolation_candidates(premises.root)
+
+    findings = [
+        Finding(
+            OVERLAY_ISOLATION,
+            (),
+            f"{path}: the file {reason}, so it was searched for no Aerora identifier. A file this "
+            f"rule cannot read is a failure rather than a pass",
+        )
+        for path, reason in unreadable
+    ]
+
+    if not examined:
+        findings.append(
+            Finding(
+                OVERLAY_ISOLATION,
+                (),
+                f"no file outside {OVERLAY_TREE}/ was examined, so the overlay's separability was "
+                f"compared against nothing. A walk that examined nothing is indistinguishable from "
+                f"a tree with no reach into it, and is a failure rather than a pass",
+            )
+        )
+        return findings
+
+    recorded = {edit.path for edit in premises.register.overlay_edits or ()}
+    found = set(carrying)
+
+    findings.extend(
+        Finding(
+            OVERLAY_ISOLATION,
+            (),
+            f"{path}: the file carries an Aerora identifier and lies outside {OVERLAY_TREE}/, and "
+            f"the register records no overlay edit for it. Requirement 10 criterion 11 rejects the "
+            f"change until the register records the path, the reason and the owner who authorised "
+            f"it: an unrecorded reach spends the overlay's separability without anybody deciding to",
+        )
+        for path in sorted(found - recorded)
+    )
+    findings.extend(
+        Finding(
+            OVERLAY_ISOLATION,
+            (),
+            f"{path}: the register records an overlay edit for it, and the file carries no Aerora "
+            f"identifier. That is a removal rather than a satisfied entry, and a stale entry "
+            f"inflates the count a reviewer weighs the next reach against",
+        )
+        for path in sorted(recorded - found)
+    )
+    return findings
+
+
 _CHECKS: Final = (
     check_guard_value,
     check_guard_assertion,
@@ -2714,6 +2871,7 @@ _CHECKS: Final = (
     check_autonomy_source,
     check_simulated_source,
     check_contract_surface,
+    check_overlay_isolation,
 )
 
 
@@ -2748,6 +2906,12 @@ def _established(premises: Premises, files: int) -> str:
     and because its two numbers are the one measurement that says the ratchet is loaded: an
     inventory compared against an extractor that has stopped extracting reports every element as
     removed, and the pair of counts is where that is visible.
+
+    The isolation walk reports its reach beside its result for that reason once more, and here the
+    reach is the half that matters. It is the broadest walk in this file, and the rule already fails
+    a walk that examined nothing -- but a walk that had narrowed rather than stopped would report an
+    empty disagreement and read as a tree with no reach into it. The count of files examined is what
+    makes narrowing visible, and it is visible as a number because it is recorded nowhere.
     """
     guards = _registry(premises)
     sites = sum(len(guard.asserted_in) for guard in guards)
@@ -2758,6 +2922,7 @@ def _established(premises: Premises, files: int) -> str:
     controls = len(read_only.exceptions) + len(read_only.actionable_control_sites)
     declared, _ = _surface(_source_tree(premises.root))
     surface = len(declared)
+    examined, carrying, _ = _isolation_candidates(premises.root)
     return (
         f"{REGISTER_PATH} records {len(premises.register.guards)} guards over "
         f"{len(premises.register.gates)} Gate_Dossiers; {len(guards)} guard values and {sites} "
@@ -2769,6 +2934,8 @@ def _established(premises: Premises, files: int) -> str:
         f"{len(CONDITIONAL_GATES) - in_force} standing down on a Gate the derivation records "
         f"closed, with {controls} actionable controls recorded; {surface} contract-surface elements "
         f"declared under {SOURCE_TREE}/ against {len(premises.register.contract_surface)} recorded; "
+        f"{len(carrying)} of {len(examined)} files outside {OVERLAY_TREE}/ carry an Aerora "
+        f"identifier against {len(premises.register.overlay_edits or ())} recorded; "
         f"no rule read a file because it was among the {files} selected source files\n"
     )
 

@@ -108,6 +108,7 @@ from analyzers.gate_guard_check import (
     IDENTIFIER_PREFIXES,
     MAVLINK_IDENTIFIER,
     NAME,
+    OVERLAY_ISOLATION,
     OVERLAY_MANIFEST,
     OVERRIDE_ENTRIES,
     PAYLOAD_COMMAND_SINK,
@@ -122,6 +123,7 @@ from analyzers.gate_guard_check import (
     UNASSIGNED,
     Finding,
     GateGuardCheckAnalyzer,
+    _isolation_candidates,
     _source_tree,
     _surface,
     check_action_seam,
@@ -133,6 +135,7 @@ from analyzers.gate_guard_check import (
     check_guard_assertion,
     check_guard_value,
     check_mavlink_identifier,
+    check_overlay_isolation,
     check_payload_command_sink,
     check_populated_file_override,
     check_simulated_source,
@@ -175,6 +178,7 @@ from ._helpers import REPO_ROOT, TOOLS_DIR
 from ._strategies import MAX_EXAMPLES
 from .test_validate_gate_register import (
     ACTUATOR_PATH_GUARD,
+    ANOTHER_OUTSIDE_PATH,
     ASSERTION_REMEDY,
     BASELINE_GUARD_GATES,
     BASELINE_PART,
@@ -183,6 +187,7 @@ from .test_validate_gate_register import (
     EXCEPTION_SCREEN,
     GUARD_DECLARATION,
     MISSION_GATE,
+    OUTSIDE_PATH,
     PAYLOAD_GATE,
     POWER_GUARD,
     PREDICATE_EXPRESSION,
@@ -198,6 +203,7 @@ from .test_validate_gate_register import (
     _accepting,
     _baseline_rows,
     _blocked_by,
+    _edit,
     _guard,
     _inventory_text,
     _permissions,
@@ -852,6 +858,8 @@ def _established(
     baseline: int = 0,
     in_force: int = CONDITIONAL_RULES,
     surface: int | None = None,
+    examined: int = 2,
+    carrying: int = 1,
 ) -> str:
     """The summary line a run ends with, spelled out rather than matched loosely.
 
@@ -878,6 +886,11 @@ def _established(
     many *register* records because the baseline agrees in both directions. A test that writes a
     declaration says so, which is what makes the two numbers a measurement of the tree against the
     register rather than one number restated.
+
+    *examined* and *carrying* are the isolation walk reach and result over the fixture repository,
+    which carries two files outside the overlay and an Aerora identifier in one of them. A test
+    writing another outside file says so. They default to the shape of the fixture rather than of
+    the repository, which is what makes them the one pair in this line a tree-based test can move.
     """
     guards = [guard for guard in register.guards if guard.symbol != MAVLINK_IDENTIFIER_GUARD]
     sites = sum(len(guard.asserted_in) for guard in guards)
@@ -895,6 +908,8 @@ def _established(
         f"{CONDITIONAL_RULES - in_force} standing down on a Gate the derivation records closed, "
         f"with {controls} actionable controls recorded; {declared} contract-surface elements "
         f"declared under {SOURCE_TREE}/ against {len(register.contract_surface)} recorded; "
+        f"{carrying} of {examined} files outside {OVERLAY_TREE}/ carry an Aerora "
+        f"identifier against {len(register.overlay_edits or ())} recorded; "
         f"no rule read a file because it was among the {files} selected source files\n"
     )
 
@@ -907,10 +922,20 @@ def _lines(
     baseline: int = 0,
     in_force: int = CONDITIONAL_RULES,
     surface: int | None = None,
+    examined: int = 2,
+    carrying: int = 1,
 ) -> list[str]:
     """The finding lines *result* printed, with the summary the run ends with taken off."""
     return result.output.removesuffix(
-        _established(register, files=files, baseline=baseline, in_force=in_force, surface=surface)
+        _established(
+            register,
+            files=files,
+            baseline=baseline,
+            in_force=in_force,
+            surface=surface,
+            examined=examined,
+            carrying=carrying,
+        )
     ).splitlines()
 
 
@@ -1599,14 +1624,19 @@ def test_adr_016_pair_accepts_an_authorisation_that_nobody_has_acted_on(tmp_path
 
 
 def test_adr_016_pair_names_a_core_header_the_tree_does_not_carry(tmp_path: Path) -> None:
-    """A file this rule cannot read is a failure rather than a pass."""
-    register = _register()
+    """A file this rule cannot read is a failure rather than a pass.
+
+    The baseline reach is withdrawn from the register first. Deleting the core header deletes the
+    one file the fixture repository reaches into, so a register still recording it would be
+    reported by `overlay-isolation` too -- correctly, and about a different subject than this one.
+    """
+    register = replace(_register(), overlay_edits=[])
     root = _tree(tmp_path / "repo", register)
     (root / CORE_HEADER).unlink()
 
     result = _review(root)
 
-    (line,) = _lines(result, register)
+    (line,) = _lines(result, register, examined=1, carrying=0)
     assert not result.passed
     assert result.issues == 1
     assert line.startswith(f"{ADR_016_PAIR}: {SINGLE_GATE}: {FRIEND_DECLARATION}: ")
@@ -3712,6 +3742,233 @@ def test_simulated_source_reads_the_real_tree_and_finds_no_declaration() -> None
 
     assert "enum Attribution" in source
     assert check_simulated_source(_premises(_register())) == []
+
+
+# ---------------------------------------------------------------------------
+# overlay-isolation
+#
+# Requirement 10 criteria 10 and 11. The fixtures are purpose-built rather than `_tree()` trees,
+# because this is the only rule in the module that walks the whole repository rather than the
+# overlay: a `_tree()` fixture carries every other rule's subject, and every one of them would
+# land inside this rule's reach and have to be recorded to keep the baseline passing.
+#
+# `_edit` and the two fictional outside paths come from the data half's tests on purpose. Both
+# halves of this ratchet have to agree on what a recorded entry looks like, so importing the
+# constructor is what makes a change to its shape fail both halves rather than one.
+# ---------------------------------------------------------------------------
+
+REACHING_SOURCE = "class AeroraFixtureReach;"
+MACRO_SOURCE = "#define AERORA_FIXTURE_REACH 1"
+PROSE_SOURCE = "// Aerora is named here in prose, and aerora again in lower case."
+
+
+def _reaching(root: Path, *files: tuple[str, str]) -> Path:
+    """*root* carrying *files* as path and content, and nothing else."""
+    for path, text in files:
+        _write(root / path, text)
+    return root
+
+
+def _with_edits(register: GateRegister, *paths: str) -> GateRegister:
+    """*register* recording one overlay edit per path in *paths*."""
+    return replace(register, overlay_edits=[_edit(path) for path in paths])
+
+
+def test_overlay_isolation_accepts_a_tree_whose_reaches_the_register_records(
+    tmp_path: Path,
+) -> None:
+    """Two reaches, both recorded, and a third file carrying none so the walk is not empty.
+
+    The examined count is asserted beside the carrying list for the reason the walk returns both:
+    two files agreeing with two records produces the same empty finding list as a walk that read
+    nothing at all, and the counts are the only thing that tells those two runs apart.
+    """
+    register = _with_edits(_register(), OUTSIDE_PATH, ANOTHER_OUTSIDE_PATH)
+    root = _reaching(
+        tmp_path / "repo",
+        (OUTSIDE_PATH, REACHING_SOURCE),
+        (ANOTHER_OUTSIDE_PATH, MACRO_SOURCE),
+        ("src/AFixtureQuiet.h", PROSE_SOURCE),
+    )
+
+    examined, carrying, unreadable = _isolation_candidates(root)
+
+    assert check_overlay_isolation(_premises_at(register, root)) == []
+    assert unreadable == []
+    assert carrying == [OUTSIDE_PATH, ANOTHER_OUTSIDE_PATH]
+    assert len(examined) == 3
+
+
+def test_overlay_isolation_names_a_file_the_register_does_not_record(tmp_path: Path) -> None:
+    """An unrecorded reach, named as unassigned Decision_Content against no Gate.
+
+    It renders `UNASSIGNED` for the reason `contract-surface` findings do. Overlay isolation is
+    unconditional, so there is no Gate whose closure would make a reach acceptable -- what makes
+    one acceptable is an owner deciding to spend the separability and recording that they did.
+    """
+    root = _reaching(tmp_path / "repo", (OUTSIDE_PATH, REACHING_SOURCE))
+
+    (finding,) = check_overlay_isolation(_premises_at(_with_edits(_register()), root))
+
+    assert finding.check == OVERLAY_ISOLATION
+    assert finding.gates == ()
+    assert UNASSIGNED in str(finding)
+    assert finding.blocking
+    assert finding.message.startswith(f"{OUTSIDE_PATH}: ")
+    assert f"lies outside {OVERLAY_TREE}/" in finding.message
+    assert "Requirement 10 criterion 11" in finding.message
+
+
+def test_overlay_isolation_names_a_recorded_file_that_no_longer_reaches(tmp_path: Path) -> None:
+    """The other direction, which a containment test either way round would pass over.
+
+    A record outliving its subject is not harmless. The recorded list is read as a count -- it is
+    the number a reviewer weighs the next reach against -- so a stale entry makes the overlay look
+    less separable than it is, and makes the next reach look cheaper than it is.
+    """
+    register = _with_edits(_register(), OUTSIDE_PATH)
+    root = _reaching(tmp_path / "repo", (OUTSIDE_PATH, PROSE_SOURCE))
+
+    (finding,) = check_overlay_isolation(_premises_at(register, root))
+
+    assert finding.check == OVERLAY_ISOLATION
+    assert finding.blocking
+    assert finding.message.startswith(f"{OUTSIDE_PATH}: ")
+    assert "is a removal rather than a satisfied entry" in finding.message
+
+
+def test_overlay_isolation_reports_both_directions_as_separate_findings(tmp_path: Path) -> None:
+    """One unrecorded reach and one stale record are two findings and never one summary.
+
+    Each has its own repair -- record the reach, or withdraw the entry -- so a rule that reported
+    the two sets as differing would be naming nothing a reviewer could act on.
+    """
+    register = _with_edits(_register(), OUTSIDE_PATH)
+    root = _reaching(
+        tmp_path / "repo",
+        (OUTSIDE_PATH, PROSE_SOURCE),
+        (ANOTHER_OUTSIDE_PATH, REACHING_SOURCE),
+    )
+
+    unrecorded, removed = check_overlay_isolation(_premises_at(register, root))
+
+    assert unrecorded.message.startswith(f"{ANOTHER_OUTSIDE_PATH}: ")
+    assert "records no overlay edit for it" in unrecorded.message
+    assert removed.message.startswith(f"{OUTSIDE_PATH}: ")
+    assert "is a removal rather than a satisfied entry" in removed.message
+
+
+def test_overlay_isolation_rejects_a_tree_it_could_not_walk(tmp_path: Path) -> None:
+    """A walk that examined nothing is a failure, and it is the only finding the run reports.
+
+    The register records a reach here, so a rule that went on to compare the two sets would report
+    that reach as removed: a correct entry named as stale, against a tree it never read. Returning
+    before the comparison is what keeps the real failure the only thing on the page.
+    """
+    register = _with_edits(_register(), OUTSIDE_PATH)
+    premises = replace(_premises(register), root=tmp_path / "absent")
+
+    (finding,) = check_overlay_isolation(premises)
+
+    assert finding.check == OVERLAY_ISOLATION
+    assert finding.gates == ()
+    assert finding.blocking
+    assert finding.message.startswith(f"no file outside {OVERLAY_TREE}/ was examined")
+    assert "is a failure rather than a pass" in finding.message
+
+
+def test_overlay_isolation_does_not_walk_the_trees_that_are_aerora_by_construction(
+    tmp_path: Path,
+) -> None:
+    """The overlay, the tools and the specs name Aerora in every file, and none of it is a reach.
+
+    A rule that read them would report hundreds of findings and be deleted rather than obeyed. The
+    sibling directory pins the exclusion to a whole path segment: `toolsmith/` is not `tools/`, and
+    an exclusion written as a bare prefix test would silence a real reach.
+    """
+    root = _reaching(
+        tmp_path / "repo",
+        (f"{OVERLAY_TREE}/src/AeroraFixture.h", REACHING_SOURCE),
+        ("tools/analyzers/AFixture.h", REACHING_SOURCE),
+        (".kiro/specs/AFixture.txt", REACHING_SOURCE),
+        ("toolsmith/AFixtureReach.h", REACHING_SOURCE),
+    )
+
+    examined, carrying, _ = _isolation_candidates(root)
+
+    assert examined == ["toolsmith/AFixtureReach.h"]
+    assert carrying == ["toolsmith/AFixtureReach.h"]
+
+
+def test_overlay_isolation_reads_an_identifier_and_not_the_word(tmp_path: Path) -> None:
+    """Prose naming Aerora is not a reach into the tree, and the distinction is load-bearing.
+
+    `.github/workflows/aerora-lint.yml` is why it has to be. That file is Aerora-owned CI that
+    names no Aerora suite, and it is correctly absent from the recorded set while its two sibling
+    legs are present -- those two name suites and it names none. A rule matching the word would
+    record a workflow file as a core edit, and the recorded count would stop meaning anything.
+
+    The prose file is asserted to contain the word before the rule declines it, so the pass is
+    evidence the rule read the file and judged it rather than evidence of an empty fixture.
+    """
+    root = _reaching(
+        tmp_path / "repo",
+        ("src/AFixtureProse.h", PROSE_SOURCE),
+        ("src/AFixtureMacro.h", MACRO_SOURCE),
+    )
+
+    examined, carrying, _ = _isolation_candidates(root)
+
+    assert "Aerora" in PROSE_SOURCE
+    assert len(examined) == 2
+    assert carrying == ["src/AFixtureMacro.h"]
+
+
+def test_overlay_isolation_passes_over_a_suffix_that_carries_no_declaration(
+    tmp_path: Path,
+) -> None:
+    """A mention in documentation costs no separability, so the walk does not read it.
+
+    The same content under a header suffix is a reach, which is what makes this a statement about
+    the suffix rather than about the content.
+    """
+    root = _reaching(
+        tmp_path / "repo",
+        ("docs/AFixtureReach.md", REACHING_SOURCE),
+        ("src/AFixtureReach.h", REACHING_SOURCE),
+    )
+
+    examined, carrying, _ = _isolation_candidates(root)
+
+    assert examined == ["src/AFixtureReach.h"]
+    assert carrying == ["src/AFixtureReach.h"]
+
+
+def test_overlay_isolation_reads_the_real_tree_and_finds_the_five_reaches() -> None:
+    """The one case whose evidence is the repository, and the surface task 2.4 has to record.
+
+    The five are asserted as a list rather than a count because each is a different kind of reach
+    -- a core header, a core test, a build file and two CI legs -- so a change that moved the count
+    without moving the list would be a different surface at the same size.
+
+    The examined count is a floor rather than an equality. This is a fork that merges upstream, so
+    the number of core files moves for reasons that have nothing to do with the overlay, and a
+    pinned figure would fail on somebody else's commit. A floor still catches what the empty-walk
+    guard cannot: that guard fails a walk that stopped, and this one fails a walk that narrowed.
+    """
+    examined, carrying, unreadable = _isolation_candidates(REPO_ROOT)
+
+    assert unreadable == []
+    assert carrying == [
+        ".github/workflows/aerora-linux.yml",
+        ".github/workflows/aerora-windows.yml",
+        "cmake/QGCTest.cmake",
+        CORE_HEADER,
+        "test/Vehicle/MavCommandAuthorizationTest.cc",
+    ]
+    assert len(examined) > 2000
+    assert "CMakeLists.txt" in examined
+    assert not any(path.startswith((f"{OVERLAY_TREE}/", "tools/", ".kiro/")) for path in examined)
 
 
 # ---------------------------------------------------------------------------
