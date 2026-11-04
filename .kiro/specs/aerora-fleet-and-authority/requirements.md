@@ -53,6 +53,9 @@ value.
   link and independent of any aircraft link.
 - **Tether_Interlock**: a member of a declared, enumerated set of safety responses that a Tether_Unit
   and a Flight_Controller may exchange directly, carrying no operator command.
+- **Link_Profile**: the recorded parameter set of a Link_Class together with the value of each
+  parameter, from which the Aerora_Station derives that class throughput. Neither the parameter
+  set nor its values are defined here.
 - **Link_Class**: a category of communication link distinguished by its sustained throughput and its
   latency characteristics.
 - **Telemetry_Tier**: a named subset of the telemetry dialect sized to a Link_Class.
@@ -177,16 +180,27 @@ cannot work is refused before a flight rather than discovered during one.
 2. THE Aerora_Station SHALL report the number of channels allocated and the number remaining.
 3. IF a proposed link allocation would exceed the channel ceiling, THEN THE Aerora_Station SHALL
    refuse the allocation and SHALL name the ceiling.
-4. THE Aerora_Station SHALL derive, for each Link_Class, the sustained throughput the active
-   Telemetry_Tier requires per aircraft.
-5. IF the aggregate requirement of the addressed fleet exceeds the sustained throughput of its
-   Link_Class, THEN THE Aerora_Station SHALL report the shortfall and SHALL name the aircraft count
-   that Link_Class sustains at the active Telemetry_Tier.
-6. THE Aerora_Station SHALL NOT present a fleet size that its active links cannot sustain.
-7. THE Gate_Register SHALL record the sustained throughput of each Link_Class, which `Q-015`
-   presently holds open.
-8. WHERE the channel ceiling is raised by an upstream core edit, THE Gate_Register SHALL record the
-   edit, its memory consequence and the owner who authorised it.
+4. THE Gate_Register SHALL record a Link_Profile for each Link_Class, carrying that class's
+   parameter set and the value of each parameter in it.
+5. THE Aerora_Station SHALL derive each Link_Class's sustained throughput from that class's
+   Link_Profile, and SHALL carry no throughput figure that the Link_Profile does not yield.
+6. THE Aerora_Station SHALL derive, for each Link_Class, the throughput the active Telemetry_Tier
+   requires per aircraft and the aircraft count that class sustains at that tier.
+7. WHEN a Link_Profile changes, THE Aerora_Station SHALL re-derive every figure that depends on it,
+   including the sustained throughput, the aircraft count the class sustains, and which
+   Telemetry_Tiers the class can carry.
+8. THE Aerora_Station SHALL report, with each derived figure, the Link_Profile it was derived from.
+9. WHILE a Link_Class holds no recorded Link_Profile, THE Aerora_Station SHALL report that class's
+   sustained throughput as unknown and the aircraft count it sustains as unknown, and SHALL NOT
+   present a default for either.
+10. IF the aggregate requirement of the addressed fleet exceeds the derived sustained throughput of
+    its Link_Class, THEN THE Aerora_Station SHALL report the shortfall and SHALL name the aircraft
+    count that class sustains at the active Telemetry_Tier.
+11. THE Aerora_Station SHALL NOT present a fleet size that its active links cannot sustain.
+12. THE Gate_Register SHALL carry a Link_Profile for each Link_Class with its parameter values
+    absent until `Q-015` closes, so that the shape is reviewable before the values exist.
+13. WHERE the channel ceiling is raised by an upstream core edit, THE Gate_Register SHALL record the
+    edit, its memory consequence and the owner who authorised it.
 
 ### Requirement 6: A tiered telemetry dialect
 
@@ -209,6 +223,9 @@ tier is live, so that I know whether I am seeing full aircraft state or the safe
 8. WHILE `DG-TLM` holds no accepted Closure_Record, THE Aerora_Station SHALL report the Gate
    identifier in place of each value the dialect would carry, which is Requirement 5 criterion 1 of
    the gate-closure document unchanged.
+9. THE Aerora_Station SHALL derive which Telemetry_Tiers a Link_Class can carry from that
+   class Link_Profile and the recorded tier memberships, and SHALL NOT offer a tier the class
+   cannot sustain.
 
 ### Requirement 7: Freshness is evaluated per Link_Class
 
@@ -232,6 +249,9 @@ reported fresh.
 7. WHILE `DG-FRS` holds no accepted Closure_Record, THE Aerora_Station SHALL report observed
    freshness as unevaluated, which the `AeroraTelemetryState::ObservedFreshnessUnevaluated` guard
    holds.
+8. IF a Link_Class recorded freshness threshold is shorter than the update interval its
+   Link_Profile yields, THEN THE Aerora_Station SHALL report that threshold as unachievable on
+   that class rather than reporting every value it carries `STALE`.
 
 ### Requirement 8: The Tether_Unit endpoint and the two Power_Modes
 
@@ -385,5 +405,5 @@ station's contribution is everything around it rather than the transfer itself.
 | --- | --- | --- |
 | Where the backend runs, and the licensing boundary | Product | Held at the product owner's request; analysed but not decided |
 | Whether `AeroraGatedOperation` gains a parameter-write form alongside its fleet form | Architecture | `ADR-014`; the two extensions are one structural change and should be designed together |
-| Sustained throughput per Link_Class | Architecture | `Q-015`; needs the radio link budget |
+| Link_Profile parameter values per Link_Class | Architecture | `Q-015`; the register carries each profile shape with its values absent, and every derived figure follows from it |
 | Whether a permission artefact is required before flight | Product, with regulatory counsel | Sources disagree; the answer changes whether a validation path must be built |
