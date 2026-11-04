@@ -1,0 +1,97 @@
+name: Aerora Lint
+
+# The overlay's lint leg, and the first thing in this programme to lint the overlay at all.
+#
+# aerora-windows.yml carries the shared rationale for an overlay-owned CI leg and is the file to
+# read first. This one exists because of a gap in trigger coverage rather than in configuration:
+#
+#   * pre-commit.yml runs on `push` to `master` and `Stable*` only, plus `pull_request`. This fork
+#     develops on `aerora/**` and has no `master` of its own, so the lint gate has never run on a
+#     branch where overlay work happens. `qmllint` in particular has never been applied to the
+#     overlay's QML - 03-gui-information-architecture-and-screens.md records four controls as
+#     `IMPLEMENTED-UNCOMPILED`, "never linted - no qmllint on this host".
+#
+# Two deliberate differences from pre-commit.yml:
+#
+#   * `--files` over the overlay's tracked files, not `--all-files`. Upstream's lint gate only ever
+#     runs on changed files, so a tree-wide sweep reports stock findings that the overlay neither
+#     caused nor can fix - the same argument aerora-windows.yml makes for scoping its tests to
+#     `^Aerora`. Narrowing the file set, not the hook set: every non-manual hook that matches an
+#     overlay file runs, including clang-format and the Aerora guard hooks.
+#   * No results artifact or PR comment. Those steps in pre-commit.yml are `pull_request`-only, and
+#     this leg runs on push.
+#
+# `clang-tidy` and `clazy` are `stages: [manual]` in .pre-commit-config.yaml and do not run here.
+# Both need a compile_commands.json, which means a configured build; that belongs with the build
+# legs rather than with a lint leg, and aerora-linux.yml is where a build already exists.
+#
+# Every pinned version comes from .github/build-config.json via build-config. Nothing is restated
+# here, so this workflow cannot drift from the project's single source of truth.
+
+on:
+  push:
+    branches:
+      - 'aerora/**'
+    paths:
+      - 'aerora/**'
+      - 'tools/**'
+      - '.pre-commit-config.yaml'
+      - '.clang-format'
+      - '.clang-tidy'
+      - '.github/build-config.json'
+      - '.github/workflows/aerora-lint.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Aerora Overlay Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
+
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          groups: dev
+          python-version: '3.12'
+
+      - name: Install Qt
+        uses: ./.github/actions/qt-install
+        with:
+          version: ${{ steps.config.outputs.qt_version }}
+          host: linux
+          arch: linux_gcc_64
+          modules: ''
+          archives: qtbase qtdeclarative icu
+
+      - name: Run pre-commit over the overlay
+        run: |
+          mapfile -t overlay < <(git ls-files -- aerora)
+          if [ "${#overlay[@]}" -eq 0 ]; then
+            echo "::error::git ls-files found no tracked files under aerora/"
+            exit 1
+          fi
+          echo "::notice::linting ${#overlay[@]} tracked overlay files"
+          uv run --frozen --project tools --group dev \
+            pre-commit run --show-diff-on-failure --color=always --files "${overlay[@]}"
