@@ -244,18 +244,33 @@ Three standing constraints apply to every task:
   - [~] 7.1 Report attachment and supply as distinct observations
     - An attached tether that has stopped supplying is neither absent nor healthy, so neither value
       is derived from the other and no combination collapses into one
+    - **Blocked, and the separateness half is already built.** `AeroraPowerModel` keeps its items
+      independent and `_reportsDoNotLeakBetweenItems` asserts it, so no combination collapses. What
+      does not exist is a *supply* item to be separate from attachment: `IF-PWR-001` is attachment,
+      `IF-PWR-003` is the active source whose value set `Q-024` holds, and the configuration
+      booleans are tokens `Q-025` holds. Adding one would author an interface item with no
+      evidence, which the held-by table below records
     - _Requirements: 8.11_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 7.2 Derive Power_Mode from the capability inventory
+  - [x] 7.2 Derive Power_Mode from the capability inventory
     - Never from the presence or absence of a tether link. A station that inferred mode from link
       presence would report battery mode for a tethered aircraft whose link had merely dropped
+    - **Already built.** `effectiveState()` reports the mode and `isExtendedSurfacePermitted()`
+      derives from the vehicle capability inventory. The model takes no link as an input at all, so
+      the prohibition is structural, and `_noTransitionIsInferredFromAConfigurationChange` and
+      `_capabilityGatesExtendedSurface` assert both halves
     - _Requirements: 8.7, 8.8_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 7.3 Report tether values `UNAVAILABLE` where no unit is attached
+  - [x] 7.3 Report tether values `UNAVAILABLE` where no unit is attached
     - Never `UNKNOWN`, and never a numeric default. `UNAVAILABLE` is producible only from a
       capability report, which is the State_Vocabulary rule unchanged
+    - **Already built.** `_unknownAndUnavailableStayDistinct` asserts that only a reported
+      capability absence on the item produces `Unavailable`, that it outranks an observation
+      already arrived, and that returning the item to `CapabilityUnknown` restores the honest
+      answer rather than latching the absence. It carries a `static_assert` on the two classes not
+      collapsing
     - _Requirements: 8.9_
     - **CI-only**: Aerora Linux and Aerora Windows
 
@@ -318,6 +333,7 @@ on one of them.
 | Where the backend runs, and the licensing boundary | Product, held at the owner's request |
 | Raising the fifteen-channel ceiling | Architecture: a core edit with its own signature |
 | The power failover itself | Electrical, and not establishable by any software test |
+| A named tether *supply* value, distinct from tether attachment | No `IF-PWR` item carries it. `IF-PWR-001` is attachment and `IF-PWR-003` is the active source, whose value set `Q-024` holds and whose boolean tokens `Q-025` holds, so supply cannot be derived from either. Requirement 8 criterion 11 needs an interface item that does not exist |
 
 ## Notes
 
