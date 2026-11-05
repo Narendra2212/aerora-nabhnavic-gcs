@@ -954,7 +954,7 @@
     },
     {
       "id": "DG-VID",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 7",
       "rationale": {
         "document": "04-ui-implementation/00-ui-architecture-map.md",
@@ -966,7 +966,7 @@
           "signingOwners": [
             "the process owner"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-VID.fork-point.json",
           "elements": [
             {
@@ -1642,7 +1642,7 @@
     },
     {
       "id": "SCR-VID-01",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

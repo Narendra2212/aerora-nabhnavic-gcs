@@ -575,7 +575,7 @@ widget. That is only possible because `AeroraTelemetrySet` enumerates its groups
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `BLOCKED` | 7 | no video overlay seam — see below; `P7-VID-004` is the content rule the screen satisfies once built, not a blocker |
+| `SCR-VID-01` | Aerora video overlay | O | child of `SCR-LIV-01` over `FlyViewVideo`; precedent `ObstacleDistanceOverlayVideo.qml`, `ProximityRadarVideoView.qml` | `DESIGNED` | 7 | no video overlay seam — see below; `P7-VID-004` is the content rule the screen satisfies once built, not a blocker |
 
 The three video C++ seams (`createVideoReceiver`, `createVideoSink`, `releaseVideoSink`) are **not**
 overridden and should stay that way: the sink is an opaque `void *` whose lifetime belongs to

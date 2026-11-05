@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-VID",
   "part": "fork-point",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "5000fd45ebee4e6aa83d4ec944090a296e1e95d8",
   "signatures": [
     {
       "owner": "the process owner",
