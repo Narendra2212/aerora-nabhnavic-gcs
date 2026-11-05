@@ -26,8 +26,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-MIS.mission-command-set.json",
           "elements": [
             {
               "name": "each mission command the Aerora mission set uses, with its issued MAVLink command identifier or its existing upstream command",
