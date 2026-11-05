@@ -201,8 +201,8 @@
           "signingOwners": [
             "Tab 1"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-TLM.adr-016-core-edit.json",
           "elements": [
             {
               "name": "the authorisation of the ADR-016 core edit, comprising the friend class AeroraVehicleFactGroupRegistrar declaration in src/Vehicle/Vehicle.h and the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP compile definition",

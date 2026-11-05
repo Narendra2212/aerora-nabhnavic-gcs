@@ -1,0 +1,34 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-TLM",
+  "part": "adr-016-core-edit",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Tab 1",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()",
+      "permits": true,
+      "reason": "The core edit is authorised, so the privileged statement is permitted to compile and the guard is permitted to read true. The recorded value moves from false to true and the recorded disagreement is retired. Available is not populated: the dialect part still holds every fact group at CONTRACT-ONLY, so the path compiles and nothing travels it."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the authorisation of the ADR-016 core edit, comprising the friend class AeroraVehicleFactGroupRegistrar declaration in src/Vehicle/Vehicle.h and the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP compile definition",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Authorised. Both halves stand: the friend declaration in src/Vehicle/Vehicle.h and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP in the CUSTOM_DEFINITIONS of aerora/CMakeLists.txt. The pair was applied before any signature permitted it, which the register carried as its one recorded disagreement, and this signature closes that gap by permitting what the tree already holds rather than by changing the tree. ADR-016 records Option B as the adopted target architecture, so what was open was the authorisation and not the design. The alternative remedy, withdrawing the compile definition, was declined: Option A was rejected in ADR-016 as a permanent forfeit that reopens the moment a fact must appear in the value picker or a CSV log, Option C was rejected as costing a core edit and a parallel mechanism both, and withdrawal would leave hazard R4-001 unfixed with no path to a fix, since vehicles of one firmware class receive the same FactGroup pointers from a cached plugin singleton. Option B is also the only one that improves upstream: ArduSubFirmwarePlugin shares FactGroup objects across vehicles today, so a per-vehicle seam is a contribution rather than an Aerora-only accommodation. The edit is one friend declaration against established upstream precedent, and the two halves are safe in the one direction that matters, because defining the flag without the declaration is a compile error rather than silent inertness. What this does not settle: the dialect part stays open, so all six fact groups remain CONTRACT-ONLY with no message to parse, and SCR-TEL-01 and SCR-LIV-02 stay unreleased until both parts are accepted.",
+          "source": "ADR-016"
+        }
+      ]
+    }
+  ]
+}
