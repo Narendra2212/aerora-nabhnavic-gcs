@@ -1,0 +1,128 @@
+name: Aerora Package
+
+# A build of the overlay that a person can run, produced on demand.
+#
+# aerora-windows.yml and aerora-linux.yml prove the overlay compiles and that its tests pass, and
+# they upload JUnit XML. Neither produces anything runnable, so the ten screens that are built have
+# never been seen outside a developer machine. This workflow exists to hand back one file.
+#
+# workflow_dispatch only, and deliberately. A Release build of QGroundControl is expensive, the
+# output is for review rather than for distribution, and nothing downstream consumes it, so running
+# it on every push would spend runner time on an artifact nobody asked for.
+#
+# Not a release. No attestation and no signing: attest-and-upload needs AWS credentials this fork
+# does not have, and an unsigned review build is the honest shape for a station that reports twelve
+# of its eighteen capability guards as false.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Carried over from aerora-windows.yml for the reason recorded there: Qt 6.11.1 on Windows needs
+  # an unreleased aqtinstall fix, pinned to a commit.
+  AQT_SOURCE: 'git+https://github.com/miurahr/aqtinstall.git@8d961e61720b3c06583517fbc68d57ec0a4e9f95'
+
+jobs:
+  windows:
+    name: Aerora Windows x64 Installer
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      # fetch-depth: 0 for the reason windows.yml records against its own checkout: the package
+      # version comes from git describe and needs reachable tags. This fork carries 124 of them and
+      # resolves to v5.2.0-dev, so a shallow clone would version the installer from nothing.
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build Setup
+        uses: ./.github/actions/build-setup
+        with:
+          qt-host: windows
+          qt-arch: win64_msvc2022_64
+          build-type: Release
+          aqt-source: ${{ env.AQT_SOURCE }}
+          cache-variant: aerora
+          cache-key-suffix: aerora-release
+
+      # The preset is the single source of truth for QGC_CUSTOM_DIR=aerora and the Release
+      # configuration. The NSIS generator is passed here instead, because packaging is this
+      # workflow concern rather than a property of the overlay, which is how windows.yml splits the
+      # same two things.
+      #
+      # Video is off. No built screen needs it, SCR-VID-01 is not built at all, and leaving it on
+      # would pull a GStreamer SDK into a job whose only output is a window to look at.
+      - name: Configure
+        uses: ./.github/actions/cmake-configure
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Release
+          preset: Aerora-Windows
+          testing: 'false'
+          extra-args: >-
+            -DQGC_CPACK_GENERATOR=NSIS
+            -DQGC_ENABLE_GST_VIDEOSTREAMING=OFF
+
+      # ADR-012: QGC_CUSTOM_BUILD is a plain CMake variable rather than a cache entry, so the only
+      # thing readable back is QGC_CUSTOM_DIR. Without this check the overlay can fall out of the
+      # build silently - it still compiles and still links, and QGCCorePlugin::instance() simply
+      # stops routing through AeroraCorePlugin - which would package stock QGroundControl under an
+      # Aerora name.
+      - name: Assert the Aerora overlay is active
+        env:
+          BUILD_DIR: ${{ runner.temp }}/build
+        run: |
+          custom_dir=$(python3 "${GITHUB_WORKSPACE}/.github/scripts/cmake_helper.py" cache-var --build-dir "${BUILD_DIR}" --name QGC_CUSTOM_DIR --required --output-key custom_dir)
+          if [ "${custom_dir}" != "aerora" ]; then
+            echo "::error::QGC_CUSTOM_DIR is ${custom_dir}, expected aerora"
+            exit 1
+          fi
+
+      - name: Build
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Release
+
+      - name: Create Installer
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Release
+          target: qgc-package
+          parallel: 'false'
+
+      # A glob rather than a filename. The overlay sets no package name of its own, so CPack names
+      # the file, and hard-coding what it produces today would make a rename read as a missing file.
+      # if-no-files-found: error turns that same rename into a failure that says so.
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: aerora-windows-installer
+          path: |
+            ${{ runner.temp }}/build/*.exe
+            ${{ runner.temp }}/build/*.exe.sha256
+          if-no-files-found: error
+          retention-days: 14

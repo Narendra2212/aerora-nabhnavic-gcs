@@ -10,6 +10,12 @@
       }
     },
     {
+      "name": "Aerora-Windows",
+      "displayName": "Aerora Windows x64 Release (overlay, packaged)",
+      "inherits": ["aerora-overlay", "Windows"],
+      "binaryDir": "${sourceDir}/build/Aerora-Windows"
+    },
+    {
       "name": "Aerora-Windows-debug",
       "displayName": "Aerora Windows x64 Debug (overlay + tests)",
       "inherits": ["aerora-overlay", "Windows-debug"],
@@ -23,6 +29,12 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "Aerora-Windows",
+      "configurePreset": "Aerora-Windows",
+      "configuration": "Release",
+      "inherits": ["build-defaults"]
+    },
     {
       "name": "Aerora-Windows-debug",
       "configurePreset": "Aerora-Windows-debug",
@@ -51,6 +63,13 @@
     }
   ],
   "workflowPresets": [
+    {
+      "name": "Aerora-Windows",
+      "steps": [
+        { "type": "configure", "name": "Aerora-Windows" },
+        { "type": "build", "name": "Aerora-Windows" }
+      ]
+    },
     {
       "name": "Aerora-Windows-debug",
       "steps": [
