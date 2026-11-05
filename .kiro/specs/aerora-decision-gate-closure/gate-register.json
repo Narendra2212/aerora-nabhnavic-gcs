@@ -2427,6 +2427,30 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraAuditEventType::ManualAuthorityExpired",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::ManualAuthorityIssued",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::ManualAuthorityRefreshed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraAuditEventType::ManualAuthorityRefused",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
       "symbol": "AeroraAuditEventType::OperatorIdentityResolved",
       "kind": "enumerator",
       "gate": "none",

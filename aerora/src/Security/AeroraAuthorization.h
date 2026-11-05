@@ -221,6 +221,85 @@ struct AeroraFleetTransmission {
 ///
 constexpr bool kCapabilityVocabularyAccepted = false;
 
+/// \brief A time-bounded authorization under which a Flight_Controller may accept manual input.
+///
+/// The station issues it and the Flight_Controller enforces it. Requirement 2 criterion 1 forbids
+/// the station carrying manual control input at all, so **this type holds no stick value**, and
+/// that absence is the prohibition rather than a rule somebody has to remember. A field that could
+/// hold an axis would make the prohibition a review matter; having nowhere to put one makes it
+/// structural.
+///
+/// The reason the grant exists at all is a hazard the register records as
+/// `manual-control-latency`: a path through a general-purpose operating system has no bounded
+/// worst-case latency, and a host that stalls delivers stick positions late or not at all. Sticks
+/// therefore reach the aircraft directly and the station grants and revokes the mode, which makes
+/// it a single point of *authority* rather than a single point of *control*.
+///
+/// Nothing here issues a grant. Issuing is an operator command and `DG-ROL` holds every origination
+/// path, so this type and its expiry are what is buildable while that Gate is open.
+///
+struct AeroraManualAuthorityGrant {
+    /// Opaque operator identity. Not a credential, and never a role name.
+    QString operatorId;
+
+    /// Monotonic microseconds at issue. Zero means no grant was ever issued, which is distinct
+    /// from a grant that has expired, and the two must stay distinct: one is a station that has
+    /// never granted manual authority and the other is one whose grant lapsed.
+    qint64 issuedAtMonotonicUs = 0;
+
+    /// Monotonic microseconds at which the grant lapses without refresh.
+    qint64 expiresAtMonotonicUs = 0;
+
+    /// Whether the grant is in force at \a nowMonotonicUs.
+    ///
+    /// Requirement 2 criterion 3: a grant carries an expiry and requires refresh to remain in
+    /// force. Expiry is therefore read from the clock on every call rather than latched, because a
+    /// latched flag would need something to clear it and whatever failed to refresh the grant is
+    /// the same thing that would have failed to clear the flag.
+    ///
+    /// An unissued grant is never in force. Criterion 5 makes a lost link expire the grant without
+    /// refresh, and an unissued grant reading as in force would invert exactly that.
+    [[nodiscard]] bool inForce(qint64 nowMonotonicUs) const
+    {
+        if (issuedAtMonotonicUs == 0) {
+            return false;
+        }
+        return nowMonotonicUs >= issuedAtMonotonicUs && nowMonotonicUs < expiresAtMonotonicUs;
+    }
+};
+
+/// \brief What the Flight_Controller reports about manual control, as an observation.
+///
+/// Requirement 2 criterion 7: the Flight_Controller reports stick positions and the grant state as
+/// telemetry, so that the station observes manual control without carrying it. Every value here
+/// arrived inbound and none of it can be sent: there is no path from this type to a link, which is
+/// what makes observing and carrying different things rather than one thing named twice.
+///
+/// \c axes is an opaque ordered list rather than named members. The Aerora dialect does not exist,
+/// so the axis set is unsettled, and naming members here would author part of it. A consumer
+/// renders the list it was given and labels nothing it was not told.
+///
+struct AeroraManualControlReport {
+    /// Monotonic microseconds at which this report was received. Zero means nothing has been
+    /// observed, which is **not** a report of centred sticks: one is the absence of telemetry and
+    /// the other is telemetry saying the operator is holding still.
+    qint64 observedAtMonotonicUs = 0;
+
+    /// Whether the Flight_Controller reports a grant in force.
+    ///
+    /// The answer from the aircraft, not a copy of what the station believes it granted. The
+    /// station issues and the Flight_Controller enforces, so the two disagreeing is a real
+    /// condition an operator needs to see, and resolving it by preferring the station would hide
+    /// the only case where the enforcement actually matters.
+    bool grantInForceAtVehicle = false;
+
+    /// The stick axis values the report carried, in the order the dialect carried them.
+    QList<float> axes;
+
+    /// Whether any report has been observed. Distinct from the content of a report.
+    [[nodiscard]] bool observed() const { return observedAtMonotonicUs != 0; }
+};
+
 /// \brief What resolving a Capability_Address against the reported inventories produced.
 ///
 /// Three states, because collapsing any two loses the repair. An address naming no capability was

@@ -112,6 +112,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraCalibrationEnforcementTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityStatusTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityStatusTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityTestDoubles.h
@@ -139,6 +141,12 @@ set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES ${AERORA_SECURITY_TEST_DIR} ${CMAKE
 # .kiro/specs/03-implementation-specification/34-audit-sink-and-security-status-contract.md.
 # ----------------------------------------------------------------------------
 
-set(AERORA_SECURITY_TEST_NAMES AeroraAuditSinkTest AeroraCalibrationAuthorizationTest AeroraCalibrationEnforcementTest
-                               AeroraFleetAuthorizationTest AeroraSecurityStatusTest AeroraSigningKeyStoreTest
+set(AERORA_SECURITY_TEST_NAMES
+    AeroraAuditSinkTest
+    AeroraCalibrationAuthorizationTest
+    AeroraCalibrationEnforcementTest
+    AeroraFleetAuthorizationTest
+    AeroraManualAuthorityTest
+    AeroraSecurityStatusTest
+    AeroraSigningKeyStoreTest
 )

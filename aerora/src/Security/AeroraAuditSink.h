@@ -56,6 +56,19 @@ enum class AeroraAuditEventType {
     VehicleResponse,
     SecurityEvent,
     SystemEvent,
+    // The four Manual_Authority_Grant transitions of Requirement 2 criterion 8. Appended rather
+    // than grouped with the command events deliberately: the store writes typeToString() and not
+    // the integer, but appending renumbers nothing at all, and an audit vocabulary is a bad place
+    // to rely on a reader being right about which representation was persisted.
+    //
+    // Four types rather than one SecurityEvent carrying a reason code, because the four have
+    // different meanings to whoever reads the trail. A refused grant is an operator who was told
+    // no; an expired one is an operator who was told yes and then lost it, which on criterion 5 is
+    // what a dropped link produces. Folding them would make a link failure unqueryable.
+    ManualAuthorityIssued,
+    ManualAuthorityRefused,
+    ManualAuthorityRefreshed,
+    ManualAuthorityExpired,
 };
 
 /// \brief What a sink did with a record.

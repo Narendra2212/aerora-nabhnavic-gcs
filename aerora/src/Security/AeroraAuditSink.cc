@@ -22,6 +22,14 @@ QString AeroraAuditEvent::typeToString(AeroraAuditEventType type)
         return QStringLiteral("SecurityEvent");
     case AeroraAuditEventType::SystemEvent:
         return QStringLiteral("SystemEvent");
+    case AeroraAuditEventType::ManualAuthorityIssued:
+        return QStringLiteral("ManualAuthorityIssued");
+    case AeroraAuditEventType::ManualAuthorityRefused:
+        return QStringLiteral("ManualAuthorityRefused");
+    case AeroraAuditEventType::ManualAuthorityRefreshed:
+        return QStringLiteral("ManualAuthorityRefreshed");
+    case AeroraAuditEventType::ManualAuthorityExpired:
+        return QStringLiteral("ManualAuthorityExpired");
     }
     return QStringLiteral("Unknown");
 }
