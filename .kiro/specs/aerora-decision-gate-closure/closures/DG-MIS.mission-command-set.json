@@ -1,0 +1,155 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-MIS",
+  "part": "mission-command-set",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-MIS-SOC-01",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "No MAVLink identifier is issued, so none needs tracing. All seven commands are existing upstream commands of the common dialect. The Aerora dialect stays NOT-EVIDENCED and nothing here requires it."
+    },
+    {
+      "id": "DG-MIS-SOC-02",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "stationMayEmit is recorded false for every command. Each is written into a mission item and executed by the flight controller; the station uploads the plan and emits none of them directly. A station emitting DO_SET_ACTUATOR would be the actuator path DG-ROL records as not permitted."
+    },
+    {
+      "id": "DG-MIS-SOC-03",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "Both seams are defined and both return a fully qualified qrc: URL. geoMapVisualQML() is recorded as an obligation because its absence is silent: GeoMapMissionItems.qml guards on non-empty, so an item missing it is invisible with no error. No base class supplies one, since every upstream coverage pattern inherits the empty default, so this item implements both itself."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "mavlink-identifier",
+      "permits": false,
+      "reason": "The register records this part as the one permitted to change the check, and the record issues no identifier, so nothing is permitted to appear in the tree. The check stays in force and keeps rejecting an Aerora MAVLink identifier."
+    }
+  ],
+  "settled": [
+    {
+      "element": "each mission command the Aerora mission set uses, with its issued MAVLink command identifier or its existing upstream command",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "MAV_CMD_NAV_WAYPOINT",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_NAV_WAYPOINT; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Fly a pass"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_DO_CHANGE_SPEED",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_DO_CHANGE_SPEED; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Pass speed"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_DO_SET_CAM_TRIGG_DIST",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_DO_SET_CAM_TRIGG_DIST; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Actuate at a fixed interval along a pass"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_DO_SET_ACTUATOR",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_DO_SET_ACTUATOR; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Discrete applicator engage and release"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_DO_SET_SERVO",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_DO_SET_SERVO; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Discrete applicator engage and release where the applicator is a servo channel"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_DO_SET_ROI_LOCATION",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_DO_SET_ROI_LOCATION; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Hold attention on a point, for inspection and structural fire fighting"
+          },
+          "source": "Q-021"
+        },
+        {
+          "key": "MAV_CMD_NAV_LOITER_TIME",
+          "value": {
+            "commandIdentifierOrUpstreamCommand": "existing upstream command MAV_CMD_NAV_LOITER_TIME; no Aerora identifier issued",
+            "stationMayEmit": false,
+            "missionNeed": "Station-keeping at a point"
+          },
+          "source": "Q-021"
+        }
+      ]
+    },
+    {
+      "element": "the Aerora complex-item type name as complexMissionItemNames() reports it",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Canonical name Surface Coverage, a QT_TR_NOOP operator-visible string. The plan-file key is AeroraSurfaceCoverage, which createComplexMissionItem() dispatches on and which is permanent from the first saved plan: an unrecognised type returns nullptr with only a warning, so changing the key silently orphans every saved plan and the operator sees a plan that loads without its pattern. Upstream is inconsistent between the two keys and that is not copied; the plan-file key carries the Aerora prefix so it cannot collide with a future upstream pattern. The item is a sibling of StructureScanComplexItem rather than a subclass of it, deriving from ComplexMissionItem directly exactly as the upstream StructureScan itself does, because upstream had already concluded that a layered vertical pattern does not fit the transect machinery and wrote a sibling instead. A subclass is not available in any case, which is a measurement and not a preference: StructureScanComplexItem declares mapVisualQML, patternName, commandName, commandDescription, abbreviation and load all final, sealing them to StructureScanMapVisual.qml, to the name Structure Scan, to the abbreviation S and to the StructureScan plan format, so a subclass could carry none of the content this record settles. ComplexMissionItem seals none of it, and geoMapVisualQML is a plain virtual returning an empty string, which is the overridable default both visual seams depend on. The cost is 35 pure virtuals implemented rather than inherited, all mechanical. What is reused is the StructureScan shape and not its code: a vertical extent, stacked horizontal passes, an entrance and bottom altitude, and an interval carrier.",
+          "source": "Q-023"
+        }
+      ]
+    },
+    {
+      "element": "the item's parameter set",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Nine parameters with units, and no limit on any of them: workingDistance m, passInterval m, actionInterval m, surfaceHeight m, startAltitude m, entryAltitude m, passSpeed m/s, passDirection enum, capabilityRequired opaque token. Which parameters exist and what each means is a shape decision this record makes. Every limit is an operating limit depending on the applicator working envelope, which is NOT-EVIDENCED, so AeroraMissionValidator keeps reporting GeometryLimits unperformable until the limits arrive and then starts running with no change to the report shape. capabilityRequired carries no actuator identity, no enumeration member and no MAVLink field, and resolves as unresolvable while DG-PAY:capability holds no accepted record.",
+          "source": "Q-023"
+        }
+      ]
+    },
+    {
+      "element": "the asset and obstruction geometry the scene editor edits expressed as item parameters",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "The worked surface is a polygon plus surfaceHeight, which is the StructureScan shape of a ground footprint extruded vertically and is closer to a building face than a survey area is. An obstruction is zero or more polygons, each with a height and a clearance, held as a first-class list rather than a flag because the product range needs several per surface and because clearance is per obstruction: a cable tray and a window ledge do not warrant the same standoff. The scene editor edits these item parameters rather than a separate model. Every clearance value is an operating limit and is not set here.",
+          "source": "Q-023"
+        }
+      ]
+    },
+    {
+      "element": "the plan-file representation",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "The type key AeroraSurfaceCoverage, with geometry persisted by the same polygon mechanism StructureScan uses, so the round trip needs no new serialisation. Because the item is a sibling rather than a subclass, it implements load and save itself rather than inheriting a sealed load. The interval value persists through CameraCalc, which upstream describes as simplifying persistence of manual grids. CameraCalc carries the interval value and is not a model of coverage quality: no coverage quality claim is derived from it anywhere, because a camera either captured a frame or did not, whereas a surface treatment has a deposition profile, a consumable budget and a result depending on standoff and rate. The round-trip property that a written item read back produces an equivalent item is an Acceptance_Criterion the register records as excluded from this Gate under requirement 6.9.",
+          "source": "Q-023"
+        }
+      ]
+    }
+  ]
+}
