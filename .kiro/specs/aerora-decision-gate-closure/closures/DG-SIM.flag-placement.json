@@ -1,0 +1,52 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-SIM",
+  "part": "flag-placement",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Architecture",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-SIM-SOC-02",
+      "satisfied": true,
+      "reviewer": "Architecture",
+      "date": "2026-11-05",
+      "note": "The classification is a field of the reported value, set where the value enters the station and immutable afterwards. No screen carries it, no global simulation singleton exists and no display queries a mode. A screen cannot render the value without the classification because they are one object, so the property holds structurally rather than by convention."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "simulated-source",
+      "permits": true,
+      "reason": "The flag has a settled location on the reported value and a settled route to every display, so a simulated-source identifier may appear in the tree. It is permitted on the reported value and on the link configuration, and not on a screen."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the location of the simulated-source flag on a reported value",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A field of the reported value itself, beside its observation class, carrying a four-member provenance enumeration: Unattributed, Live, Simulated, Replayed. It is set once where the value enters the station, from the link that delivered it, and is immutable thereafter. Unattributed is the default so that a value nobody attributed never claims to be real, which follows AeroraMissionIndex::Origin, where a sequence number whose provenance is unrecorded is Unattributed and carries no number. Replayed is a member rather than a kind of Simulated, so the three ways a value can fail to be live stay distinguishable.",
+          "source": "P7-SIM-002"
+        }
+      ]
+    },
+    {
+      "element": "the means by which the flag reaches each display that shows the value",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "It travels inside the value, not beside it. This is the recorded Aerora precedent: AeroraLinkProfile carries the profile revision inside AeroraDerivedLinkFigure because the two are read together and a value separated from its provenance is one a reader assumes is current. There is therefore no separate signal, no screen-level property, no global mode singleton and no parallel channel that could arrive late or not at all. A display binds to the value and gets the classification with it.",
+          "source": "P7-SIM-002"
+        }
+      ]
+    }
+  ]
+}

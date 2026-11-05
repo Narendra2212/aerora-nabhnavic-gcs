@@ -1,0 +1,42 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-SIM",
+  "part": "discriminator",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Architecture",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-SIM-SOC-01",
+      "satisfied": true,
+      "reviewer": "Architecture",
+      "date": "2026-11-05",
+      "note": "Log replay is a distinct classification. A replayed value arrives from a stored log with no live link, so it is Replayed rather than Simulated: the repairs differ, since a simulated value becomes real by connecting to an aircraft and a replayed value never becomes real at all. Folding replay into simulation would make the two indistinguishable in exactly the review where the difference matters."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "simulated-source",
+      "permits": true,
+      "reason": "The discriminator is settled, so a simulated-link identifier may appear on the link configuration. It is permitted there and on the reported value, and not on a screen."
+    }
+  ],
+  "settled": [
+    {
+      "element": "a means of identifying a simulated link that is present in a release configuration",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A declared property of the link configuration, recorded when the link is created and present in every build rather than behind a debug define. The vehicle-reported MAV_MODE_FLAG_HIL_ENABLED bit of HEARTBEAT.base_mode is read as corroboration, and a disagreement between the two is reported rather than silently resolved either way. The declaration is authoritative because provenance has to be known when the first value arrives, before any heartbeat has been parsed, and a vehicle-reported bit cannot classify a value that arrived before it. The HIL bit alone was rejected for that reason and because a simulator does not reliably set it while a real aircraft in hardware-in-the-loop is still a real aircraft. The declaration alone was rejected because nothing would then contradict an operator who marked a simulator as live.",
+          "source": "P7-SIM-002"
+        }
+      ]
+    }
+  ]
+}

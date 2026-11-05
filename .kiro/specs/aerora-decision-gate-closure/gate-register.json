@@ -1050,8 +1050,8 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-SIM.flag-placement.json",
           "elements": [
             {
               "name": "the location of the simulated-source flag on a reported value",
@@ -1078,8 +1078,8 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-SIM.discriminator.json",
           "elements": [
             {
               "name": "a means of identifying a simulated link that is present in a release configuration",
