@@ -35,6 +35,7 @@ on:
     paths:
       - 'aerora/**'
       - 'tools/**'
+      - '.kiro/specs/**'
       - '.pre-commit-config.yaml'
       - '.clang-format'
       - '.clang-tidy'
@@ -109,3 +110,28 @@ jobs:
           echo "::notice::linting ${#overlay[@]} tracked overlay files"
           uv run --frozen --project tools --group dev \
             pre-commit run --show-diff-on-failure --color=always --files "${overlay[@]}"
+
+      # The Gate_Register is the overlay decision record, and until this step nothing in CI read
+      # it. The two checkers are pre-commit hooks, but this leg passes pre-commit only the files
+      # tracked under aerora/, and both hooks match paths under .kiro/specs/, so neither was ever
+      # triggered here. They are invoked directly instead of being coaxed into firing through a
+      # file list, because what has to run is the whole check and not the part of it some file
+      # happens to select.
+      - name: Check the Gate_Register
+        run: |
+          uv run --frozen --project tools --group lint \
+            python tools/validate_gate_register.py
+          uv run --frozen --project tools --group lint \
+            python tools/analyzers/gate_guard_check.py aerora/ src/Vehicle/Vehicle.h
+
+      # The suites behind those two checkers, which ran nowhere in CI either. ci-scripts.yml
+      # collects tools/tests/ but takes a sparse checkout carrying neither .kiro/ nor aerora/, so
+      # they failed there on missing files; tools/tests/conftest.py now skips them when those trees
+      # are absent, and this is the leg that has them. It is also the leg that needs them: a
+      # Gate closure is a change to the register, and the register is what these assert over.
+      - name: Run the Gate_Register suites
+        run: |
+          uv run --frozen --project tools --group dev \
+            pytest -q tools/tests/test_gate_register.py \
+              tools/tests/test_validate_gate_register.py \
+              tools/tests/test_gate_guard_check.py
