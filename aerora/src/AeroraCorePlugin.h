@@ -65,6 +65,45 @@ public:
     /// Aerora's to remove.
     const QVariantList &toolBarIndicators() override;
 
+    /// Appends the registered complex mission item names to the base list (HO-TAB5-01).
+    ///
+    /// Required before the first extension registers rather than optional: MissionController
+    /// reads this to build the Plan view pattern menu, and createComplexMissionItem() below is
+    /// what a saved plan goes through on load. Without both, an extension item never appears in
+    /// the editor and a plan containing one fails to load with only a warning.
+    ///
+    /// \a vehicle is null-checked rather than passed straight through. The base dereferences it
+    /// to decide whether StructureScan applies to the frame, so a null would crash inside upstream
+    /// code; when it is null the base is skipped and only the registered names are returned, which
+    /// is a degraded list rather than a crash.
+    ///
+    /// Each entry carries `canonicalName` and `translatedName` as the base does, and for a
+    /// registered name the two are the same string. An extension supplies its name at runtime, and
+    /// a runtime string has no catalogue entry to look up, so calling tr() on it would imply a
+    /// translation that does not exist. An extension needing a translated display name needs a
+    /// second accessor on AeroraMissionExtension; that is recorded here rather than invented.
+    QVariantList complexMissionItemNames(Vehicle *vehicle) override;
+
+    /// Creates a registered complex item, or delegates to the base (HO-TAB5-01).
+    ///
+    /// The registry is consulted *first*. The base logs "Unknown complex item type" before
+    /// returning nullptr, so delegating first would put a false warning on the normal path for
+    /// every Aerora item: the type is known, just not to upstream.
+    ///
+    /// The consequence of that order is that an extension registering an upstream name would
+    /// shadow it, and the registry cannot see the upstream set in order to refuse it. What
+    /// prevents it is the plan-file key convention DG-MIS settles: an Aerora key carries the
+    /// `Aerora` prefix, so it cannot collide with a present or future upstream pattern. A build
+    /// that ignores the convention is a build defect this seam does not detect.
+    ///
+    /// \a kmlOrShpFile is not forwarded to the registry, because AeroraMissionExtension takes no
+    /// such argument: an Aerora item is initialised from its own geometry rather than from a KML
+    /// or SHP import. The argument still reaches the base for the upstream items.
+    ComplexMissionItem *createComplexMissionItem(const QString &complexItemType,
+                                                 PlanMasterController *masterController,
+                                                 bool flyView,
+                                                 const QString &kmlOrShpFile = QString()) override;
+
     /// Delegates to AeroraCommandAuthorizer when an authorization policy is configured.
     ///
     /// While no policy is configured (Q-029 is OPEN) this returns true and warns once. That is a

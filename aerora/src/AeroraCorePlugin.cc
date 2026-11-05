@@ -6,6 +6,7 @@
 #include <QtQml/QQmlApplicationEngine>
 
 #include "AeroraCommandAuthorizer.h"
+#include "AeroraMissionExtension.h"
 #include "AeroraPlanBridge.h"
 #include "AeroraPlatformKeyProtector.h"
 #include "AeroraQmlOverrides.h"
@@ -167,6 +168,54 @@ const QVariantList &AeroraCorePlugin::analyzePages()
     }();
 
     return pages;
+}
+
+QVariantList AeroraCorePlugin::complexMissionItemNames(Vehicle *vehicle)
+{
+    // Null-checked rather than passed through: QGCCorePlugin::complexMissionItemNames()
+    // dereferences the vehicle to decide whether StructureScan applies to the frame. Skipping the
+    // base call costs the upstream patterns in a state that should not occur; passing a null would
+    // crash inside upstream code.
+    QVariantList items;
+    if (vehicle != nullptr) {
+        items = QGCCorePlugin::complexMissionItemNames(vehicle);
+    } else {
+        qCWarning(AeroraCorePluginLog)
+            << "complexMissionItemNames called with no vehicle: the upstream patterns are omitted"
+            << "because the base implementation dereferences it.";
+    }
+
+    // Appends rather than replaces, for the reason analyzePages() appends: the upstream patterns
+    // are not Aerora to remove. The list is empty today because no extension is registered, so
+    // this is behaviourally identical to the base until one is.
+    const QStringList registered =
+        AeroraMissionExtensionRegistry::instance()->complexMissionItemNames();
+    for (const QString &name : registered) {
+        QVariantMap entry;
+        entry[QStringLiteral("canonicalName")] = name;
+        entry[QStringLiteral("translatedName")] = name;
+        items.append(entry);
+    }
+
+    return items;
+}
+
+ComplexMissionItem *AeroraCorePlugin::createComplexMissionItem(const QString &complexItemType,
+                                                               PlanMasterController *masterController,
+                                                               bool flyView,
+                                                               const QString &kmlOrShpFile)
+{
+    // Registry first. The base logs an Unknown complex item type warning before returning nullptr,
+    // so asking it first would put a false warning on the normal path for every Aerora item.
+    if (ComplexMissionItem *const item =
+            AeroraMissionExtensionRegistry::instance()->createComplexMissionItem(complexItemType,
+                                                                                masterController,
+                                                                                flyView)) {
+        return item;
+    }
+
+    return QGCCorePlugin::createComplexMissionItem(complexItemType, masterController, flyView,
+                                                   kmlOrShpFile);
 }
 
 const QVariantList &AeroraCorePlugin::toolBarIndicators()
