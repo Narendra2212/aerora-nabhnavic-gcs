@@ -1038,7 +1038,7 @@
     },
     {
       "id": "DG-SIM",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 8",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -1050,7 +1050,7 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-SIM.flag-placement.json",
           "elements": [
             {
@@ -1078,7 +1078,7 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-SIM.discriminator.json",
           "elements": [
             {
@@ -1787,7 +1787,7 @@
     },
     {
       "id": "SCR-SIM-01",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

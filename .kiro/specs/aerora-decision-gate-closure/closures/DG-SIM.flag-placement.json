@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-SIM",
   "part": "flag-placement",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "d9021504e999caaa34977340dfa026cc4b999b4f",
   "signatures": [
     {
       "owner": "Architecture",
