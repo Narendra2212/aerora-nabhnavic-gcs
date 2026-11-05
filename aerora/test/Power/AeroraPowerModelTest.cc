@@ -42,6 +42,7 @@ constexpr const char *kTelemetryLogCategory = "aerora.telemetry";
 QStringList expectedItemIds()
 {
     return QStringList{QStringLiteral("powerTetherConfiguration"),
+                       QStringLiteral("powerTetherSupply"),
                        QStringLiteral("powerBatteryConfiguration"),
                        QStringLiteral("powerEffectiveState"),
                        QStringLiteral("powerReportedState"),
@@ -70,9 +71,14 @@ void AeroraPowerModelTest::_itemsStartUnknownAndAreSeparate()
     AeroraPowerMock mock(&scheduler);
     AeroraPowerModel *const model = mock.model();
 
-    // Exactly seven items, and exactly these seven. An eighth would most likely be a field relating
+    // Exactly eight items, and exactly these eight. A ninth would most likely be a field relating
     // the watchdog event to a power state or a converter change, and none of those relationships is
     // evidenced in either direction — that is the absence this assertion protects.
+    //
+    // The eighth is powerTetherSupply, added with IF-PWR-013 because Requirement 8 criterion 11
+    // needs attachment and supply reported as distinct values. It is a separate item rather than a
+    // field on the attachment item for exactly the reason this assertion exists: a relationship
+    // nobody has evidenced must not be built into the shape.
     QStringList actualIds;
     for (const AeroraReportedValue *const value : model->reportedValues()) {
         actualIds << value->itemId();
@@ -542,10 +548,12 @@ void AeroraPowerModelTest::_anAttachedTetherThatStoppedSupplyingIsNeitherAbsentN
 
     attachment->recordReport(QString::fromLatin1(kToken), mock.nowUs(),
                              AeroraTelemetrySource::fromSendingComponent(1, 1));
+    // Consumed once and not per item. AeroraFreshness emits the unconfigured-threshold warning
+    // once per freshness class, and both items share the power class, so a second expectation
+    // would wait for a warning that has already been emitted.
     _consumeUnconfiguredThresholdWarning(attachment);
     supply->recordReport(QString::fromLatin1(kOtherToken), mock.nowUs(),
                          AeroraTelemetrySource::fromSendingComponent(1, 1));
-    _consumeUnconfiguredThresholdWarning(supply);
 
     // Both observed, both carrying a value, and the two tokens distinct. The tokens themselves are
     // fixtures: Q-025 holds what the firmware actually reports, so this asserts that the station
@@ -599,13 +607,19 @@ void AeroraPowerModelTest::_tetherAttachmentAndSupplyAreIndependent()
     AeroraReportedValue *const items[] = {model->tetherConfiguration(), model->tetherSupply()};
     const int actions[] = {attachmentAction, supplyAction};
 
+    // The warning is consumed once, on the first item evaluated, because AeroraFreshness emits it
+    // once per freshness class and both items share the power class.
+    bool warningConsumed = false;
     for (int index = 0; index < 2; ++index) {
         if (actions[index] == 0) {
             continue;
         }
         items[index]->recordReport(QString::fromLatin1(kToken), mock.nowUs(),
                                    AeroraTelemetrySource::fromSendingComponent(1, 1));
-        _consumeUnconfiguredThresholdWarning(items[index]);
+        if (!warningConsumed) {
+            _consumeUnconfiguredThresholdWarning(items[index]);
+            warningConsumed = true;
+        }
         if (actions[index] == 2) {
             items[index]->clearReport();
         }
