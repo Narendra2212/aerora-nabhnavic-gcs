@@ -60,7 +60,8 @@ AnalyzePage {
         AeroraTelemetryState.Effective,
         AeroraTelemetryState.Requested,
         AeroraTelemetryState.Proposed,
-        AeroraTelemetryState.Stale
+        AeroraTelemetryState.Stale,
+        AeroraTelemetryState.NotCarried
     ]
 
     /// A value that is obviously a sample and could not be mistaken for a reading from an

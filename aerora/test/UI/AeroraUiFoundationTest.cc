@@ -282,7 +282,7 @@ void AeroraUiFoundationTest::_stateVocabularyPageListsEveryStateClass()
     // order the page presents.
     const QStringList pageClasses({QStringLiteral("Unknown"), QStringLiteral("Unavailable"), QStringLiteral("Reported"),
                                    QStringLiteral("Effective"), QStringLiteral("Requested"), QStringLiteral("Proposed"),
-                                   QStringLiteral("Stale")});
+                                   QStringLiteral("Stale"), QStringLiteral("NotCarried")});
 
     QStringList declaredClasses;
     declaredClasses.reserve(classEnum.keyCount());
