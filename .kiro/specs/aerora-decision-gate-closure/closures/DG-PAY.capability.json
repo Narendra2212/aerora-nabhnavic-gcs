@@ -1,0 +1,44 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-PAY",
+  "part": "capability",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Firmware",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [],
+  "guardPermissions": [
+    {
+      "symbol": "kCapabilityVocabularyAccepted",
+      "permits": true,
+      "reason": "The register records this part as the only part permitted to change the constant, and the identifier form and the presence mechanism are both settled, so the capability vocabulary is accepted and the constant may become true. It stays false in the tree until the owning tab implements the change and asserts it, because this record grants a permission and does not perform one."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the form of a capability identifier",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A vendor-rooted reverse-DNS string, lowercase and dot-separated, such as in.nabhnavic.payload.sprayer. The payload builder issues it under a namespace it controls: Aerora payloads under the Aerora domain, a third-party payload under the namespace its vendor already issued, used as given. The station never mints one, so two suppliers cannot collide and the station never has to arbitrate between them. The station stores the identifier verbatim and compares it by equality, and never parses the segments for meaning: the namespace exists to avoid collisions and is not a taxonomy the station reasons about. This matters because the identifier reaches saved plan files through the capabilityRequired parameter of the surface-coverage item, where it is permanent, and because a new product family is meant to cost a capability token and a product profile rather than a change to the mission item or the command set.",
+          "source": "Q3-009"
+        }
+      ]
+    },
+    {
+      "element": "the means by which a vehicle reports capability presence separately from capability state",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Presence and state arrive on different messages with different lifetimes, and the mechanism for presence is upstream rather than Aerora. A payload component advertises itself through COMPONENT_METADATA, with the deprecated COMPONENT_INFORMATION as the fallback the tree already implements, fetched once per component id and schema-validated as a metadata document. Presence is therefore constant for a connection and is a property of the component, not of any value it reports. State arrives as reported payload items, which is a separate decision held by DG-PAY:payload and settled by the payload interface control document. The separation is what makes the three kinds of emptiness distinguishable, and each has a different repair. A component that never advertised is Unknown: nothing has been observed and the repair is to wait. A component that advertised and reported the capability absent is Unavailable: it can never be obtained and there is no repair. A capability present whose value the live Telemetry_Tier omits is NotCarried and the repair is to change tier. 00-README.md records Unavailable as producible only from a vehicle capability report, and this settles what that report is: the component metadata advertisement and nothing else, so no absence of a message and no timeout may produce Unavailable. No Aerora message, field or dialect entry is introduced. The Aerora MAVLink dialect stays NOT-EVIDENCED and nothing here requires it.",
+          "source": "Q3-009"
+        }
+      ]
+    }
+  ]
+}

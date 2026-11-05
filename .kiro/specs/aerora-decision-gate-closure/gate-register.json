@@ -501,8 +501,8 @@
           "signingOwners": [
             "Firmware"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.capability.json",
           "elements": [
             {
               "name": "the form of a capability identifier",
