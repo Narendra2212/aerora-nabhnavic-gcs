@@ -4,6 +4,8 @@
 
 #include <QtCore/QChar>
 #include <QtCore/QList>
+#include <QtCore/QMetaEnum>
+#include <QtCore/QMetaObject>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
@@ -15,6 +17,7 @@
 #include "AeroraActionableControls.h"
 #include "AeroraPlanBridge.h"
 #include "AeroraProvenance.h"
+#include "AeroraTelemetryState.h"
 #include "PlanMasterController.h"
 #include "QGroundControlQmlGlobal.h"
 
@@ -36,9 +39,20 @@ constexpr const char* kPageObjectName = "aeroraMissionProgressPage";
 constexpr const char* kVocabularyEntryButton = "analyzeButton_Aerora State Vocabulary";
 constexpr const char* kVocabularyFlickable = "aeroraVocabulary_flickable";
 
-/// Every enumerator of AeroraTelemetryState::Class. The count is what the vocabulary page must
-/// render a row for; AeroraUiFoundationTest holds this set against the meta-object.
-constexpr int kStateClassCount = 7;
+/// How many enumerators AeroraTelemetryState::Class declares, which is how many rows the
+/// vocabulary page must render.
+///
+/// Read from the meta-object rather than written down. A literal here drifts the moment the
+/// vocabulary grows a member, and it drifts into a failure that looks like a page defect rather
+/// than like an expectation nobody updated. The page builds its rows from the enumeration, so the
+/// expectation is built from the enumeration too. `AeroraUiFoundationTest` is what holds the page
+/// list itself against the meta-object, in order; this only needs the count.
+int stateClassCount()
+{
+    const QMetaObject* const meta = &AeroraTelemetryState::staticMetaObject;
+    const int index = meta->indexOfEnumerator("Class");
+    return index < 0 ? 0 : meta->enumerator(index).keyCount();
+}
 
 /// SCR-SEC-01 and SCR-HLP-03's Analyze entries and the flickables inside their loaded pages. The
 /// titles come from AeroraCorePlugin::analyzePages(), so a rename there breaks these and should.
@@ -271,7 +285,7 @@ void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEvery
     // Polled, because Repeater delegates instantiate over following frames rather than during the
     // click that loaded the page.
     const bool rendered =
-        UnitTest::waitForCondition([flickable]() { return countStateSamples(flickable) == kStateClassCount; },
+        UnitTest::waitForCondition([flickable]() { return countStateSamples(flickable) == stateClassCount(); },
                                    TestTimeout::mediumMs(), QStringLiteral("every state class to render a sample"));
 
     if (!rendered) {
@@ -287,7 +301,7 @@ void AeroraSceneAttachmentUITest::_stateVocabularyPageIsReachableAndRendersEvery
     // One sample per class, including UNAVAILABLE - whose sample is instantiated and deliberately
     // invisible, so it is counted by existence rather than by visibility.
     QVERIFY2(rendered, qPrintable(QStringLiteral("expected %1 rendered state-class samples, found %2")
-                                      .arg(kStateClassCount)
+                                      .arg(stateClassCount())
                                       .arg(countStateSamples(flickable))));
 }
 
