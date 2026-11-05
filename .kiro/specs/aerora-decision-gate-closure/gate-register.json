@@ -3099,6 +3099,42 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraThresholdAchievability::Achievable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraThresholdAchievability::NotDeterminable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraThresholdAchievability::Unachievable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTierSupport::NotDeterminable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTierSupport::NotSustainable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTierSupport::Sustainable",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
       "symbol": "AeroraVehicleCapabilities::Category::Command",
       "kind": "enumerator",
       "gate": "none",

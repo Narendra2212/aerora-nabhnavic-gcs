@@ -80,6 +80,11 @@ AeroraTelemetryState::Observation AeroraStateValue::_observation() const
         break;
     case AeroraTelemetryState::SourceUnavailable:
     case AeroraTelemetryState::NotObserved:
+    case AeroraTelemetryState::NotCarriedByLiveTier:
+        // Grouped with the two above because the latch is left alone, not because nothing
+        // happened. The freshness evaluator cannot produce this observation at all - a tier
+        // omission is not a freshness verdict - and a tier that stopped carrying an item is no
+        // evidence that an already stale value became current.
         break;
     }
 

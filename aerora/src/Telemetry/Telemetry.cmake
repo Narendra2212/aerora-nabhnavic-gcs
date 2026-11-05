@@ -61,6 +61,7 @@ set(AERORA_TELEMETRY_SOURCES
     ${AERORA_TELEMETRY_DIR}/AeroraFactGroupRegistrar.h
     ${AERORA_TELEMETRY_DIR}/AeroraFreshness.cc
     ${AERORA_TELEMETRY_DIR}/AeroraFreshness.h
+    ${AERORA_TELEMETRY_DIR}/AeroraLinkProfile.h
     ${AERORA_TELEMETRY_DIR}/AeroraStateValue.cc
     ${AERORA_TELEMETRY_DIR}/AeroraStateValue.h
     ${AERORA_TELEMETRY_DIR}/AeroraTelemetrySet.cc
@@ -92,9 +93,12 @@ set(AERORA_TELEMETRY_TEST_DIR ${AERORA_TELEMETRY_DIR}/../../test/Telemetry)
 cmake_path(NORMAL_PATH AERORA_TELEMETRY_TEST_DIR)
 
 set(AERORA_TELEMETRY_TEST_SOURCES
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraLinkProfileTest.cc
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraLinkProfileTest.h
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryAttachmentTest.cc
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryAttachmentTest.h
-    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.cc ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.h
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.cc
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryStateTest.h
 )
 
 set(AERORA_TELEMETRY_TEST_INCLUDE_DIRECTORIES

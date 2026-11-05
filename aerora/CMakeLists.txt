@@ -402,6 +402,7 @@ if(QGC_BUILD_TESTING)
     # The suites stay compiled on Windows, so none of them rots, and none is reported as
     # passing.
     # ----------------------------------------------------------------------------------------
+    add_qgc_test(AeroraLinkProfileTest LABELS Unit)
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
     add_qgc_test(AeroraVehicleSetupTest LABELS Unit)
