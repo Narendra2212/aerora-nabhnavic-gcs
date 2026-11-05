@@ -201,7 +201,7 @@
           "signingOwners": [
             "Tab 1"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-TLM.adr-016-core-edit.json",
           "elements": [
             {
@@ -1875,14 +1875,14 @@
           "7.17",
           "7.18"
         ],
-        "owner": "Tab 1",
+        "owner": "Firmware",
         "remedies": [
-          "Tab 1 signs the ADR-016 core-edit part, authorising the friend declaration and the compile definition the tree already carries",
-          "the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn from aerora/CMakeLists.txt CUSTOM_DEFINITIONS, returning the guard to false"
+          "DG-TLM:dialect is accepted, which is the remaining part permitting the guard to read true; Tab 1 accepted the ADR-016 core-edit part on 2026-11-05, so the authorisation of the applied pair is no longer what holds it",
+          "the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn from aerora/CMakeLists.txt CUSTOM_DEFINITIONS, returning the guard to false, which Tab 1 declined in the accepted core-edit record"
         ],
         "handOnRow": "finding-1"
       },
-      "remedy": "whichever ADR-016 remedy lands: Tab 1 signs the core-edit part, or the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn. The assertion is added in the same change, because asserting either value today records the wrong state"
+      "remedy": "DG-TLM:dialect is accepted, at which point the recorded value moves to true and the assertion is added in the same change. Asserting true before then would record a value the register pins at false, and asserting false would fail against the source, so the recorded absence stays until the remaining permission exists. The core-edit authorisation is no longer what holds it."
     },
     {
       "symbol": "AeroraCorePlugin::isAuthorizationEnforced()",

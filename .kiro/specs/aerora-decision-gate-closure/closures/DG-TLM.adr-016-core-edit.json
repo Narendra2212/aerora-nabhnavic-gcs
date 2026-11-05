@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-TLM",
   "part": "adr-016-core-edit",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "8fa75047f3a634180231c23c2c48f99c69dd18f5",
   "signatures": [
     {
       "owner": "Tab 1",
@@ -16,7 +16,7 @@
     {
       "symbol": "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()",
       "permits": true,
-      "reason": "The core edit is authorised, so the privileged statement is permitted to compile and the guard is permitted to read true. The recorded value moves from false to true and the recorded disagreement is retired. Available is not populated: the dialect part still holds every fact group at CONTRACT-ONLY, so the path compiles and nothing travels it."
+      "reason": "One of the two permissions the register requires for this guard, and the register records both: permittedToChangeBy names DG-TLM:dialect as well as this part. This record removes the authorisation objection to the applied pair, and the recorded value stays false until the dialect part is accepted too. So the guard is permitted jointly and not by this signature alone, the recorded disagreement stays, and its remaining remedy is the dialect part rather than this one."
     }
   ],
   "settled": [
