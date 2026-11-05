@@ -36,8 +36,7 @@
               "requiredAttributes": [
                 "commandIdentifierOrUpstreamCommand",
                 "stationMayEmit"
-              ],
-              "keySource": "the Aerora mission command set the Closure_Record enumerates"
+              ]
             },
             {
               "name": "the Aerora complex-item type name as complexMissionItemNames() reports it",
@@ -173,8 +172,7 @@
                 "owningFactGroup",
                 "freshnessClass",
                 "inboundMessage"
-              ],
-              "keySource": "the Aerora fact set the Closure_Record enumerates"
+              ]
             }
           ],
           "signOffConditions": [
@@ -267,8 +265,7 @@
                 "thresholdValue",
                 "unit",
                 "source"
-              ],
-              "keySource": "the freshness classes the DG-TLM dialect part names"
+              ]
             }
           ],
           "signOffConditions": [
@@ -334,13 +331,13 @@
               "source": "Q-029",
               "requiredAttributes": [
                 "commandClasses"
-              ],
-              "keySource": "the role set the Closure_Record enumerates"
+              ]
             },
             {
               "name": "for each role, the command classes the role may authorise",
               "settlementShape": "mapping",
-              "source": "Q-029"
+              "source": "Q-029",
+              "keySource": "the command classes the authorization scope distinguishes"
             }
           ],
           "signOffConditions": [
@@ -374,6 +371,11 @@
             {
               "name": "the point at which the station evaluates an authorization",
               "settlementShape": "single",
+              "source": "ADR-014"
+            },
+            {
+              "name": "the command classes the authorization scope distinguishes",
+              "settlementShape": "keyed",
               "source": "ADR-014"
             }
           ],
@@ -451,8 +453,7 @@
                 "valueRange",
                 "enumerationMembers",
                 "reportingMessage"
-              ],
-              "keySource": "the reported payload item set the payload interface control document names"
+              ]
             }
           ],
           "signOffConditions": [
@@ -483,8 +484,7 @@
                 "valueRange",
                 "enumerationMembers",
                 "reportingMessage"
-              ],
-              "keySource": "the reported tether item set P7-PWR-006 names"
+              ]
             }
           ],
           "signOffConditions": [
@@ -534,8 +534,7 @@
                 "itemName",
                 "unit",
                 "reportingMessage"
-              ],
-              "keySource": "the reported consumable item set the Closure_Record enumerates"
+              ]
             },
             {
               "name": "the approved consumption model that P7-ARCH-005 requires before any consumption projection is displayed",
@@ -624,13 +623,13 @@
               "source": "P7-AI-001",
               "requiredAttributes": [
                 "stateVocabularyClass"
-              ],
-              "keySource": "the lifecycle states the Closure_Record enumerates"
+              ]
             },
             {
               "name": "the permitted transitions between lifecycle states",
               "settlementShape": "mapping",
-              "source": "P7-AI-001"
+              "source": "P7-AI-001",
+              "keySource": "the lifecycle states"
             },
             {
               "name": "the expiry rule",
@@ -756,8 +755,7 @@
               "source": "Q4-003",
               "requiredAttributes": [
                 "backend"
-              ],
-              "keySource": "the five target platforms"
+              ]
             },
             {
               "name": "the write-failure accounting behaviour",
@@ -804,8 +802,7 @@
               "source": "D-DAT-04",
               "requiredAttributes": [
                 "category"
-              ],
-              "keySource": "the event categories the Closure_Record enumerates"
+              ]
             }
           ],
           "signOffConditions": []

@@ -479,8 +479,9 @@ that the station can enforce a command boundary and an operator control can exis
    rather than as element values: the role names, and for each role, the command classes the role may
    authorise.
 2. THE `DG-ROL` Gate_Dossier SHALL record the `ADR-014` part of the Decision_Content: the selected
-   outbound authorization scope among the recorded options A, B and C, and the point at which the
-   station evaluates an authorization.
+   outbound authorization scope among the recorded options A, B and C, the point at which the
+   station evaluates an authorization, and the command classes the authorization scope
+   distinguishes.
 3. THE `DG-ROL` Gate_Dossier SHALL record Product and operations as the owners authorised to sign the
    `Q-029` part, Architecture as the owner authorised to sign the `ADR-014` part, and Tab 2 as the
    implementing owner.
