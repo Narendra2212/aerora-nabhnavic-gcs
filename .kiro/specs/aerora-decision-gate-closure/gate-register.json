@@ -322,8 +322,8 @@
             "Product",
             "operations"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-ROL.role-set.json",
           "elements": [
             {
               "name": "the role names",

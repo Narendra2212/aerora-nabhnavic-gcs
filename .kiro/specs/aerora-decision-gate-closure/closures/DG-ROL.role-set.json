@@ -1,0 +1,137 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-ROL",
+  "part": "role-set",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-05"
+    },
+    {
+      "owner": "operations",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-ROL-SOC-01",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "Every recorded role maps to at least one command class. A role authorising nothing is not a role in this set: a view-only operator is the absence of a role rather than a member of it."
+    },
+    {
+      "id": "DG-ROL-SOC-02",
+      "satisfied": true,
+      "reviewer": "operations",
+      "date": "2026-11-05",
+      "note": "All five command classes are covered. command by Remote Pilot and Maintenance Technician, parameter by Maintenance Technician, mission by Remote Pilot and Mission Planner, manual-control by Remote Pilot alone, payload by Remote Pilot and Payload Operator. So authorizeMavCommand() reaches a verdict for every class the station can emit rather than falling through."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraCorePlugin::isAuthorizationEnforced()",
+      "permits": true,
+      "reason": "With the role set and the authorization scope settled, a policy can be implemented and evaluated, so enforcement may become true."
+    },
+    {
+      "symbol": "kGroundStationActuatorPathImplemented",
+      "permits": false,
+      "reason": "Settling who may authorise a payload operation does not permit the station to actuate one. The payload controller owns actuation and payload safety, and a ground-station actuator path would be a second safety authority competing with it. This part permits no change regardless of what DG-PAY settles."
+    },
+    {
+      "symbol": "kAutonomousPayloadActionImplemented",
+      "permits": false,
+      "reason": "Same boundary. A role may authorise a payload operation an operator requests; nothing here permits the station to originate one by itself."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the role names",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "Remote Pilot",
+          "value": {
+            "commandClasses": [
+              "command",
+              "mission",
+              "manual-control",
+              "payload"
+            ]
+          },
+          "source": "Q-029"
+        },
+        {
+          "key": "Payload Operator",
+          "value": {
+            "commandClasses": [
+              "payload"
+            ]
+          },
+          "source": "Q-029"
+        },
+        {
+          "key": "Mission Planner",
+          "value": {
+            "commandClasses": [
+              "mission"
+            ]
+          },
+          "source": "Q-029"
+        },
+        {
+          "key": "Maintenance Technician",
+          "value": {
+            "commandClasses": [
+              "command",
+              "parameter"
+            ]
+          },
+          "source": "Q-029"
+        }
+      ]
+    },
+    {
+      "element": "for each role, the command classes the role may authorise",
+      "shape": "mapping",
+      "entries": [
+        {
+          "key": "Remote Pilot",
+          "value": [
+            "command",
+            "mission",
+            "manual-control",
+            "payload"
+          ],
+          "source": "Q-029"
+        },
+        {
+          "key": "Payload Operator",
+          "value": [
+            "payload"
+          ],
+          "source": "Q-029"
+        },
+        {
+          "key": "Mission Planner",
+          "value": [
+            "mission"
+          ],
+          "source": "Q-029"
+        },
+        {
+          "key": "Maintenance Technician",
+          "value": [
+            "command",
+            "parameter"
+          ],
+          "source": "Q-029"
+        }
+      ]
+    }
+  ]
+}
