@@ -360,8 +360,8 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-ROL.authorization-scope.json",
           "elements": [
             {
               "name": "the selected outbound authorization scope among the recorded options A, B and C",

@@ -1,0 +1,93 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-ROL",
+  "part": "authorization-scope",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Architecture",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-ROL-SOC-03",
+      "satisfied": true,
+      "reviewer": "Architecture",
+      "date": "2026-11-05",
+      "note": "An unauditable allow is denied for the actuating classes, payload and manual-control, and counted but allowed for command, parameter and mission. The split is deliberate: denying everywhere turns an audit sink failure into a flight-control failure, so a full disk would start refusing commands mid-flight including the command to land. Denying nowhere leaves the trail with a hole precisely where actuation happened. P7-AUDIT-003 is answered as deny-for-actuating."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraCorePlugin::isAuthorizationEnforced()",
+      "permits": true,
+      "reason": "The scope and the evaluation point are settled, so the gate can enforce rather than warn."
+    },
+    {
+      "symbol": "kGroundStationActuatorPathImplemented",
+      "permits": false,
+      "reason": "Selecting a seam for the payload class says where an operator-requested payload operation is authorised. It does not permit the station to drive an actuator, which stays the payload controller concern."
+    },
+    {
+      "symbol": "kAutonomousPayloadActionImplemented",
+      "permits": false,
+      "reason": "Nothing in the scope decision permits the station to originate a payload action without an operator asking for one."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the selected outbound authorization scope among the recorded options A, B and C",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Option C: a layered model with a distinct seam per outbound class, each gated where that class converges. The classes are command, parameter, mission, manual-control and payload. Option A was rejected because it leaves startCalibration, which can spin motors, permanently ungated. Option B was rejected because its recorded blocking issue stands: it requires a policy able to decide arbitrary message types, and it evaluates heartbeats and telemetry requests with signing and timing consequences the audit records as not yet assessed, in three upstream hot-path files.",
+          "source": "ADR-014"
+        }
+      ]
+    },
+    {
+      "element": "the point at which the station evaluates an authorization",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Per class, at the convergence point the outbound audit already identified. The command class is evaluated at MavCommandQueue::sendWorker() through QGCCorePlugin::authorizeMavCommand(), which is built and needs no further core edit. The parameter class is evaluated at ParameterManager::_mavlinkParamSet, candidate C1. A class with no seam yet is recorded as out of scope with an owner rather than left implicit, which is what makes the model incremental: a class closes without reopening the ones already closed.",
+          "source": "ADR-014"
+        }
+      ]
+    },
+    {
+      "element": "the command classes the authorization scope distinguishes",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "command",
+          "value": "Queued MAV_CMD traffic. The seam is MavCommandQueue::sendWorker() through QGCCorePlugin::authorizeMavCommand(), together with Vehicle::startCalibration() under ADR-015. Built today. An unauditable allow is counted and allowed.",
+          "source": "ADR-014"
+        },
+        {
+          "key": "parameter",
+          "value": "Parameter writes. The seam is ParameterManager::_mavlinkParamSet, candidate C1 of the outbound audit. Not built; owner Tab 2. An unauditable allow is counted and allowed.",
+          "source": "ADR-014"
+        },
+        {
+          "key": "mission",
+          "value": "Mission upload, download and clear. No seam is built; owner Tab 2, and the class is recorded out of scope with an owner rather than left implicit. An unauditable allow is counted and allowed.",
+          "source": "ADR-014"
+        },
+        {
+          "key": "manual-control",
+          "value": "Manual control and joystick axes. No seam is built; owner Tab 2. Actuating, so an unauditable allow is denied under P7-AUDIT-003.",
+          "source": "ADR-014"
+        },
+        {
+          "key": "payload",
+          "value": "Payload operations an operator requests. No seam is built; owner Tab 2. Actuating, so an unauditable allow is denied under P7-AUDIT-003. Recording the class permits no station-side actuation and no station-originated payload action.",
+          "source": "ADR-014"
+        }
+      ]
+    }
+  ]
+}
