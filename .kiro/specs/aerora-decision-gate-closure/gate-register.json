@@ -501,7 +501,7 @@
           "signingOwners": [
             "Firmware"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.capability.json",
           "elements": [
             {
