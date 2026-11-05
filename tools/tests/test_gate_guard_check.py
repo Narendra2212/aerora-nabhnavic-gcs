@@ -4124,3 +4124,82 @@ def test_guard_assertion_rejects_each_recorded_guard_whose_site_stopped_naming_i
     assert line.startswith(f"{GUARD_ASSERTION}: {gates}: {symbol}: ")
     assert f"{SOLO_SITE} no longer names the symbol" in line
     assert "Requirement 4 criterion 9" in line
+
+
+# Property 9: Aerora logic stays inside the overlay.
+# Validates: Requirements 10.10, 10.11.
+#
+# Three fixture paths, each independently in one of four states. The states are what the rule has
+# to tell apart: reaching and recorded, reaching and unrecorded, recorded and no longer reaching,
+# and neither. Two of the four are findings and two are not, so a rule that reported everything and
+# a rule that reported nothing each fail half of this.
+#
+# Quantified over the *tree* as well as the register, which is what makes it a property of the set
+# equality rather than of one direction. The containment tests pass under a rule that only looks
+# one way; this does not.
+_ISOLATION_PATHS = (OUTSIDE_PATH, ANOTHER_OUTSIDE_PATH, "cmake/AFixture.cmake")
+_REACHING_RECORDED = "reaching-and-recorded"
+_REACHING_UNRECORDED = "reaching-and-unrecorded"
+_ISOLATION_RECORDED_ONLY = "recorded-and-no-longer-reaching"
+_ISOLATION_NEITHER = "neither"
+_ISOLATION_STATES = (
+    _REACHING_RECORDED,
+    _REACHING_UNRECORDED,
+    _ISOLATION_RECORDED_ONLY,
+    _ISOLATION_NEITHER,
+)
+_REACHING = frozenset({_REACHING_RECORDED, _REACHING_UNRECORDED})
+_RECORDED = frozenset({_REACHING_RECORDED, _ISOLATION_RECORDED_ONLY})
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(
+    st.dictionaries(
+        st.sampled_from(_ISOLATION_PATHS), st.sampled_from(_ISOLATION_STATES), min_size=1
+    )
+)
+def test_aerora_logic_stays_inside_the_overlay(
+    tmp_path_factory: pytest.TempPathFactory, states: dict[str, str]
+) -> None:
+    """Set equality in both directions, over a generated tree and a generated record.
+
+    A reach nobody recorded spends the separability of the overlay without anybody deciding to. A
+    record whose file no longer reaches has outlived its subject, and that matters because the list
+    is read as a count -- it is the number a reviewer weighs the next reach against, so a stale
+    entry makes the next one look cheaper than it is.
+
+    Every file is written either way, carrying an identifier or carrying only prose, so the walk
+    examines the same set in every example and a finding is never the result of a file being absent.
+    """
+    register = _with_edits(
+        _register(), *sorted(path for path, state in states.items() if state in _RECORDED)
+    )
+    root = _reaching(
+        tmp_path_factory.mktemp("isolation") / "repo",
+        *(
+            (path, REACHING_SOURCE if state in _REACHING else PROSE_SOURCE)
+            for path, state in sorted(states.items())
+        ),
+    )
+
+    examined, carrying, unreadable = _isolation_candidates(root)
+    findings = check_overlay_isolation(_premises_at(register, root))
+
+    unrecorded = sorted(p for p, s in states.items() if s == _REACHING_UNRECORDED)
+    removed = sorted(p for p, s in states.items() if s == _ISOLATION_RECORDED_ONLY)
+    assert unreadable == []
+    assert len(examined) == len(states)
+    assert carrying == sorted(p for p, s in states.items() if s in _REACHING)
+    assert len(findings) == len(unrecorded) + len(removed)
+    for path in unrecorded:
+        assert any(
+            f.message.startswith(f"{path}: ") and "records no overlay edit for it" in f.message
+            for f in findings
+        )
+    for path in removed:
+        assert any(
+            f.message.startswith(f"{path}: ")
+            and "is a removal rather than a satisfied entry" in f.message
+            for f in findings
+        )
+    assert all(f.check == OVERLAY_ISOLATION and f.blocking and f.gates == () for f in findings)

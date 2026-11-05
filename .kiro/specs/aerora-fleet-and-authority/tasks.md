@@ -99,7 +99,7 @@ Three standing constraints apply to every task:
     - _Requirements: 5.12_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [ ]* 1.6 Write property tests for the derivation
+  - [x]* 1.6 Write property tests for the derivation
     - **Property 3: Every derived link figure follows from its profile**
     - **Property 4: A profile carrying no values yields no figure**
     - **Validates: Requirements 5.5, 5.7, 5.9**
@@ -137,7 +137,7 @@ Three standing constraints apply to every task:
     - _Requirements: 10.10_
     - **Local**: `uv run --quiet --with jsonschema python tools/analyzers/gate_guard_check.py aerora/ src/Vehicle/Vehicle.h`
 
-  - [ ]* 2.5 Write the property test for overlay isolation
+  - [x]* 2.5 Write the property test for overlay isolation
     - **Property 9: Aerora logic stays inside the overlay**
     - **Validates: Requirements 10.10, 10.11**
 
@@ -164,7 +164,7 @@ Three standing constraints apply to every task:
     - _Requirements: 2.10, 11.2, 11.3_
     - **Local**: `uv run --quiet --with jsonschema python tools/validate_gate_register.py`
 
-  - [ ]* 3.4 Write tests for the hazard-citation resolution
+  - [x]* 3.4 Write tests for the hazard-citation resolution
     - **Validates: Requirements 10.9**
 
 - [x] 4. Checkpoint — the Python half proves itself on this host

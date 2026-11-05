@@ -70,6 +70,7 @@ from ._strategies import (
     inventories,
     inventory_document,
     inventory_row,
+    link_profiles,
     registers,
 )
 
@@ -1188,3 +1189,55 @@ def test_link_profile_finds_the_recorded_class_and_reports_the_others_absent() -
 def test_link_profile_reports_absent_where_the_register_records_no_profiles() -> None:
     """The state the register is in until task 1.5, which must read as absent rather than raise."""
     assert link_profile(_register(), LINK_CLASS) is None
+
+
+# ---------------------------------------------------------------------------
+# Property 3: Every derived link figure follows from its profile.
+# Property 4: A profile carrying no values yields no figure.
+# Validates: Requirements 5.5, 5.7, 5.9.
+#
+# Quantified over generated profiles rather than over generated formulas, because the formula is
+# the part Q-015 holds and a generated one would be asserting something about arithmetic nobody has
+# written. What is quantified is the shape around it, which is the half these properties exist for.
+# ---------------------------------------------------------------------------
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(link_profiles())
+def test_a_profile_carrying_no_values_yields_no_figure(
+    recorded: list[LinkProfile] | None,
+) -> None:
+    """Property 4. For every generated profile with empty parameters, every figure is absent.
+
+    The formula raises if it is asked, so this also establishes *where* the absence is decided.
+    Criterion 9 is satisfied by returning unknown before the arithmetic rather than by the
+    arithmetic happening to yield nothing: a formula written against a parameter set that does not
+    exist could return anything, including a plausible zero.
+    """
+    for profile in recorded or ():
+        if profile.parameters:
+            continue
+        assert derive_link_figure(profile, _refuses) is None
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(link_profiles(), st.integers(min_value=-9, max_value=9))
+def test_every_derived_link_figure_follows_from_its_profile(
+    recorded: list[LinkProfile] | None, yielded: int
+) -> None:
+    """Property 3. A figure carries the value the formula produced and the revision it came from.
+
+    Both halves matter and neither implies the other. A figure carrying the wrong value is wrong; a
+    figure carrying the right value and the wrong revision is worse, because it invites a reader to
+    trace it to parameters it did not come from.
+
+    Quantified over the yielded value too, so the revision cannot be passing by coincidence on a
+    single fixture figure.
+    """
+    for profile in recorded or ():
+        figure = derive_link_figure(profile, lambda _: yielded)
+        if not profile.parameters:
+            assert figure is None
+            continue
+        assert figure == DerivedFigure(value=yielded, revision=profile.revision)
+        assert figure.revision == profile.revision

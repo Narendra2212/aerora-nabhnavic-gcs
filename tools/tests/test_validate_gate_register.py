@@ -204,7 +204,7 @@ from validate_gate_register import (
 )
 
 from ._helpers import REPO_ROOT
-from ._strategies import MAX_EXAMPLES, sign_off_conditions
+from ._strategies import MAX_EXAMPLES, hazards, sign_off_conditions
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -5907,3 +5907,59 @@ def test_link_profile_names_a_profile_recording_a_derived_figure(key: str) -> No
 
     assert message.startswith(f"{PROFILE_CLASS}: ")
     assert f"records a {key} parameter" in message
+
+
+# ---------------------------------------------------------------------------
+# Properties over the hazard log.
+# Validates: Requirements 10.9.
+#
+# Task 3.4 asks for tests of hazard-citation resolution. Nothing cites a hazard yet -- the two
+# criteria that will are source-half rules nobody has built -- so a property over citation
+# resolution would quantify over an empty set and pass by having nothing to look at. What is
+# quantified instead is the half that makes citation possible: that an id resolves to at most one
+# record, and that the check is total over every log the generator can produce.
+# ---------------------------------------------------------------------------
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(hazards())
+def test_a_hazard_id_resolves_to_at_most_one_record(recorded: list[Hazard] | None) -> None:
+    """The id is the whole of what a citation carries, so two records under one settle nothing.
+
+    Asserted as a property rather than as a case because the generator draws ids unique and this
+    then holds for every log it can produce: the check reports nothing, and a lookup by id finds
+    one record or none. A rejection citing an id that resolved twice would name two mitigations.
+    """
+    premises = _premises(replace(_register(), hazards=recorded))
+    findings = check_hazard_log(premises)
+
+    if recorded is None:
+        assert findings == []
+        return
+    if not recorded:
+        assert len(findings) == 1
+        assert "recorded and empty" in findings[0].message
+        return
+    assert findings == []
+    for hazard in recorded:
+        matching = [item for item in recorded if item.id == hazard.id]
+        assert len(matching) == 1
+
+
+@settings(max_examples=MAX_EXAMPLES, deadline=None)
+@given(hazards())
+def test_every_recorded_hazard_carries_an_accepted_mitigation(
+    recorded: list[Hazard] | None,
+) -> None:
+    """Acceptance is the point of the record, so the owner and the mitigation are never empty.
+
+    A hazard with no owner against it is a note. This log exists so that a rejection can cite
+    something a person stands behind, and the owner is drawn from `OWNER_LABELS` rather than from
+    free text for that reason.
+    """
+    for hazard in recorded or ():
+        assert hazard.id
+        assert hazard.statement
+        assert hazard.severity
+        assert hazard.mitigation
+        assert hazard.accepted_by in OWNER_LABELS
