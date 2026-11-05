@@ -46,4 +46,8 @@ private slots:
     void _aThresholdShorterThanTheIntervalIsUnachievable();
     void _aThresholdEqualToTheIntervalIsAchievable();
     void _aThresholdLongerThanTheIntervalIsAchievable();
+
+    // Property 7: an unachievable threshold is named, not applied.
+    void _anUnachievableThresholdIsNamedNotApplied_data();
+    void _anUnachievableThresholdIsNamedNotApplied();
 };

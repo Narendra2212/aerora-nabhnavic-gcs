@@ -29,6 +29,10 @@ private slots:
     void _attachmentAndSupplyAreDistinctObservations();
     void _anAttachedTetherThatStoppedSupplyingIsNeitherAbsentNorHealthy();
 
+    // Property 6: tether attachment and supply are independent.
+    void _tetherAttachmentAndSupplyAreIndependent_data();
+    void _tetherAttachmentAndSupplyAreIndependent();
+
     // The two prohibitions that are easiest to breach by accident.
     void _noTransitionIsInferredFromAConfigurationChange();
     void _staleEffectiveStateIsNeverReplacedByAReport();

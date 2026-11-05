@@ -52,4 +52,15 @@ private slots:
 
     // The guard the Gate_Register pins.
     void _theCapabilityVocabularyIsRecordedUnaccepted();
+
+    // Property 1: a Fleet_Operation is authorized atomically.
+    void _aFleetOperationIsAuthorizedAtomically_data();
+    void _aFleetOperationIsAuthorizedAtomically();
+
+    // Property 2: addressing and subject vary independently.
+    void _addressingAndSubjectVaryIndependently_data();
+    void _addressingAndSubjectVaryIndependently();
+
+    // Property 5: capability exclusion is not refusal.
+    void _capabilityExclusionIsNotRefusal();
 };

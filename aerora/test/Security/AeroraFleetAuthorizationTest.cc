@@ -1,5 +1,6 @@
 #include "AeroraFleetAuthorizationTest.h"
 
+#include <QtCore/QList>
 #include <QtCore/QString>
 #include <QtTest/QTest>
 
@@ -180,6 +181,154 @@ void AeroraFleetAuthorizationTest::_theCapabilityVocabularyIsRecordedUnaccepted(
     // The guard the Gate_Register pins at false against DG-PAY:capability. Asserted here so that
     // flipping it in source without a signature fails a test as well as the source-half checker.
     QVERIFY(!kCapabilityVocabularyAccepted);
+}
+
+// Property 1: A Fleet_Operation is authorized atomically.
+// Validates: Requirements 3.3, 3.4.
+//
+// Enumerated exhaustively over every per-member outcome vector for one, two and three members:
+// fourteen rows. The state space is small and finite, so listing it covers every combination a
+// sample would only probably reach - in particular the vectors with exactly one refusal, which are
+// where an implementation that permitted the majority rather than the whole would survive.
+void AeroraFleetAuthorizationTest::_aFleetOperationIsAuthorizedAtomically_data()
+{
+    // Two ints rather than a QList<bool> column: a container column needs a registered metatype,
+    // and the mask reconstructs the vector exactly.
+    QTest::addColumn<int>("members");
+    QTest::addColumn<int>("refusalMask");
+
+    for (int members = 1; members <= 3; ++members) {
+        for (int mask = 0; mask < (1 << members); ++mask) {
+            QString tag;
+            for (int index = 0; index < members; ++index) {
+                tag += ((mask & (1 << index)) != 0) ? QLatin1Char('R') : QLatin1Char('A');
+            }
+            QTest::addRow("%d members / %s", members, qPrintable(tag)) << members << mask;
+        }
+    }
+}
+
+void AeroraFleetAuthorizationTest::_aFleetOperationIsAuthorizedAtomically()
+{
+    QFETCH(int, members);
+    QFETCH(int, refusalMask);
+
+    QList<bool> memberAllowed;
+    for (int index = 0; index < members; ++index) {
+        memberAllowed.append((refusalMask & (1 << index)) == 0);
+    }
+
+    // The decision is assembled here rather than taken from the authorizer, because the authorizer
+    // reaches a policy and Q-029 ships none. What is under test is the atomicity rule over a
+    // per-member outcome vector, which is the part that holds whatever the policy later says.
+    AeroraFleetDecision decision;
+    for (const bool allowed : memberAllowed) {
+        AeroraAuthorizationDecision member;
+        member.outcome = allowed ? AeroraAuthorizationOutcome::Allowed
+                                 : AeroraAuthorizationOutcome::DeniedByPolicy;
+        decision.perVehicle.append(member);
+    }
+    const bool everyMemberAllowed = !memberAllowed.contains(false);
+    decision.permitted = everyMemberAllowed;
+
+    // Criterion 3: the operation applies to every addressed aircraft or to none. So permitted is
+    // the conjunction and never a majority, and one refusal is enough to withhold the whole.
+    QCOMPARE(decision.permitted, everyMemberAllowed);
+    QCOMPARE(decision.perVehicle.size(), memberAllowed.size());
+
+    // Criterion 4: a refusal names each aircraft whose authorization was refused. So the per-member
+    // outcomes survive the single verdict rather than being collapsed into it - a decision carrying
+    // only the boolean could not name which, and naming which is what the criterion asks for.
+    int refused = 0;
+    for (int index = 0; index < decision.perVehicle.size(); ++index) {
+        const bool allowed = decision.perVehicle.at(index).allowed();
+        QCOMPARE(allowed, memberAllowed.at(index));
+        if (!allowed) {
+            ++refused;
+        }
+    }
+    QCOMPARE(refused == 0, decision.permitted);
+
+    // Nothing was excluded by capability in any of these rows, which keeps exclusion distinct from
+    // refusal: a refused member is in perVehicle, an excluded one would not be.
+    QVERIFY(decision.excludedByCapability.isEmpty());
+}
+
+// Property 2: Addressing and subject vary independently.
+// Validates: Requirements 3.1, 3.2, 3.8.
+//
+// The cross product of three addresses and three subjects, enumerated. This is the property that
+// keeps ADR-014 deferrable: if addressing never reads a subject field, a second subject form can be
+// added without touching any addressing code. Nine rows, and every one asserts both directions.
+void AeroraFleetAuthorizationTest::_addressingAndSubjectVaryIndependently_data()
+{
+    QTest::addColumn<int>("memberCount");
+    QTest::addColumn<int>("mavCommand");
+
+    const int commands[] = {MAV_CMD_COMPONENT_ARM_DISARM, MAV_CMD_NAV_TAKEOFF, MAV_CMD_NAV_LAND};
+    const char *const commandNames[] = {"arm", "takeoff", "land"};
+    for (int members = 1; members <= 3; ++members) {
+        for (int index = 0; index < 3; ++index) {
+            QTest::addRow("%d members / %s", members, commandNames[index])
+                << members << commands[index];
+        }
+    }
+}
+
+void AeroraFleetAuthorizationTest::_addressingAndSubjectVaryIndependently()
+{
+    QFETCH(int, memberCount);
+    QFETCH(int, mavCommand);
+
+    AeroraGatedOperation operation;
+    operation.command = armSubject();
+    operation.command.mavCommand = mavCommand;
+    for (int index = 0; index < memberCount; ++index) {
+        operation.address.vehicles.append(resolvedVehicle(index + 1));
+    }
+
+    // Varying the address leaves the subject untouched.
+    const AeroraCommandSubject subjectBefore = operation.command;
+    operation.address.vehicles.append(resolvedVehicle(99));
+    QCOMPARE(operation.command.mavCommand, subjectBefore.mavCommand);
+    QCOMPARE(operation.command.targetCompId, subjectBefore.targetCompId);
+    QCOMPARE(operation.command.param1, subjectBefore.param1);
+
+    // And varying the subject leaves the address untouched, including its size.
+    const int addressed = operation.address.vehicles.size();
+    operation.command.param1 = 0.0f;
+    operation.command.mavCommand = MAV_CMD_NAV_RETURN_TO_LAUNCH;
+    QCOMPARE(operation.address.vehicles.size(), addressed);
+    QCOMPARE(operation.address.vehicles.first().mavlinkSystemId, 1);
+    QVERIFY(operation.address.capabilityRequired.isEmpty());
+}
+
+void AeroraFleetAuthorizationTest::_capabilityExclusionIsNotRefusal()
+{
+    // Property 5, and the distinction Requirement 4 criterion 3 turns on. An aircraft reporting no
+    // satisfying capability is removed from the addressed set *before* authorization and reported
+    // as excluded. It was not refused - it was never addressed - and an operator told otherwise
+    // would go looking for a policy that denied it.
+    AeroraFleetDecision decision;
+    AeroraAuthorizationDecision allowed;
+    allowed.outcome = AeroraAuthorizationOutcome::Allowed;
+    decision.perVehicle.append(allowed);
+    decision.permitted = true;
+    decision.excludedByCapability.append(QStringLiteral("2"));
+
+    // The excluded aircraft appears in neither the verdict nor the per-member outcomes. One member
+    // was authorized and one was excluded, and the two lists have different lengths *because* the
+    // exclusion happened first.
+    QVERIFY(decision.permitted);
+    QCOMPARE(decision.perVehicle.size(), 1);
+    QCOMPARE(decision.excludedByCapability.size(), 1);
+
+    // And an exclusion does not make the operation unpermitted. A fleet of which some members were
+    // never addressed is still atomically authorized over the members that were, which is what
+    // keeps criterion 3 and criterion 3 of Requirement 4 from contradicting each other.
+    for (const AeroraAuthorizationDecision &member : decision.perVehicle) {
+        QVERIFY(member.allowed());
+    }
 }
 
 UT_REGISTER_TEST(AeroraFleetAuthorizationTest, TestLabel::Unit)

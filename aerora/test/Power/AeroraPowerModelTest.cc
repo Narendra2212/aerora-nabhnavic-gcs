@@ -564,3 +564,61 @@ void AeroraPowerModelTest::_anAttachedTetherThatStoppedSupplyingIsNeitherAbsentN
     QCOMPARE(supply->stateClass(), AeroraTelemetryState::Unknown);
     QCOMPARE(attachment->stateClass(), AeroraTelemetryState::Reported);
 }
+
+// Property 6: Tether attachment and supply are independent.
+// Validates: Requirements 8.11.
+//
+// Enumerated exhaustively over the cross product of what can happen to each item: left alone,
+// reported, or reported and then cleared. Nine rows. The state space is small and finite, so a
+// list covers every combination where a sample would only probably reach the corner that matters -
+// reported then cleared on one item while the other was left alone, which is the shape of a lost
+// supply report against a still-attached tether.
+void AeroraPowerModelTest::_tetherAttachmentAndSupplyAreIndependent_data()
+{
+    QTest::addColumn<int>("attachmentAction");
+    QTest::addColumn<int>("supplyAction");
+
+    const char *const names[] = {"untouched", "reported", "cleared"};
+    for (int attachment = 0; attachment < 3; ++attachment) {
+        for (int supply = 0; supply < 3; ++supply) {
+            QTest::addRow("attachment %s / supply %s", names[attachment], names[supply])
+                << attachment << supply;
+        }
+    }
+}
+
+void AeroraPowerModelTest::_tetherAttachmentAndSupplyAreIndependent()
+{
+    QFETCH(int, attachmentAction);
+    QFETCH(int, supplyAction);
+
+    ManualScheduler scheduler;
+    AeroraPowerMock mock(&scheduler);
+    AeroraPowerModel *const model = mock.model();
+
+    AeroraReportedValue *const items[] = {model->tetherConfiguration(), model->tetherSupply()};
+    const int actions[] = {attachmentAction, supplyAction};
+
+    for (int index = 0; index < 2; ++index) {
+        if (actions[index] == 0) {
+            continue;
+        }
+        items[index]->recordReport(QString::fromLatin1(kToken), mock.nowUs(),
+                                   AeroraTelemetrySource::fromSendingComponent(1, 1));
+        _consumeUnconfiguredThresholdWarning(items[index]);
+        if (actions[index] == 2) {
+            items[index]->clearReport();
+        }
+    }
+
+    // Each item observes exactly what was done to it, and nothing about what was done to the other.
+    // That is the whole of independence: a model deriving one from the other would show a supplying
+    // tether the moment one was plugged in, or an unplugged tether the moment a supply report was
+    // lost, and both claims are ones Q-025 licenses nobody to make.
+    for (int index = 0; index < 2; ++index) {
+        const bool expectObserved = actions[index] == 1;
+        QCOMPARE(items[index]->isObserved(), expectObserved);
+        QCOMPARE(items[index]->stateClass(),
+                 expectObserved ? AeroraTelemetryState::Reported : AeroraTelemetryState::Unknown);
+    }
+}
