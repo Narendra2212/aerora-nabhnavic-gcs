@@ -241,7 +241,7 @@ Three standing constraints apply to every task:
 
 - [ ] 7. The tether endpoint, read side
 
-  - [~] 7.1 Report attachment and supply as distinct observations
+  - [ ] 7.1 Report attachment and supply as distinct observations
     - An attached tether that has stopped supplying is neither absent nor healthy, so neither value
       is derived from the other and no combination collapses into one
     - **Blocked, and the separateness half is already built.** `AeroraPowerModel` keeps its items
@@ -304,7 +304,7 @@ Three standing constraints apply to every task:
     - **Property 7: An unachievable threshold is named, not applied**
     - **Validates: Requirements 7.8**
 
-- [~] 9. Checkpoint — CI proves the C++ half
+- [x] 9. Checkpoint — CI proves the C++ half
   - Push and confirm the **Aerora Lint**, **Aerora Linux** and **Aerora Windows** legs are green
   - Confirm the new suites ran rather than being silently unregistered, by reading the test counts
     in the leg output rather than only its conclusion
