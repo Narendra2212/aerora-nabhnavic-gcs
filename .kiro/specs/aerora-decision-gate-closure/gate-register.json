@@ -3021,6 +3021,18 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraTelemetryState::NotCarried",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraTelemetryState::NotCarriedByLiveTier",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
       "symbol": "AeroraTelemetryState::NotObserved",
       "kind": "enumerator",
       "gate": "none",

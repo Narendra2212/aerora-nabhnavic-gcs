@@ -21,6 +21,8 @@ AeroraTelemetryState::Class AeroraTelemetryState::resolve(Kind declaredKind, Obs
         return Unavailable;
     case NotObserved:
         return Unknown;
+    case NotCarriedByLiveTier:
+        return NotCarried;
     case ObservedStale:
         return Stale;
     case ObservedFresh:
@@ -74,7 +76,7 @@ bool AeroraTelemetryState::carriesValue(Class stateClass)
 
 bool AeroraTelemetryState::isNonValue(Class stateClass)
 {
-    return (stateClass == Unknown) || (stateClass == Unavailable);
+    return (stateClass == Unknown) || (stateClass == Unavailable) || (stateClass == NotCarried);
 }
 
 QString AeroraTelemetryState::classToString(Class stateClass)
@@ -94,6 +96,8 @@ QString AeroraTelemetryState::classToString(Class stateClass)
         return QStringLiteral("PROPOSED");
     case Stale:
         return QStringLiteral("STALE");
+    case NotCarried:
+        return QStringLiteral("NOT_CARRIED");
     }
 
     qCCritical(AeroraTelemetryLog) << "Internal Error: unhandled state class:" << static_cast<int>(stateClass);

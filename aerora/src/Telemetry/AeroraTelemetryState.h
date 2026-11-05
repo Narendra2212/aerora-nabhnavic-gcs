@@ -63,6 +63,21 @@ public:
         Proposed,
         /// Observed once, now past its freshness threshold. Shown with its age, never as current.
         Stale,
+        /// The live Telemetry_Tier does not carry this item, so no value is available on the tier
+        /// in force. Requirement 6 criterion 4 forbids reporting this as \c Unknown.
+        ///
+        /// The third kind of emptiness, and the three are not interchangeable. \c Unknown is an
+        /// item still waiting to be observed; \c Unavailable is an item whose capability is
+        /// reported absent and which can never be obtained; this is an item the aircraft can
+        /// produce but the tier in force omits. Each has a different repair - wait, nothing, or
+        /// change tier - and an operator told the wrong one acts on the wrong thing.
+        ///
+        /// Nothing produces this yet. Deciding whether the live tier carries an item needs the
+        /// tier memberships, which `DG-TLM` settles, so the class and its resolution exist ahead
+        /// of anything that can reach them. That is deliberate: when the memberships land, the
+        /// cheap change is adding the production path, not retrofitting a vocabulary member under
+        /// time pressure and reaching for \c Unknown because it is already there.
+        NotCarried,
     };
     Q_ENUM(Class)
 
@@ -99,6 +114,10 @@ public:
         ObservedStale,
         /// Observed, but no freshness threshold is configured, so no verdict has been reached.
         ObservedFreshnessUnevaluated,
+        /// The live Telemetry_Tier does not carry this item, so there is nothing to observe on the
+        /// tier in force. Distinct from \c NotObserved, which is an item the tier does carry and
+        /// which has not arrived yet.
+        NotCarriedByLiveTier,
     };
     Q_ENUM(Observation)
 

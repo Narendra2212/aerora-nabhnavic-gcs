@@ -82,8 +82,9 @@ void AeroraTelemetryStateTest::_resolutionTable_data()
     QTest::addColumn<int>("observation");
     QTest::addColumn<int>("expectedClass");
 
-    // Observation outranks kind for the three conditions a producer may not declare: an absent
-    // capability, nothing observed, and an observation that has aged out.
+    // Observation outranks kind for the four conditions a producer may not declare: an absent
+    // capability, nothing observed, an observation that has aged out, and an item the live
+    // Telemetry_Tier does not carry.
     const struct
     {
         const char *tag;
@@ -105,6 +106,13 @@ void AeroraTelemetryStateTest::_resolutionTable_data()
         QTest::addRow("%s/stale", kind.tag)
             << static_cast<int>(kind.kind) << static_cast<int>(AeroraTelemetryState::ObservedStale)
             << static_cast<int>(AeroraTelemetryState::Stale);
+        // Requirement 6 criterion 4: an item the live tier omits resolves to NotCarried for every
+        // declared kind, and never to Unknown. Uniform in kind for the same reason the three above
+        // are: what the tier carries is not the producer declaration to make.
+        QTest::addRow("%s/not-carried", kind.tag)
+            << static_cast<int>(kind.kind)
+            << static_cast<int>(AeroraTelemetryState::NotCarriedByLiveTier)
+            << static_cast<int>(AeroraTelemetryState::NotCarried);
     }
 
     // A fresh observation, and an observation whose freshness has not been evaluated, both resolve to
@@ -170,6 +178,11 @@ void AeroraTelemetryStateTest::_classPredicates_data()
     // Stale is the row that must carry a value and not be current: the last reading is kept and shown
     // with its age, never presented as describing the aircraft now.
     QTest::newRow("stale") << static_cast<int>(AeroraTelemetryState::Stale) << false << false << false << true;
+
+    // Not carried is the third non-value. It answers isNonValue like the other two and stays
+    // distinct from both, because the repair differs: wait, nothing, or change tier.
+    QTest::newRow("notCarried") << static_cast<int>(AeroraTelemetryState::NotCarried) << false << false << false
+                                << false;
 }
 
 void AeroraTelemetryStateTest::_classPredicates()
@@ -188,8 +201,14 @@ void AeroraTelemetryStateTest::_classPredicates()
     QCOMPARE(AeroraTelemetryState::carriesValue(resolved), carriesValue);
     QCOMPARE(AeroraTelemetryState::isNonValue(resolved), !carriesValue);
 
-    // The two non-values both answer isNonValue and are still not interchangeable.
+    // The three non-values all answer isNonValue and none is interchangeable with another.
+    // Requirement 6 criterion 4 forbids reporting a value the live tier omits as UNKNOWN, so the
+    // renderings are compared pairwise rather than just counted.
     QVERIFY(AeroraTelemetryState::classToString(AeroraTelemetryState::Unknown)
+            != AeroraTelemetryState::classToString(AeroraTelemetryState::Unavailable));
+    QVERIFY(AeroraTelemetryState::classToString(AeroraTelemetryState::NotCarried)
+            != AeroraTelemetryState::classToString(AeroraTelemetryState::Unknown));
+    QVERIFY(AeroraTelemetryState::classToString(AeroraTelemetryState::NotCarried)
             != AeroraTelemetryState::classToString(AeroraTelemetryState::Unavailable));
 }
 
