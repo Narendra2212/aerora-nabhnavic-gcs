@@ -211,7 +211,7 @@ Three standing constraints apply to every task:
     - _Requirements: 4.2, 4.3, 4.4, 4.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ]* 5.5 Write property tests for the addressing axis
+  - [x]* 5.5 Write property tests for the addressing axis
     - **Property 1: A Fleet_Operation is authorized atomically**
     - **Property 2: Addressing and subject vary independently**
     - **Property 5: Capability exclusion is not refusal**
@@ -274,7 +274,7 @@ Three standing constraints apply to every task:
     - _Requirements: 8.9_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ]* 7.4 Write the property test for the tether observations
+  - [x]* 7.4 Write the property test for the tether observations
     - **Property 6: Tether attachment and supply are independent**
     - **Validates: Requirements 8.11**
 
@@ -300,7 +300,7 @@ Three standing constraints apply to every task:
     - _Requirements: 7.2, 7.3, 7.8_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [ ]* 8.4 Write the property test for threshold achievability
+  - [x]* 8.4 Write the property test for threshold achievability
     - **Property 7: An unachievable threshold is named, not applied**
     - **Validates: Requirements 7.8**
 
