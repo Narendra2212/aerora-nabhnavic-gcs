@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-AUT",
   "part": "proposal-model",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "387f4d0279915c14c04f9104d9d87a2a9d028cf5",
   "signatures": [
     {
       "owner": "Architecture",

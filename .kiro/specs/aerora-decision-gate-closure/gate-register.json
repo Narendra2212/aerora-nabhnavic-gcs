@@ -603,7 +603,7 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-AUT.proposal-model.json",
           "elements": [
             {
