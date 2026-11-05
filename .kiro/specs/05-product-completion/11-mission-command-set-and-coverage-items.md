@@ -65,8 +65,9 @@ quality claim is derived from it anywhere.
 
 ## 2. One Aerora complex item, and it is not transect-shaped
 
-**Decision: Aerora adds exactly one complex item, for surface coverage, derived from
-`StructureScanComplexItem`.**
+**Decision: Aerora adds exactly one complex item, for surface coverage: a sibling of
+`StructureScanComplexItem` that derives from `ComplexMissionItem` directly, exactly as the upstream
+`StructureScan` itself does.**
 
 Three of the four mission classes the product range needs require no Aerora code at all, which is
 worth stating plainly because the cheapest correct version of this work is the one that adds an item
@@ -98,6 +99,28 @@ cannot be replaced or omitted; QML-visible `cameraShots`, `timeBetweenShots`,
 `cameraTriggerInTurnAround`, `hoverAndCapture` and `refly90Degrees` properties that are meaningless
 on a wall and would appear in any editor bound to the item; and a pure-virtual
 `_recalcCameraShots()` that a subclass must implement even to return nothing.
+
+### Why a sibling and not a subclass
+
+`StructureScanComplexItem` cannot be subclassed into this item, and the reason is mechanical rather
+than stylistic: it declares every override this item needs `final`.
+
+| Override | Declared | Sealed to |
+| --- | --- | --- |
+| `mapVisualQML()` | `final` | `StructureScanMapVisual.qml` |
+| `patternName()` | `final` | `Structure Scan` |
+| `commandName()`, `commandDescription()` | `final` | `Structure Scan` |
+| `abbreviation()` | `final` | `S` |
+| `load()` | `final` | The StructureScan plan format |
+
+So a subclass could not carry its own name, could not return its own map visual, and could not read
+its own plan-file representation. Every obligation this document places on the item is sealed by
+that base.
+
+`ComplexMissionItem` seals none of it: `patternName()`, `mapVisualQML()`, `load()` and the rest are
+pure virtual, and `geoMapVisualQML()` is a plain virtual returning an empty string, which is the
+overridable default section 7 depends on. Deriving there costs 35 pure virtuals to implement rather
+than inherit -- all mechanical, and all owned here rather than by a base that sealed them.
 
 Ground coverage keeps the transect lineage through upstream `Survey`. The split follows upstream.
 
@@ -214,8 +237,8 @@ item missing the second visual works for one operator and is invisible to anothe
 
 Every upstream coverage pattern already has this gap: `TransectStyleComplexItem`, `Survey`,
 `CorridorScan` and `StructureScan` all inherit the empty default, and only `SimpleMissionItem` and
-the two landing patterns override it. **Inheriting `StructureScan` therefore does not supply a
-GeoMap visual** and no amount of base-class reuse will.
+the two landing patterns override it. **No base class supplies a GeoMap visual** and no amount of
+reuse will.
 
 The URL must be fully qualified. Upstream returns bare filenames, which resolve relative to the
 document containing the `Loader` and work only because upstream visuals are co-located with their

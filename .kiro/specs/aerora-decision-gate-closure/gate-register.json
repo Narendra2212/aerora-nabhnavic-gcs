@@ -14,7 +14,7 @@
   "gates": [
     {
       "id": "DG-MIS",
-      "status": "CLOSED",
+      "status": "OPEN",
       "implementingOwner": "Tab 5",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -26,8 +26,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "accepted",
-          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-MIS.mission-command-set.json",
+          "state": "open",
+          "closureRecord": null,
           "elements": [
             {
               "name": "each mission command the Aerora mission set uses, with its issued MAVLink command identifier or its existing upstream command",
@@ -1301,7 +1301,7 @@
     },
     {
       "id": "SCR-MIS-01",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1318,7 +1318,7 @@
     },
     {
       "id": "SCR-MIS-02",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1335,7 +1335,7 @@
     },
     {
       "id": "SCR-MIS-03",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1348,7 +1348,7 @@
     },
     {
       "id": "SCR-MIS-04",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1400,7 +1400,7 @@
     },
     {
       "id": "SCR-MIS-07",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1412,7 +1412,7 @@
     },
     {
       "id": "SCR-MIS-08",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1424,7 +1424,7 @@
     },
     {
       "id": "SCR-MIS-09",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
