@@ -278,21 +278,21 @@ Three standing constraints apply to every task:
     - **Property 6: Tether attachment and supply are independent**
     - **Validates: Requirements 8.11**
 
-- [ ] 8. Tier and freshness mechanism
+- [x] 8. Tier and freshness mechanism
 
-  - [~] 8.1 Report the live Telemetry_Tier and the not-carried distinction
+  - [x] 8.1 Report the live Telemetry_Tier and the not-carried distinction
     - A value absent because the live tier omits it is reported as not carried by that tier, and
       never as `UNKNOWN`. A value retained from a tier no longer live carries its age
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 8.2 Derive which tiers a Link_Class can carry
+  - [x] 8.2 Derive which tiers a Link_Class can carry
     - From the Link_Profile and the recorded tier memberships, so a tier the link cannot sustain is
       never offered
     - _Requirements: 6.9, 5.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 8.3 Implement the unachievable-threshold check
+  - [x] 8.3 Implement the unachievable-threshold check
     - A recorded freshness threshold shorter than the interval the profile yields is reported
       unachievable on that class, rather than marking every value it carries `STALE`
     - This is the check that stops a low-rate link under thresholds written for a high-rate one from
