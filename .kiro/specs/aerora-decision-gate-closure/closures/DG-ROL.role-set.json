@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-ROL",
   "part": "role-set",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "a49acbecf4ecd4159a3a9768035e8354dca56d64",
   "signatures": [
     {
       "owner": "Product",

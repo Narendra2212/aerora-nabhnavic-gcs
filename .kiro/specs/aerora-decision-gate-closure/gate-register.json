@@ -309,7 +309,7 @@
     },
     {
       "id": "DG-ROL",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 2",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -322,7 +322,7 @@
             "Product",
             "operations"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-ROL.role-set.json",
           "elements": [
             {
@@ -360,7 +360,7 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-ROL.authorization-scope.json",
           "elements": [
             {
@@ -1487,7 +1487,7 @@
     },
     {
       "id": "SCR-VEH-05",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1710,7 +1710,7 @@
     },
     {
       "id": "SCR-SEC-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

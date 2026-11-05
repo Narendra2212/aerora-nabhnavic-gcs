@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-ROL",
   "part": "authorization-scope",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "fdf478942a9984db0bd7b4a9e020779bb5a5af70",
   "signatures": [
     {
       "owner": "Architecture",
