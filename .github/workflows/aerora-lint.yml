@@ -40,7 +40,7 @@ on:
       - '.clang-format'
       - '.clang-tidy'
       - '.github/build-config.json'
-      - '.github/workflows/aerora-lint.yml'
+      - '.github/workflows/aerora-*.yml'
   workflow_dispatch:
 
 concurrency:

@@ -1022,3 +1022,41 @@ test results here are **`NOT RUN`**.
 The one remaining occurrence of the word in this document is `GCS-VERIFIED` under
 [Corrections](#corrections-to-earlier-phases), which quotes another document's status string rather
 than making a claim.
+
+## The surface-coverage item carries its parameters as Facts
+
+Decided before the item is written, because the carrier is harder to change than the item.
+
+`SettingsFact` members with a `FactMetaData` JSON resource, matching every upstream complex item
+and the Fact System rule in `AGENTS.md`. It is what the editor QML needs: `FactTextField` and its
+relatives bind to a `Fact*`, so a plain property would mean hand-written controls, hand-written
+unit suffixes and a hand-written plan-file round trip for each of the nine.
+
+### The metadata carries shape and no limits
+
+`DG-MIS` settles the parameter *set* and settles that no limit on any of them is set. `FactMetaData`
+is exactly where a limit would live, so the file carries `name`, `shortDesc`, `type`, `units` and
+`decimalPlaces` and omits `min`, `max` and `default` for every parameter whose limit source is still
+open. That is all nine but one.
+
+| Parameter | Unit | Limit source |
+| --- | --- | --- |
+| `workingDistance` | m | Applicator ICD |
+| `passInterval` | m | Applicator ICD |
+| `actionInterval` | m | Applicator ICD |
+| `surfaceHeight` | m | Frame and airframe |
+| `startAltitude` | m | Frame and airframe |
+| `entryAltitude` | m | Frame and airframe |
+| `passSpeed` | m/s | Airframe and applicator |
+| `passDirection` | enum | Product: alternating or one-way, which the record settles |
+| `capabilityRequired` | token | `DG-PAY:capability` |
+
+An omitted `default` means the Fact starts at the type zero, and a `workingDistance` of zero is not
+a usable standoff. That is deliberate and it is not the safety argument: inventing 2 m instead
+would produce a plan that *looks* flyable and is not, which is the failure `P7-NOINV-002` describes
+for retention periods and which applies identically here. What stops a plan built on zeros is
+`AeroraMissionValidator`, whose `GeometryLimits` check already reports itself unperformable for
+exactly this reason and starts refusing once the limits arrive, with no change to the report shape.
+
+So the item is implementable now and unflyable until an applicator ICD exists. Those are different
+states and the register keeps them apart.
