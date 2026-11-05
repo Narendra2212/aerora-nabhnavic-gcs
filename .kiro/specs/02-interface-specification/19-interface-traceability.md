@@ -313,6 +313,7 @@ method.
 | `IF-PWR-010` | Converter state | `AERORA-GCS-REQ-029` | — | Q-024 | `ARTIFACT-OBSERVED`, `NOT-EVIDENCED` | `OPEN` | `INTEGRATION` |
 | `IF-PWR-011` | Watchdog fault | `AERORA-POWER-REQ-007`, `AERORA-SAFE-REQ-011` | — | Q3-004 | `MODEL` | `PROPOSED` | `INTEGRATION` |
 | `IF-PWR-012` | Power capability | `AERORA-MAV-REQ-009` | — | Q-024 | `NOT-EVIDENCED` | `OPEN` | `INTEGRATION` |
+| `IF-PWR-013` | Tether supply state | `AERORA-GCS-REQ-029` | — | Q-025 | `MODEL` | `PROPOSED` | `INTEGRATION` |
 | `IF-RAD-001` | Radio host presentation | `AERORA-COMM-REQ-006` | R-003 | Q3-001 | `NOT-EVIDENCED` | `OPEN` | `BENCH` |
 | `IF-RAD-002` | Serial port configuration | `AERORA-COMM-REQ-006` | — | — | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-RAD-003` | USB device identity | `AERORA-COMM-REQ-011`, `AERORA-COMM-REQ-012` | R-003 | Q3-001 | `NOT-EVIDENCED` | `OPEN` | `BENCH` |

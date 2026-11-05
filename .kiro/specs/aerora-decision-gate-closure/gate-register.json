@@ -3357,6 +3357,12 @@
       "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
     },
     {
+      "symbol": "kItemTetherSupply",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
       "symbol": "kItemWatchdogEvent",
       "kind": "registryKey",
       "gate": "none",

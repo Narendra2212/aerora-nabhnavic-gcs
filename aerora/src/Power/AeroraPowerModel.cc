@@ -22,6 +22,7 @@ constexpr const char *kPowerFreshnessClass = "aeroraPower";
 // records and lookup only: none is a protocol value, a fact name or an operator-facing label, and
 // none is ever sent, parsed or matched against a MAVLink field.
 constexpr const char *kItemTetherConfiguration = "powerTetherConfiguration";   // IF-PWR-001
+constexpr const char *kItemTetherSupply = "powerTetherSupply";                 // IF-PWR-013
 constexpr const char *kItemBatteryConfiguration = "powerBatteryConfiguration"; // IF-PWR-002
 constexpr const char *kItemEffectiveState = "powerEffectiveState";             // IF-PWR-003
 constexpr const char *kItemReportedState = "powerReportedState";               // IF-PWR-003, 009
@@ -47,6 +48,12 @@ AeroraPowerModel::AeroraPowerModel(AeroraFreshness *freshness,
                                              AeroraTelemetryState::KindReported);
     _batteryConfiguration = _addReportedValue(QString::fromLatin1(kItemBatteryConfiguration),
                                               AeroraTelemetryState::KindReported);
+
+    // Separate from the tether configuration above, and the separateness is the point. An attached
+    // tether that has stopped supplying is neither absent nor healthy, and a combined tether-health
+    // item would have to report it as one of those. Requirement 8 criterion 11.
+    _tetherSupply = _addReportedValue(QString::fromLatin1(kItemTetherSupply),
+                                      AeroraTelemetryState::KindReported);
 
     // The only KindEffective item in the module. Keeping it distinct from the reported item is
     // what makes "a stale report does not become the effective value" structural rather than a

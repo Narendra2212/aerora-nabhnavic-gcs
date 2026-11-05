@@ -205,6 +205,24 @@ public:
     /// which stays in QGroundControl's own battery fact groups.
     [[nodiscard]] AeroraReportedValue *batteryConfiguration() const { return _batteryConfiguration; }
 
+    /// Whether an attached tether is delivering power, as reported. \c IF-PWR-013.
+    ///
+    /// Separate from \c tetherConfiguration() and never derived from it. Attachment says a tether
+    /// is connected; this says a connected tether is supplying. The two come apart in the case that
+    /// matters most - a tether still connected that has stopped supplying - and Requirement 8
+    /// criterion 11 of aerora-fleet-and-authority requires that case be reported as neither absent
+    /// nor healthy. One combined tether-health value would have to pick one of those, and both are
+    /// wrong.
+    ///
+    /// Not derived from \c effectiveState() either. That item carries which source is in force and
+    /// its value set is \c UNKNOWN under \c Q-024, so no token can be read to mean the tether is
+    /// supplying; and even settled, inferring supply from it would make a battery-mode aircraft
+    /// with a healthy tether indistinguishable from one whose tether had failed.
+    ///
+    /// Unknown until the vehicle says otherwise. Nothing is inferred from attachment, from a
+    /// voltage reading, or from traffic stopping.
+    [[nodiscard]] AeroraReportedValue *tetherSupply() const { return _tetherSupply; }
+
     /// \return The configuration item for \a configuration, never null.
     [[nodiscard]] Q_INVOKABLE AeroraReportedValue *configuration(Configuration configuration) const;
 
@@ -296,6 +314,7 @@ private:
     // constructed when _addReportedValue() populates them. Each is parented to this model and
     // never replaced, so the accessors are CONSTANT from QML's point of view.
     AeroraReportedValue *_tetherConfiguration = nullptr;
+    AeroraReportedValue *_tetherSupply = nullptr;
     AeroraReportedValue *_batteryConfiguration = nullptr;
     AeroraReportedValue *_effectiveState = nullptr;
     AeroraReportedValue *_reportedState = nullptr;

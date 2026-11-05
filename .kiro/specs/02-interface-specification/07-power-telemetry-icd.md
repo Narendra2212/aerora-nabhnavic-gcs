@@ -62,6 +62,7 @@ unavailable rather than computing an estimate of its own.
 | `IF-PWR-010` | Converter state | The tether configuration has an onboard conversion stage whose health is operationally relevant | `ARTIFACT-OBSERVED` hardware; reporting `NOT-EVIDENCED` | `OPEN` |
 | `IF-PWR-011` | Watchdog fault | Represented **separately** from power state, because the watchdog acts independently | `MODEL` | `PROPOSED` |
 | `IF-PWR-012` | Power capability | Which power configuration this aircraft supports, so the display adapts | `NOT-EVIDENCED` | `OPEN` |
+| `IF-PWR-013` | Tether supply state | Represented **separately** from `IF-PWR-001`, because supply can stop while attachment persists. An attached tether that has stopped supplying is neither absent nor healthy, and a single tether-health value would have to call it one of those | `MODEL` | `PROPOSED` |
 
 ## Contract details
 
@@ -74,6 +75,7 @@ unavailable rather than computing an estimate of its own.
 | `IF-PWR-008` | Vehicle to GCS | Vehicle, where validated | Power module | `UNKNOWN` | Stamped at parse | None | Vehicle |
 | `IF-PWR-011` | Vehicle to GCS | Watchdog, reporting path contested | Power module, authority module | Event | Stamped at parse | None | Safety path |
 | `IF-PWR-012` | Vehicle to GCS | Flight controller | Capability model | On connection | Current | None | Vehicle |
+| `IF-PWR-013` | Vehicle to GCS | Power system via the flight controller | Power module | `UNKNOWN` | Stamped at parse; stale visible | None | Power system |
 
 | ID | Failure behaviour | Requirements | Risks | Questions | Verification |
 | --- | --- | --- | --- | --- | --- |
@@ -89,6 +91,28 @@ unavailable rather than computing an estimate of its own.
 | `IF-PWR-010` | Converter state unknown; shown as unknown | `AERORA-GCS-REQ-029` | — | Q-024 | `INTEGRATION` |
 | `IF-PWR-011` | Shown as a distinct event, not as a power state value, and not as the cause of the payload stop | `AERORA-POWER-REQ-007`, `AERORA-SAFE-REQ-011` | — | Q3-004 | `INTEGRATION` |
 | `IF-PWR-012` | No power capability reported means the display offers the generic battery model only | `AERORA-MAV-REQ-009` | — | Q-024 | `INTEGRATION` |
+| `IF-PWR-013` | Supply state unknown; **never inferred from attachment, from a voltage reading or from the active source** | `AERORA-GCS-REQ-029` | — | Q-025 | `INTEGRATION` |
+
+## Tether supply is separate from tether attachment
+
+`IF-PWR-013` is not a value of `IF-PWR-001`, and it is not derivable from `IF-PWR-003` either.
+
+Attachment says whether a tether is connected. Supply says whether an attached tether is delivering
+power. The two come apart in the case that matters most: a tether that is still physically
+connected and has stopped supplying. Requirement 8 criterion 11 of the aerora-fleet-and-authority
+specification requires those be reported as distinct values, so that such a tether is **neither
+reported absent nor reported healthy**. One combined tether-health value would have to pick one of
+those two, and both are wrong.
+
+It is not derivable from the active source. `IF-PWR-003` carries which source is in force, and its
+value set is `UNKNOWN` under `Q-024`, so the station cannot read a token to mean *the tether is
+supplying*. Even once that value set is settled, inferring supply from it would make a battery-mode
+aircraft with a healthy tether indistinguishable from one whose tether had failed, which is the
+same collapse in the other direction.
+
+The ground station infers nothing here. With no supply report the state is unknown, and
+`AERORA-GCS-REQ-029` governs: not inferred from attachment, not from a voltage reading, and not
+from the active source.
 
 ## The watchdog fault is separate from power state
 

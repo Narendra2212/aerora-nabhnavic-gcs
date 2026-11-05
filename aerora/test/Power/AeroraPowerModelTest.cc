@@ -497,3 +497,70 @@ void AeroraPowerModelTest::_destroyedEvaluatorMustNotRefreshAStaleObservation()
 }
 
 UT_REGISTER_TEST(AeroraPowerModelTest, TestLabel::Unit)
+
+void AeroraPowerModelTest::_attachmentAndSupplyAreDistinctObservations()
+{
+    // Requirement 8 criterion 11, and IF-PWR-013. Two items, two receive times, two tokens, and
+    // neither derived from the other. Reporting one must leave the other exactly where it was.
+    ManualScheduler scheduler;
+    AeroraPowerMock mock(&scheduler);
+    AeroraPowerModel *const model = mock.model();
+
+    AeroraReportedValue *const attachment = model->tetherConfiguration();
+    AeroraReportedValue *const supply = model->tetherSupply();
+    QVERIFY(attachment != nullptr);
+    QVERIFY(supply != nullptr);
+    QVERIFY(attachment != supply);
+    QVERIFY(attachment->itemId() != supply->itemId());
+
+    QCOMPARE(attachment->stateClass(), AeroraTelemetryState::Unknown);
+    QCOMPARE(supply->stateClass(), AeroraTelemetryState::Unknown);
+
+    attachment->recordReport(QString::fromLatin1(kToken), mock.nowUs(),
+                             AeroraTelemetrySource::fromSendingComponent(1, 1));
+    _consumeUnconfiguredThresholdWarning(attachment);
+
+    // Reporting attachment says nothing about supply. A model that derived one from the other would
+    // show a supplying tether the moment one was plugged in, which is the claim Q-025 does not
+    // license anybody to make.
+    QCOMPARE(attachment->stateClass(), AeroraTelemetryState::Reported);
+    QCOMPARE(supply->stateClass(), AeroraTelemetryState::Unknown);
+    QVERIFY(!supply->isObserved());
+}
+
+void AeroraPowerModelTest::_anAttachedTetherThatStoppedSupplyingIsNeitherAbsentNorHealthy()
+{
+    // The case criterion 11 names, and the reason the two items exist rather than one. A combined
+    // tether-health item would have to report this aircraft as absent or as healthy, and it is
+    // neither: the tether is still connected and it has stopped delivering.
+    ManualScheduler scheduler;
+    AeroraPowerMock mock(&scheduler);
+    AeroraPowerModel *const model = mock.model();
+
+    AeroraReportedValue *const attachment = model->tetherConfiguration();
+    AeroraReportedValue *const supply = model->tetherSupply();
+
+    attachment->recordReport(QString::fromLatin1(kToken), mock.nowUs(),
+                             AeroraTelemetrySource::fromSendingComponent(1, 1));
+    _consumeUnconfiguredThresholdWarning(attachment);
+    supply->recordReport(QString::fromLatin1(kOtherToken), mock.nowUs(),
+                         AeroraTelemetrySource::fromSendingComponent(1, 1));
+    _consumeUnconfiguredThresholdWarning(supply);
+
+    // Both observed, both carrying a value, and the two tokens distinct. The tokens themselves are
+    // fixtures: Q-025 holds what the firmware actually reports, so this asserts that the station
+    // keeps two independent answers rather than asserting what either answer means.
+    QVERIFY(attachment->isObserved());
+    QVERIFY(supply->isObserved());
+    QVERIFY(AeroraTelemetryState::carriesValue(attachment->stateClass()));
+    QVERIFY(AeroraTelemetryState::carriesValue(supply->stateClass()));
+    QVERIFY(attachment->reportedToken() != supply->reportedToken());
+
+    // And the absence of a supply report is not the absence of the tether. Clearing supply alone
+    // must leave attachment reported, which is what stops a lost supply report from reading as an
+    // unplugged tether.
+    supply->clearReport();
+
+    QCOMPARE(supply->stateClass(), AeroraTelemetryState::Unknown);
+    QCOMPARE(attachment->stateClass(), AeroraTelemetryState::Reported);
+}

@@ -26,6 +26,8 @@ private slots:
     void _reportsDoNotLeakBetweenItems_data();
     void _reportsDoNotLeakBetweenItems();
     void _unknownAndUnavailableStayDistinct();
+    void _attachmentAndSupplyAreDistinctObservations();
+    void _anAttachedTetherThatStoppedSupplyingIsNeitherAbsentNorHealthy();
 
     // The two prohibitions that are easiest to breach by accident.
     void _noTransitionIsInferredFromAConfigurationChange();

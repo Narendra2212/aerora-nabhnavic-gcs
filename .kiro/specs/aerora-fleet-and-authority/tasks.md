@@ -239,17 +239,17 @@ Three standing constraints apply to every task:
     - _Requirements: 2.7_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-- [ ] 7. The tether endpoint, read side
+- [x] 7. The tether endpoint, read side
 
-  - [ ] 7.1 Report attachment and supply as distinct observations
+  - [x] 7.1 Report attachment and supply as distinct observations
     - An attached tether that has stopped supplying is neither absent nor healthy, so neither value
       is derived from the other and no combination collapses into one
-    - **Blocked, and the separateness half is already built.** `AeroraPowerModel` keeps its items
-      independent and `_reportsDoNotLeakBetweenItems` asserts it, so no combination collapses. What
-      does not exist is a *supply* item to be separate from attachment: `IF-PWR-001` is attachment,
-      `IF-PWR-003` is the active source whose value set `Q-024` holds, and the configuration
-      booleans are tokens `Q-025` holds. Adding one would author an interface item with no
-      evidence, which the held-by table below records
+    - `IF-PWR-013` was added to the power ICD to carry tether supply, following the `MODEL`
+      evidence precedent `IF-PWR-011` already sets for an item the architecture needs and the
+      firmware has not yet evidenced. `AeroraPowerModel::tetherSupply()` is that item, separate
+      from `tetherConfiguration()` and never derived from it or from `effectiveState()`
+    - What the tokens *mean* is still held by `Q-025`, so the tests assert the station keeps two
+      independent answers rather than asserting what either answer says
     - _Requirements: 8.11_
     - **CI-only**: Aerora Linux and Aerora Windows
 
@@ -333,7 +333,7 @@ on one of them.
 | Where the backend runs, and the licensing boundary | Product, held at the owner's request |
 | Raising the fifteen-channel ceiling | Architecture: a core edit with its own signature |
 | The power failover itself | Electrical, and not establishable by any software test |
-| A named tether *supply* value, distinct from tether attachment | No `IF-PWR` item carries it. `IF-PWR-001` is attachment and `IF-PWR-003` is the active source, whose value set `Q-024` holds and whose boolean tokens `Q-025` holds, so supply cannot be derived from either. Requirement 8 criterion 11 needs an interface item that does not exist |
+| What a tether supply token *means* | `Q-025`: `IF-PWR-013` now carries the item and the station keeps it separate from attachment, but the token set is unsettled, so the station reports the token and interprets none of it |
 
 ## Notes
 
