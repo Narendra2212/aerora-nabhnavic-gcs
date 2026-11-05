@@ -217,9 +217,9 @@ Three standing constraints apply to every task:
     - **Property 5: Capability exclusion is not refusal**
     - **Validates: Requirements 3.3, 3.4, 4.3**
 
-- [ ] 6. The manual authority grant
+- [x] 6. The manual authority grant
 
-  - [~] 6.1 Implement `AeroraManualAuthorityGrant` and its expiry
+  - [x] 6.1 Implement `AeroraManualAuthorityGrant` and its expiry
     - A grant carries an opaque operator identifier, an issue time and an expiry, and reports
       whether it is in force at a given monotonic time
     - **The type carries no stick value.** Requirement 2 criterion 1 forbids the station from being
@@ -228,12 +228,12 @@ Three standing constraints apply to every task:
     - _Requirements: 2.2, 2.3_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 6.2 Record every grant transition in the audit trail
+  - [x] 6.2 Record every grant transition in the audit trail
     - Issued, refused, refreshed and expired, each with the operator identity and the time
     - _Requirements: 2.8_
     - **CI-only**: Aerora Linux and Aerora Windows
 
-  - [~] 6.3 Implement the mirrored-input read path
+  - [x] 6.3 Implement the mirrored-input read path
     - The flight controller reports stick positions and grant state as telemetry, and the station
       displays them. This is how the station observes manual control without carrying it
     - _Requirements: 2.7_
