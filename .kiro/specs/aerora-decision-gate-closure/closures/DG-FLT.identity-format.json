@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-FLT",
   "part": "identity-format",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "002ba59015315db01c15461c9e45c0cac478635b",
   "signatures": [
     {
       "owner": "Product",
