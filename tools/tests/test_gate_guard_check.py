@@ -3944,12 +3944,17 @@ def test_overlay_isolation_passes_over_a_suffix_that_carries_no_declaration(
     assert carrying == ["src/AFixtureReach.h"]
 
 
-def test_overlay_isolation_reads_the_real_tree_and_finds_the_five_reaches() -> None:
+def test_overlay_isolation_reads_the_real_tree_and_finds_the_six_reaches() -> None:
     """The one case whose evidence is the repository, and the surface task 2.4 has to record.
 
-    The five are asserted as a list rather than a count because each is a different kind of reach
-    -- a core header, a core test, a build file and two CI legs -- so a change that moved the count
-    without moving the list would be a different surface at the same size.
+    The six are asserted as a list rather than a count because each is a different kind of reach
+    -- a core header, a core test, a build file, two CI legs and a packaging leg -- so a change
+    that moved the count without moving the list would be a different surface at the same size.
+
+    The packaging leg is the one that proves the pin earns its keep. It was added without a
+    recorded overlay edit and sat unreported for two commits, because aerora-lint.yml triggers on
+    itself rather than on the workflow directory, so adding a sibling workflow ran no lint leg.
+    A count would have caught it here just as well; the list says which reach appeared.
 
     The examined count is a floor rather than an equality. This is a fork that merges upstream, so
     the number of core files moves for reasons that have nothing to do with the overlay, and a
@@ -3961,6 +3966,7 @@ def test_overlay_isolation_reads_the_real_tree_and_finds_the_five_reaches() -> N
     assert unreadable == []
     assert carrying == [
         ".github/workflows/aerora-linux.yml",
+        ".github/workflows/aerora-package.yml",
         ".github/workflows/aerora-windows.yml",
         "cmake/QGCTest.cmake",
         CORE_HEADER,
