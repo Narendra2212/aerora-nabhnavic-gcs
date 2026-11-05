@@ -783,7 +783,7 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.retention.json",
           "elements": [
             {
