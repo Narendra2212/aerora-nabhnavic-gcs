@@ -14,7 +14,7 @@
   "gates": [
     {
       "id": "DG-MIS",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 5",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -26,7 +26,7 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-MIS.mission-command-set.json",
           "elements": [
             {
@@ -1301,7 +1301,7 @@
     },
     {
       "id": "SCR-MIS-01",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1318,7 +1318,7 @@
     },
     {
       "id": "SCR-MIS-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1335,7 +1335,7 @@
     },
     {
       "id": "SCR-MIS-03",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1348,7 +1348,7 @@
     },
     {
       "id": "SCR-MIS-04",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1400,7 +1400,7 @@
     },
     {
       "id": "SCR-MIS-07",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1412,7 +1412,7 @@
     },
     {
       "id": "SCR-MIS-08",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1424,7 +1424,7 @@
     },
     {
       "id": "SCR-MIS-09",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

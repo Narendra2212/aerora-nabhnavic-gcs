@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-MIS",
   "part": "mission-command-set",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "3c3fc0bf1067553e4b72cf6820eaa9ad4880f868",
   "signatures": [
     {
       "owner": "Product",

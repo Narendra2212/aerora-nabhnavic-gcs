@@ -1,13 +1,13 @@
 # Mission Command Set and Coverage Items
 
-The content `DG-MIS` waits on. This document is what Product signs; writing it does not close the
-Gate.
+The content `DG-MIS` settles. Product signed the `mission-command-set` part against this document
+and the Gate is recorded `CLOSED`.
 
 ## Status
 
 | Item | Status |
 | --- | --- |
-| This document | `PROPOSED` -- `DG-MIS` remains `OPEN` until Product signs the `mission-command-set` part |
+| This document | `DESIGNED` -- Product signed the `mission-command-set` part and `DG-MIS` is recorded `CLOSED` |
 | Aerora MAVLink commands introduced | **Zero.** Every command below is an existing upstream command |
 | Aerora complex items introduced | One: surface coverage |
 | Operating limits set here | **NONE.** No spacing, standoff, altitude or consumable limit is invented |
