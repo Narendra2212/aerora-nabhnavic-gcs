@@ -1,0 +1,79 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-FLT",
+  "part": "identity-format",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-FLT-SOC-01",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "A vehicle observed before an identifier is issued renders as a first contact: SCR-FLT-01 shows it by the link it arrived on and its MAVLink system id, labels it as not yet in the fleet, and offers adoption. fleetIdentityKnown() is false and fleetIdentity() is empty in that state rather than falling back to the system id, so the display shows an absence an operator can act on and not a wrong name. The absence is Unknown, meaning never reported and the repair is to adopt, rather than Unavailable."
+    },
+    {
+      "id": "DG-FLT-SOC-02",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "The identifier is minted by the station and bound to the board UID from AUTOPILOT_VERSION. The MAVLink system id is read nowhere in the derivation. It is protocol-level addressing, assigned per connection, not stable across the life of a vehicle and not unique across a fleet, so an identity derived from it would change under a routine reconfiguration."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraVehicleIdentity::fleetIdentityKnown()",
+      "permits": true,
+      "reason": "With the form, the authority, the scope and the lifetime settled, an evidence source can report an identity, so the guard may become true for a vehicle the store recognises. It stays false for a first contact, which is a state and not a gap."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the identifier's form",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A UUID version 4, stored and compared as its canonical lowercase hyphenated string. AeroraVehicleIdentity stores it verbatim as an opaque QString and parses nothing, so the form is a store convention rather than a parsed grammar. The operator-facing registration, such as a DGCA UIN or a tail number, is an attribute of the fleet record and is not the identifier: it can be entered late or corrected without rewriting flight history, and a wrong one cannot silently rebind a history.",
+          "source": "D-DAT-03"
+        }
+      ]
+    },
+    {
+      "element": "the authority that issues an identifier",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "The station persistence store, on first contact. The station reads AUTOPILOT_VERSION.uid2, falling back to uid where uid2 is absent, looks the value up in the Vehicles table, and either returns the fleet identity already bound to that board or mints a new one and binds it. No firmware change and no operator entry is required before an aircraft is usable. A board swap presents an unbound board UID for an aircraft the operator recognises, so rebinding is an operator confirmation rather than a silent merge, and the identity stays with the airframe rather than following the board.",
+          "source": "D-DAT-03"
+        }
+      ]
+    },
+    {
+      "element": "the scope within which an identifier is unique",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "One station persistence store. The identifier is unique among the rows of that Vehicles table and is not claimed to be unique across stations: two stations meeting the same aircraft independently mint different identifiers. That is recorded as a known limit rather than hidden, because the alternative is a globally unique scheme no authority issues today. Correlating two stores is a later decision and needs the board UID, which both stores record, so nothing here forecloses it.",
+          "source": "D-DAT-03"
+        }
+      ]
+    },
+    {
+      "element": "the identifier's lifetime",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Permanent for the airframe record. It survives a MAVLink system id change, a link change, a reconnection and a flight-control board swap. It is retired rather than deleted when an airframe leaves service, and a retired identifier is never reused, because an audit record and a flight log already name it and reuse would silently attribute one airframe history to another.",
+          "source": "D-DAT-03"
+        }
+      ]
+    }
+  ]
+}

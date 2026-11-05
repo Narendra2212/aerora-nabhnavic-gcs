@@ -873,8 +873,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-FLT.identity-format.json",
           "elements": [
             {
               "name": "the identifier's form",
