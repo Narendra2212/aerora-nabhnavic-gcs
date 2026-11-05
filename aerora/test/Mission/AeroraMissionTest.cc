@@ -5,6 +5,7 @@
 #include <QtCore/QRegularExpression>
 #include <QtTest/QTest>
 
+#include "AeroraCorePlugin.h"
 #include "AeroraMissionIndex.h"
 #include "AeroraMissionMock.h"
 #include "AeroraMissionObserver.h"
@@ -17,6 +18,12 @@
 namespace {
 
 constexpr const char *kLogCategory = "Aerora.Mission";
+
+// The two other categories HO-TAB5-01 crosses. The core plugin warns when it is asked for the
+// pattern menu with no vehicle, and the upstream base warns before returning nullptr for a type it
+// does not know - which is every Aerora type.
+constexpr const char *kCorePluginLogCategory = "Aerora.CorePlugin";
+constexpr const char *kUpstreamPluginLogCategory = "API.QGCCorePlugin";
 
 /// Data columns carry command ids as `int` so the table relies only on built-in metatypes.
 QList<MAV_CMD> toCommands(const QList<int> &commandIds)
@@ -447,6 +454,66 @@ void AeroraMissionTest::_missionCommandSetIsNotDeclared()
     const QList<MAV_CMD> declared = registry->declaredMissionCommandSet();
     QCOMPARE(declared.count(), 1);
     QVERIFY(declared.contains(MAV_CMD_NAV_WAYPOINT));
+}
+
+void AeroraMissionTest::_corePluginPublishesRegisteredComplexItems()
+{
+    // HO-TAB5-01. The registry is only reachable through two QGCCorePlugin seams, and both have
+    // to be overridden or a registered item is unreachable: MissionController reads
+    // complexMissionItemNames() to build the Plan view pattern menu, and createComplexMissionItem()
+    // is what a saved plan goes through on load. Neither failure is loud - the item simply never
+    // appears, and a plan containing one loads without its pattern.
+    //
+    // The plugin is obtained rather than constructed, and init() is not called. The constructor is
+    // a debug log, the two seams read only the registry and the base, and no item is ever created
+    // here, so a null PlanMasterController is never dereferenced.
+    AeroraMissionExtensionRegistry *const registry = AeroraMissionExtensionRegistry::instance();
+    AeroraCorePlugin *const plugin = AeroraCorePlugin::instance();
+
+    // A null vehicle degrades rather than crashes. The base dereferences it to decide whether
+    // StructureScan suits the frame, so the override skips the base and returns the registered
+    // names alone - none yet, which is this build.
+    expectLogMessage(kCorePluginLogCategory,
+                     QtWarningMsg,
+                     QRegularExpression(QStringLiteral("called with no vehicle")));
+    QVERIFY(plugin->complexMissionItemNames(nullptr).isEmpty());
+    verifyExpectedLogMessage();
+
+    auto *const extension =
+        new StubExtension(QStringLiteral("stub.surface"), {QStringLiteral("AeroraStubPattern")}, {});
+    _stubExtensions.append(extension);
+    QVERIFY(registry->registerExtension(extension));
+
+    // A registered name now reaches the menu, carrying both keys the seam exchanges. They are the
+    // same string because an extension supplies its name at runtime, and a runtime string has no
+    // catalogue entry to look up.
+    expectLogMessage(kCorePluginLogCategory,
+                     QtWarningMsg,
+                     QRegularExpression(QStringLiteral("called with no vehicle")));
+    const QVariantList published = plugin->complexMissionItemNames(nullptr);
+    verifyExpectedLogMessage();
+
+    QCOMPARE(published.count(), 1);
+    const QVariantMap entry = published.first().toMap();
+    QCOMPARE(entry.value(QStringLiteral("canonicalName")).toString(), QStringLiteral("AeroraStubPattern"));
+    QCOMPARE(entry.value(QStringLiteral("translatedName")).toString(), QStringLiteral("AeroraStubPattern"));
+
+    // The registry is asked before the base, which is what keeps the upstream unknown-type warning
+    // off the normal path for an item upstream was never going to know. The stub creates nothing,
+    // so the registry warns and the override then delegates, and the base warns in turn. Both are
+    // expected in FIFO order; what is under test is that the stub was asked at all.
+    QCOMPARE(extension->createCallCount, 0);
+    expectLogMessage(kLogCategory,
+                     QtWarningMsg,
+                     QRegularExpression(QStringLiteral("claimed a complex item name but created nothing")));
+    expectLogMessage(kUpstreamPluginLogCategory,
+                     QtWarningMsg,
+                     QRegularExpression(QStringLiteral("Unknown complex item type")));
+    QVERIFY(plugin->createComplexMissionItem(QStringLiteral("AeroraStubPattern"), nullptr, false) == nullptr);
+    verifyExpectedLogMessage();
+    verifyExpectedLogMessage();
+
+    QCOMPARE(extension->createCallCount, 1);
 }
 
 void AeroraMissionTest::_observerPresentsAnUncheckedUploadAsUnverified()

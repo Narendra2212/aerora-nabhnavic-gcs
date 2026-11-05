@@ -37,6 +37,7 @@ private slots:
     void _resumeReportsItemsNotCarriedForwardBeforeResumeIndex();
     void _missionExtensionRegistryRefusesAmbiguity();
     void _missionCommandSetIsNotDeclared();
+    void _corePluginPublishesRegisteredComplexItems();
 
     void _validationModelNeverTreatsAnUncheckedConditionAsPassed();
     void _validationVerdicts_data();
