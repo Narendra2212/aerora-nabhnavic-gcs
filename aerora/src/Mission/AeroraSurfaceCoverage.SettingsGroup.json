@@ -1,0 +1,68 @@
+{
+    "version": 1,
+    "fileType": "FactMetaData",
+    "QGC.MetaData.Facts": [
+        {
+            "name": "WorkingDistance",
+            "shortDesc": "Standoff from the worked surface, measured along the surface normal.",
+            "type": "double",
+            "units": "m",
+            "decimalPlaces": 2
+        },
+        {
+            "name": "PassInterval",
+            "shortDesc": "Spacing between stacked passes.",
+            "type": "double",
+            "units": "m",
+            "decimalPlaces": 2
+        },
+        {
+            "name": "ActionInterval",
+            "shortDesc": "Distance between actuations along a pass.",
+            "type": "double",
+            "units": "m",
+            "decimalPlaces": 2
+        },
+        {
+            "name": "SurfaceHeight",
+            "shortDesc": "Vertical extent of the worked surface.",
+            "type": "double",
+            "units": "vertical m",
+            "decimalPlaces": 2
+        },
+        {
+            "name": "StartAltitude",
+            "shortDesc": "Altitude of the first pass, in the item frame.",
+            "type": "double",
+            "units": "vertical m",
+            "decimalPlaces": 1
+        },
+        {
+            "name": "EntryAltitude",
+            "shortDesc": "Altitude the aircraft arrives and departs at.",
+            "type": "double",
+            "units": "vertical m",
+            "decimalPlaces": 1
+        },
+        {
+            "name": "PassSpeed",
+            "shortDesc": "Ground speed along a pass.",
+            "type": "double",
+            "units": "m/s",
+            "decimalPlaces": 1
+        },
+        {
+            "name": "PassDirection",
+            "shortDesc": "Whether stacked passes alternate direction or all run the same way.",
+            "type": "uint32",
+            "enumStrings": "Alternating,One way",
+            "enumValues": "0,1",
+            "default": 0
+        },
+        {
+            "name": "CapabilityRequired",
+            "shortDesc": "Payload capability a pass needs. Opaque: it carries no actuator identity, no enumeration member and no MAVLink field.",
+            "type": "string"
+        }
+    ]
+}
