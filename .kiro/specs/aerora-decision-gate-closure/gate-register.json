@@ -2286,120 +2286,6 @@
   },
   "contractSurface": [
     {
-      "symbol": "AeroraFirmwareClaim::kFirmwareClass",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraMissionResumeBoundary::kPayloadStatePersistenceEvidenced",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraMissionResumeBoundary::kReplayedCommandCount",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraMissionValidationReport::kNotPerformedBlocksOperation",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPayloadModel::kAutonomousPayloadActionImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPayloadModel::kGroundStationActuatorPathImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kAutomaticSourceTransitionImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kDefinedThresholdCount",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kPowerArbitrationImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kRemainingEnergyEstimationImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kStationInitiatedPowerActionImplemented",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraPowerModel::kWatchdogToPowerRelationshipEvidenced",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraProvenance::kUpstreamBaseCommitKnown",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraSecurityStatus::kEnforcementVerified",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "AeroraSigningKeyStore::kProtectedKeySubgroup",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "kCapabilityVocabularyAccepted",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "kLatitudeLimitDeg",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
-      "symbol": "kLongitudeLimitDeg",
-      "kind": "constant",
-      "gate": "none",
-      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
-    },
-    {
       "symbol": "AeroraAuditEventType::AuthorizationDecision",
       "kind": "enumerator",
       "gate": "none",
@@ -2566,6 +2452,12 @@
       "kind": "enumerator",
       "gate": "none",
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraFirmwareClaim::kFirmwareClass",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
     },
     {
       "symbol": "AeroraFleetTransmissionOutcome::Delivered",
@@ -2832,6 +2724,30 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraMissionObserver::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kGcsPayloadStateReplayImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kPayloadStatePersistenceEvidenced",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraMissionResumeBoundary::kReplayedCommandCount",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
       "symbol": "AeroraMissionSnapshot::GcsPlan",
       "kind": "enumerator",
       "gate": "none",
@@ -2874,6 +2790,12 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraMissionValidationReport::kNotPerformedBlocksOperation",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
       "symbol": "AeroraPayloadModel::RequestOutcome::RefusedByCommandPath",
       "kind": "enumerator",
       "gate": "none",
@@ -2904,6 +2826,24 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraPayloadModel::kAutonomousPayloadActionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPayloadModel::kGroundStationActuatorPathImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPayloadModel::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
       "symbol": "AeroraPlanBridge::Role::GcsPlan",
       "kind": "enumerator",
       "gate": "none",
@@ -2928,6 +2868,66 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraPowerModel::kAutomaticSourceTransitionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kDefinedThresholdCount",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kPowerArbitrationImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kRemainingEnergyEstimationImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraPowerModel::kStationInitiatedPowerActionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraPowerModel::kWatchdogToPowerRelationshipEvidenced",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraProvenance::kAbsentBranchSentinel",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraProvenance::kAbsentCommitSentinel",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraProvenance::kUpstreamBaseCommitKnown",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
       "symbol": "AeroraQmlOverrides::Tier::PopulatedFile",
       "kind": "enumerator",
       "gate": "none",
@@ -2940,6 +2940,18 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraQmlOverrides::kOverridePrefix",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "AeroraQmlOverrides::kResourceScheme",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
       "symbol": "AeroraSecurityStatus::Enforcement::EnforcedAtCommandGate",
       "kind": "enumerator",
       "gate": "none",
@@ -2950,6 +2962,18 @@
       "kind": "enumerator",
       "gate": "none",
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraSecurityStatus::kEnforcementVerified",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraSigningKeyStore::kProtectedKeySubgroup",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
     },
     {
       "symbol": "AeroraStateValue::CapabilityAbsent",
@@ -2968,6 +2992,82 @@
       "kind": "enumerator",
       "gate": "none",
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::_jsonObstructionsKey",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::_jsonSurfacePolygonKey",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::actionIntervalName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::canonicalName",
+      "kind": "constant",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::capabilityRequiredName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::entryAltitudeName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::jsonComplexItemTypeValue",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::passDirectionName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::passIntervalName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::passSpeedName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::settingsGroup",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::startAltitudeName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::surfaceHeightName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraSurfaceCoverageComplexItem::workingDistanceName",
+      "kind": "registryKey",
+      "gate": "DG-MIS"
+    },
+    {
+      "symbol": "AeroraTelemetrySet::kServiceName",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
     },
     {
       "symbol": "AeroraTelemetrySource::OriginatingComponent",
@@ -3210,6 +3310,12 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraVehicleComponent::kQmlModuleResourceRoot",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
       "symbol": "AeroraVehicleServices::Classification::CorroboratedAerora",
       "kind": "enumerator",
       "gate": "none",
@@ -3234,58 +3340,10 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
-      "symbol": "AeroraMissionObserver::kServiceName",
-      "kind": "registryKey",
+      "symbol": "kCapabilityVocabularyAccepted",
+      "kind": "constant",
       "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraPayloadModel::kServiceName",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraPowerModel::kServiceName",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraProvenance::kAbsentBranchSentinel",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraProvenance::kAbsentCommitSentinel",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraQmlOverrides::kOverridePrefix",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraQmlOverrides::kResourceScheme",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraTelemetrySet::kServiceName",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
-    },
-    {
-      "symbol": "AeroraVehicleComponent::kQmlModuleResourceRoot",
-      "kind": "registryKey",
-      "gate": "none",
-      "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
     },
     {
       "symbol": "kItemBatteryConfiguration",
@@ -3364,6 +3422,18 @@
       "kind": "registryKey",
       "gate": "none",
       "reason": "a service-registry or lookup key owned by the module that publishes it, never sent, parsed or matched against a MAVLink field"
+    },
+    {
+      "symbol": "kLatitudeLimitDeg",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "kLongitudeLimitDeg",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
     },
     {
       "symbol": "kPayloadFreshnessClass",
