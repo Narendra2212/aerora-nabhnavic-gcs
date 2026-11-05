@@ -1,0 +1,131 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-AUT",
+  "part": "proposal-model",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Architecture",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-AUT-SOC-02",
+      "satisfied": true,
+      "reviewer": "Architecture",
+      "date": "2026-11-05",
+      "note": "All four states map to a State_Vocabulary class exactly and none is stretched to fit: Absent to Unknown, Proposed to Proposed, Approved to Requested, Expired to Stale. Rejected is deliberately not a state. It maps to no class: Unavailable carries the right meaning but 00-README.md records it as producible only from a vehicle capability report, and Unknown would say nothing was ever observed about a proposal an operator deliberately declined. Rejection is therefore the transition from Proposed to Absent, and which operator declined what and when is recorded as an OperatorAction and an AuthorizationDecision event rather than as a lifecycle state."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "autonomy-source",
+      "permits": false,
+      "reason": "The register records two parts as permitted to change this check and this is one of them. The record settles the shape of a proposal and not where a proposal comes from, which DG-AUT:source-interface holds, so no autonomy-source identifier is permitted into the tree yet and the check stays in force. A proposal model with no source to receive one from introduces nothing for the check to allow."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the proposal's source, timestamp, subject and basis fields",
+      "shape": "single",
+      "entries": [
+        {
+          "value": {
+            "source": "An opaque identifier of the autonomy source that produced the proposal, stored verbatim and never parsed. Its form is held by DG-AUT:source-interface, and nothing in this model reads inside it.",
+            "timestamp": "Two values recorded together, matching what the Events table already treats as authoritative: occurredUtcMs for wall time and monotonicUs as the ordering source of truth. A queue ordered by wall time would reorder itself when the clock is corrected mid-flight, which is exactly when an operator is reading it.",
+            "subject": "What the proposal is about, named the way a telemetry item is named, so that a proposal and the value it concerns resolve to one subject rather than to two spellings of it.",
+            "basis": "The evidence the source offers, carried verbatim and not interpreted. SCR-AIS-01 displays it. The station renders a basis and does not evaluate one, because a station that evaluated the basis would be a second autonomy source deciding whether the first one was right."
+          },
+          "source": "P7-AI-001"
+        }
+      ]
+    },
+    {
+      "element": "the lifecycle states",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "Absent",
+          "value": {
+            "stateVocabularyClass": "Unknown",
+            "meaning": "No proposal exists for the subject. Both the entry state and the exit state, which is what makes the lifecycle a cycle rather than a set of dead ends."
+          },
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Proposed",
+          "value": {
+            "stateVocabularyClass": "Proposed",
+            "meaning": "A source suggests this and nobody has accepted it. Subordinate and labelled, never promoted to Effective."
+          },
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Approved",
+          "value": {
+            "stateVocabularyClass": "Requested",
+            "meaning": "An operator approved it, so the station has asked for it and the vehicle has not reported it in force. Never promoted to Effective, which is the aircraft reporting what it is actually doing."
+          },
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Expired",
+          "value": {
+            "stateVocabularyClass": "Stale",
+            "meaning": "Past its expiry budget. Keeps its last content and its age, and is never presented as current."
+          },
+          "source": "P7-AI-001"
+        }
+      ]
+    },
+    {
+      "element": "the permitted transitions between lifecycle states",
+      "shape": "mapping",
+      "entries": [
+        {
+          "key": "Absent",
+          "value": [
+            "Proposed"
+          ],
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Proposed",
+          "value": [
+            "Approved",
+            "Expired",
+            "Absent"
+          ],
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Approved",
+          "value": [
+            "Absent"
+          ],
+          "source": "P7-AI-001"
+        },
+        {
+          "key": "Expired",
+          "value": [
+            "Absent"
+          ],
+          "source": "P7-AI-001"
+        }
+      ]
+    },
+    {
+      "element": "the expiry rule",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A proposal expires when its age exceeds a configured expiry budget, measured from the proposal timestamp on the monotonic clock rather than on wall time. On expiry it enters Expired, which presents as Stale: last content retained, age shown, never presented as current. The budget value is not set here. It is a freshness budget, and Q-036 and DG-FRS hold those, so the rule is settled and the number is not, which is the same split the mission parameter set uses. Expiry never approves. An expired proposal transitions only to Absent, so no path runs from Expired to Approved and the rule cannot become a timeout that acts by itself. P7-AI-002 requires an explicit operator approval event, and a proposal that approved itself by ageing would be the hardest version of that violation to notice.",
+          "source": "P7-AI-001"
+        }
+      ]
+    }
+  ]
+}

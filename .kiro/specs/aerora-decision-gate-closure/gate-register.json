@@ -603,8 +603,8 @@
           "signingOwners": [
             "Architecture"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-AUT.proposal-model.json",
           "elements": [
             {
               "name": "the proposal's source, timestamp, subject and basis fields",
