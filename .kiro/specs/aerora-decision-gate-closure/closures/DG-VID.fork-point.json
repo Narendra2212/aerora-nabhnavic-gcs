@@ -1,0 +1,89 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-VID",
+  "part": "fork-point",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "the process owner",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-VID-SOC-01",
+      "satisfied": true,
+      "reviewer": "the process owner",
+      "date": "2026-11-05",
+      "note": "The recorded class-X fork target rises from zero to one. The drift review is scheduled at every upstream sync with a floor of once per release, the owner is Tab 7, and the fork is listed in the seam budget as the one entry. One is a budget rather than a precedent: a second class-X fork needs its own signature."
+    },
+    {
+      "id": "DG-VID-SOC-02",
+      "satisfied": true,
+      "reviewer": "the process owner",
+      "date": "2026-11-05",
+      "note": "Four alternatives were considered. Using the existing widget layer was declined because it is bound visible: !fullScreen and so is invisible in fullscreen video, which is the one case a video overlay is for; what it does deliver without any fork is SCR-LIV-01 drawn over video whenever the widget layer is visible, including video as the main item with the map in PiP, and that is retained. Overriding the three video C++ seams was declined because the sink is an opaque void pointer owned by its creating plugin, so they must be taken as a set and Aerora has no reason to own the pipeline. Accepting no fullscreen overlay was declined because SCR-VID-01 is a product screen. Contributing an overlay loader seam to upstream is not declined: it is the preferred long-term exit and is pursued in parallel, so the fork is reviewed for removal at each drift review rather than being permanent by default."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraQmlOverrides::populatedFileOverrideCount()",
+      "permits": true,
+      "reason": "The fork point, the upstream commit, the owner, the cadence and the reason are settled, so the count may rise from zero to one. One, and not more: the register records this part as permitting the change, and a second class-X override is a separate decision with its own signature."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the Tier::PopulatedFile override target src/FlyView/FlyViewVideo.qml",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Confirmed as the target, and it is the only one. The three video C++ seams, createVideoReceiver, createVideoSink and releaseVideoSink, are deliberately not overridden: the sink is an opaque void pointer whose lifetime belongs to whichever plugin created it, so the three must be overridden as a set or not at all, and Aerora has no reason to take ownership of the pipeline. The override is of the QML file alone.",
+          "source": "Q-038"
+        }
+      ]
+    },
+    {
+      "element": "the upstream commit the replacement is authored against",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "bcd2ac4bb7d1c713bcbadfbce03c988deb0ff629, dated 2026-07-18, which is the newest upstream commit touching src/FlyView/FlyViewVideo.qml in this tree. Recorded as a hash rather than a branch so a drift review compares against a fixed point.",
+          "source": "IF-UIS-012"
+        }
+      ]
+    },
+    {
+      "element": "the named fork owner",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Tab 7, which is already the implementing owner of DG-VID. The party that maintains the overlay is the party that notices upstream drift, so ownership of the fork and ownership of the thing the fork exists for are not split.",
+          "source": "IF-UIS-012"
+        }
+      ]
+    },
+    {
+      "element": "the drift-review cadence",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "At every upstream sync, and at minimum once per release. Event-driven with a time floor: the file is stable, upstream last touched it on 2026-07-18, so a fixed monthly review would mostly find nothing while still missing a change made the day after one. The floor exists so that a long gap between syncs cannot leave the fork unreviewed indefinitely.",
+          "source": "IF-UIS-012"
+        }
+      ]
+    },
+    {
+      "element": "the recorded fork reason",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "In fullscreen video the widget layer, the Aerora custom layer and the bottom-right column of FlyView.qml are all bound visible: !QGroundControl.videoManager.fullScreen, so the only thing still drawn is what lives inside FlyViewVideo.qml. That is why upstream instantiates its own two video overlays there, ProximityRadarVideoView and ObstacleDistanceOverlayVideo. The file is populated upstream and offers no child seam, so reaching the video surface the way both recorded precedents reach it requires overriding that file. The previously recorded blocker P7-VID-004 was wrong and is not the reason: it is a content constraint satisfied by rendering any safety value through AeroraValueDisplay or AeroraStateText, and satisfied trivially by an overlay displaying no safety value.",
+          "source": "Q-038"
+        }
+      ]
+    }
+  ]
+}

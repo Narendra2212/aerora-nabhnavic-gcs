@@ -966,8 +966,8 @@
           "signingOwners": [
             "the process owner"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-VID.fork-point.json",
           "elements": [
             {
               "name": "the Tier::PopulatedFile override target src/FlyView/FlyViewVideo.qml",
