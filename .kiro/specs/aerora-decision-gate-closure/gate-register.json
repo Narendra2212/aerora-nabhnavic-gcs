@@ -3423,6 +3423,11 @@
       "path": ".github/workflows/aerora-windows.yml",
       "reason": "The Windows CI leg for the overlay, configuring CUSTOMCLASS=AeroraCorePlugin and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP. It names no suite: the scene-attachment test is registered off Windows, so this leg has no registration to assert. A new file rather than an edit to an upstream workflow.",
       "owner": "the process owner"
+    },
+    {
+      "path": ".github/workflows/aerora-package.yml",
+      "reason": "The dispatch-only packaging leg for the overlay, which produces a Release installer for review and uploads it as an artifact. It configures the build through the Aerora-Windows preset and names AeroraCorePlugin in the overlay-active assertion, which is the identifier this rule matches: the assertion exists because QGC_CUSTOM_BUILD is a plain CMake variable, so the overlay can fall out of the build while still compiling and linking, and the job would then package stock QGroundControl under an Aerora name. A new file rather than an edit to an upstream workflow, so it carries no rebase conflict. It signs nothing and releases nothing. Recorded because the ten screens the overlay builds had never been runnable outside a developer machine, and this reach is what it cost to make them so.",
+      "owner": "the process owner"
     }
   ],
   "hazards": [
