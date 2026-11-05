@@ -90,6 +90,14 @@ public:
     /// Changes the tether configuration item only.
     void reportTetherConfiguration(const QString &reportedToken);
 
+    /// Scenario: an attached tether is supplying or has stopped, as the vehicle reports it.
+    /// `IF-PWR-013`.
+    ///
+    /// Changes the tether supply item only. In particular it does not touch the tether
+    /// configuration: an attached tether that has stopped supplying is still attached, which is
+    /// the case Requirement 8 criterion 11 exists for.
+    void reportTetherSupply(const QString &reportedToken);
+
     /// Scenario: battery available or not, as the vehicle reports it. `IF-PWR-002`.
     ///
     /// Changes the battery configuration item only. In particular it does not report the tether

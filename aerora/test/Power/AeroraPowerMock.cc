@@ -48,6 +48,11 @@ void AeroraPowerMock::reportTetherConfiguration(const QString &reportedToken)
     _model->tetherConfiguration()->recordReport(reportedToken, nowUs(), _source);
 }
 
+void AeroraPowerMock::reportTetherSupply(const QString &reportedToken)
+{
+    _model->tetherSupply()->recordReport(reportedToken, nowUs(), _source);
+}
+
 void AeroraPowerMock::reportBatteryConfiguration(const QString &reportedToken)
 {
     _model->batteryConfiguration()->recordReport(reportedToken, nowUs(), _source);

@@ -42,8 +42,8 @@ constexpr const char *kTelemetryLogCategory = "aerora.telemetry";
 QStringList expectedItemIds()
 {
     return QStringList{QStringLiteral("powerTetherConfiguration"),
-                       QStringLiteral("powerTetherSupply"),
                        QStringLiteral("powerBatteryConfiguration"),
+                       QStringLiteral("powerTetherSupply"),
                        QStringLiteral("powerEffectiveState"),
                        QStringLiteral("powerReportedState"),
                        QStringLiteral("powerSourceTransition"),
@@ -357,6 +357,7 @@ void AeroraPowerModelTest::_disconnectClearsReportsAndRestoresNothing()
     QVERIFY(mock.reportCapabilityAvailable(QString::fromLatin1(kCapabilityKey)));
     mock.reportTetherConfiguration(QString::fromLatin1(kToken));
     mock.reportBatteryConfiguration(QString::fromLatin1(kToken));
+    mock.reportTetherSupply(QString::fromLatin1(kToken));
     mock.reportEffectiveState(QString::fromLatin1(kToken));
     mock.reportReportedState(QString::fromLatin1(kToken));
     mock.reportSourceTransition(QString::fromLatin1(kToken));
