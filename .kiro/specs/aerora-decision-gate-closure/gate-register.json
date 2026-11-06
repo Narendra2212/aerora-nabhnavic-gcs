@@ -783,8 +783,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.retention.json",
           "elements": [
             {
               "name": "the retention caps of D-DAT-01",

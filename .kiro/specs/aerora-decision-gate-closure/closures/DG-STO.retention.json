@@ -1,0 +1,125 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-STO",
+  "part": "retention",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [],
+  "guardPermissions": [],
+  "settled": [
+    {
+      "element": "the retention caps of D-DAT-01",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Operator-adjustable SettingsFacts in the Aerora settings group, mirroring how maxCacheDiskSize drives tile pruning, with defaults of 365 days of age and 2 GB of total size across Events and EventValues. A year is chosen so that an annual audit, an insurance cycle and a full operating season all fall inside the window rather than outside it. 2 GB is large for integer and text rows and small against the disks these stations run on. Both are raised or lowered per deployment rather than compiled in. Sessions follow Events and are pruned when no audit record references them. Vehicles are never pruned automatically: an operator deletes a vehicle record explicitly. These caps govern the operational event log and not the audit trail, which AuditRecords keeps separate by using ON DELETE RESTRICT where every other table uses CASCADE, so pruning cannot reach an audit record as a side effect.",
+          "source": "D-DAT-01"
+        }
+      ]
+    },
+    {
+      "element": "whether an audit record may be deleted at all per D-DAT-02",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "No. An audit record may not be deleted at all, by an operator or by the pruner, and may only be exported. The station offers no delete path for one: an exported record is managed as a file outside the station, and the station itself never removes one. This is already half a database property rather than only a rule the pruner must remember, because AuditRecords uses ON DELETE RESTRICT while every other table uses CASCADE. The consequence for the interface is that the confirmation flow of SCR-SEC-03 is an export flow and not a destructive one, so no destructive-action authorisation is designed for it. The reason is that an operator who can delete the record of their own actions leaves no evidence that they did, which defeats what the audit is for. The accepted cost is recorded rather than hidden: if an obligation to erase specific records ever arises, the station has no mechanism for it and one would have to be designed under whatever authority imposes the obligation. Permitting deletion behind a second authorisation was considered and declined, because a recorded deletion event proves that something was removed and not what it said.",
+          "source": "D-DAT-02"
+        }
+      ]
+    },
+    {
+      "element": "the event categories of D-DAT-04",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "LinkEvent",
+          "value": {
+            "category": "LinkEvent",
+            "storedValue": 0,
+            "meaning": "A link opened, closed, or changed Link_Class."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "VehicleEvent",
+          "value": {
+            "category": "VehicleEvent",
+            "storedValue": 1,
+            "meaning": "A vehicle appeared, was adopted into the fleet, or asserted a firmware claim."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "StateChange",
+          "value": {
+            "category": "StateChange",
+            "storedValue": 2,
+            "meaning": "A reported value changed its State_Vocabulary class. The only category that populates Events.stateClass; every other leaves it null."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "OperatorAction",
+          "value": {
+            "category": "OperatorAction",
+            "storedValue": 3,
+            "meaning": "An operator acted through the interface."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "AuthorizationDecision",
+          "value": {
+            "category": "AuthorizationDecision",
+            "storedValue": 4,
+            "meaning": "A command was allowed or denied, with the role that authorised it."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "MissionEvent",
+          "value": {
+            "category": "MissionEvent",
+            "storedValue": 5,
+            "meaning": "A plan was uploaded, downloaded, cleared or resumed."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "PayloadEvent",
+          "value": {
+            "category": "PayloadEvent",
+            "storedValue": 6,
+            "meaning": "A payload capability or payload state changed as reported by the vehicle."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "Fault",
+          "value": {
+            "category": "Fault",
+            "storedValue": 7,
+            "meaning": "A station-side failure: a store write that failed, an audit record that was lost, a message that could not be parsed."
+          },
+          "source": "D-DAT-04"
+        },
+        {
+          "key": "SecurityEvent",
+          "value": {
+            "category": "SecurityEvent",
+            "storedValue": 8,
+            "meaning": "The security posture itself changed: enforcement enabled or disabled, a key rotated, a platform protector found unavailable. Distinct from AuthorizationDecision, which is a verdict on one command, so SCR-SEC-03 can show a security timeline that is not a list of command verdicts."
+          },
+          "source": "D-DAT-04"
+        }
+      ]
+    }
+  ]
+}
