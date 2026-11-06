@@ -63,6 +63,20 @@
             "name": "CapabilityRequired",
             "shortDesc": "Payload capability a pass needs. Opaque: it carries no actuator identity, no enumeration member and no MAVLink field.",
             "type": "string"
+        },
+        {
+            "name": "ObstructionHeight",
+            "shortDesc": "Vertical extent of an obstruction on the worked surface.",
+            "type": "double",
+            "units": "vertical m",
+            "decimalPlaces": 2
+        },
+        {
+            "name": "ObstructionClearance",
+            "shortDesc": "Standoff the aircraft keeps from this obstruction. Per obstruction, because a cable tray and a window ledge do not warrant the same clearance.",
+            "type": "double",
+            "units": "m",
+            "decimalPlaces": 2
         }
     ]
 }

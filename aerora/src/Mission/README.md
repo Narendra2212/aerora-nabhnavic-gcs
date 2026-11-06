@@ -1060,3 +1060,15 @@ exactly this reason and starts refusing once the limits arrive, with no change t
 
 So the item is implementable now and unflyable until an applicator ICD exists. Those are different
 states and the register keeps them apart.
+
+### The obstruction element shares the settings group
+
+An obstruction carries two more Facts, `ObstructionHeight` and `ObstructionClearance`, and they sit
+in the same `FactMetaData` file as the nine. One file per settings group is the upstream shape, and
+an obstruction is part of the item rather than a thing of its own: it has no meaning outside the
+surface it excludes.
+
+Neither carries a limit either, for the same reason and with one addition that is explicit in the
+record: the clearance *value* is an operating limit and is not set here. Clearance is per
+obstruction rather than per item because a cable tray and a window ledge do not warrant the same
+standoff, which is also why obstructions are a list and not a flag.
