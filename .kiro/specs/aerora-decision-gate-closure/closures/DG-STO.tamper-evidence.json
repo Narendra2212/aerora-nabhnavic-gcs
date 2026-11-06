@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-STO",
   "part": "tamper-evidence",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "4fcff5bc212af16f97b878f67eaf221ec81e82c5",
   "signatures": [
     {
       "owner": "Tab 2",

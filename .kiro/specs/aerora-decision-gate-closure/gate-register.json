@@ -723,7 +723,7 @@
     },
     {
       "id": "DG-STO",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 1",
       "rationale": {
         "document": "05-product-completion/09-local-persistence-architecture.md",
@@ -736,7 +736,7 @@
             "Tab 2",
             "security architecture"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.tamper-evidence.json",
           "elements": [
             {
@@ -1522,7 +1522,7 @@
     },
     {
       "id": "SCR-TEL-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1662,7 +1662,7 @@
     },
     {
       "id": "SCR-LOG-01",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1681,7 +1681,7 @@
     },
     {
       "id": "SCR-LOG-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1723,7 +1723,7 @@
     },
     {
       "id": "SCR-SEC-03",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1736,7 +1736,7 @@
     },
     {
       "id": "SCR-SEC-04",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
