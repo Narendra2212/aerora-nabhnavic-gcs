@@ -242,7 +242,7 @@
     },
     {
       "id": "DG-FRS",
-      "status": "CLOSED",
+      "status": "OPEN",
       "implementingOwner": "Tab 4",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -254,8 +254,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "accepted",
-          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-FRS.freshness-budget.json",
+          "state": "open",
+          "closureRecord": null,
           "elements": [
             {
               "name": "for each freshness class, a threshold value, the unit of the threshold, and the source the value is drawn from",
@@ -723,7 +723,7 @@
     },
     {
       "id": "DG-STO",
-      "status": "CLOSED",
+      "status": "OPEN",
       "implementingOwner": "Tab 1",
       "rationale": {
         "document": "05-product-completion/09-local-persistence-architecture.md",
@@ -736,8 +736,8 @@
             "Tab 2",
             "security architecture"
           ],
-          "state": "accepted",
-          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.tamper-evidence.json",
+          "state": "open",
+          "closureRecord": null,
           "elements": [
             {
               "name": "the audit chain construction",
@@ -1522,7 +1522,7 @@
     },
     {
       "id": "SCR-TEL-02",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1539,7 +1539,7 @@
     },
     {
       "id": "SCR-TEL-03",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1662,7 +1662,7 @@
     },
     {
       "id": "SCR-LOG-01",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1681,7 +1681,7 @@
     },
     {
       "id": "SCR-LOG-02",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1723,7 +1723,7 @@
     },
     {
       "id": "SCR-SEC-03",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1736,7 +1736,7 @@
     },
     {
       "id": "SCR-SEC-04",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
@@ -1756,7 +1756,7 @@
     },
     {
       "id": "SCR-SET-02",
-      "released": true,
+      "released": false,
       "observation": null,
       "blockingEntries": [
         {
