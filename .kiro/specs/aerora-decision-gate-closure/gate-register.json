@@ -242,7 +242,7 @@
     },
     {
       "id": "DG-FRS",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 4",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -254,7 +254,7 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-FRS.freshness-budget.json",
           "elements": [
             {
@@ -1539,7 +1539,7 @@
     },
     {
       "id": "SCR-TEL-03",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1756,7 +1756,7 @@
     },
     {
       "id": "SCR-SET-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

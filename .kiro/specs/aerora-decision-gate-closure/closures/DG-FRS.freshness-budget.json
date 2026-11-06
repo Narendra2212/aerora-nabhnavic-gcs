@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-FRS",
   "part": "freshness-budget",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "42eb882db0f1ff1fc9616f2858e6b49e4ea66a64",
   "signatures": [
     {
       "owner": "Product",
