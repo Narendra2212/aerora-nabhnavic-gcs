@@ -736,8 +736,8 @@
             "Tab 2",
             "security architecture"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.tamper-evidence.json",
           "elements": [
             {
               "name": "the audit chain construction",
