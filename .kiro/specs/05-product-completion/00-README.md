@@ -27,6 +27,7 @@ claimed anywhere.
 | 09 | [Local Persistence Architecture](09-local-persistence-architecture.md) | WP1-C: schema, platform paths, durability, retention, export, failure behaviour, and the Q-037 assessment |
 | 10 | [Parameter Write Path and Authorization Boundary](10-parameter-write-path-and-authorization-boundary.md) | WP9-A: who can write a vehicle parameter, from where, and what the current gate does and does not cover |
 | 11 | [Mission Command Set and Coverage Items](11-mission-command-set-and-coverage-items.md) | The content `DG-MIS` settles: the command set, the one Aerora complex item, its parameters, the geometry and the plan-file key |
+| 12 | [Payload, Tether and Gimbal Item Sets](12-payload-tether-and-gimbal-item-sets.md) | The content `DG-PAY` waits on, derived from the firmware model: the reported item names and the units the model evidences |
 
 Document numbers are allocated by Tab 1 **before** a document is created. 09 was briefly used twice
 and Tab 9's was renumbered to 10; see
