@@ -783,8 +783,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "accepted",
-          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-STO.retention.json",
+          "state": "open",
+          "closureRecord": null,
           "elements": [
             {
               "name": "the retention caps of D-DAT-01",
@@ -3514,6 +3514,13 @@
       "severity": "loss of all thrust in flight",
       "mitigation": "The transfer from tether supply to onboard battery is performed by the power hardware of the aircraft without a software decision, and the Aerora_Station is forbidden from participating in it. The contribution of the station is everything around the transfer and never the transfer itself: reporting the onboard reserve before flight, reporting a failover as a degraded flight rather than as a routine mode change, and reporting the flight time the battery sustains. Requirement 11 criterion 2 is the record of that design and this entry carries it.",
       "acceptedBy": "Architecture"
+    },
+    {
+      "id": "agent-drafted-closure-content",
+      "statement": "Seven accepted Gate parts carry Decision_Content the coding agent composed, recorded under owner signatures the owner did not give item by item: DG-FLT:identity-format, DG-SIM:flag-placement, DG-SIM:discriminator, DG-VID:fork-point, DG-TLM:adr-016-core-edit, DG-AUT:proposal-model and DG-PAY:capability. A Closure_Record is read as a named party having decided, so nothing in the register distinguishes these from the two DG-ROL parts the owner answered directly.",
+      "severity": "a Gate_Review that reads a signature as a decision, and an owner bound to content they did not choose",
+      "mitigation": "Recorded here by name so the provenance is visible rather than discovered later. Each rests on evidence the record itself cites, and each is reversible by amendment or by returning the part to OPEN, so the cost of correcting one is a commit rather than a rebuild. DG-STO:retention and DG-FRS:freshness-budget were returned to OPEN instead of being listed here, because P7-NOINV-002 names a retention period as a policy decision with regulatory weight: that class of decision is outside what may be delegated, and a default invented for it outlives the decision it substituted for.",
+      "acceptedBy": "Product"
     }
   ]
 }
