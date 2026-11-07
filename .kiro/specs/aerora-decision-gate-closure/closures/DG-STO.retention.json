@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-STO",
   "part": "retention",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "fa55f71cc58095abc6c9683f3b095acfff95d134",
   "signatures": [
     {
       "owner": "Product",
