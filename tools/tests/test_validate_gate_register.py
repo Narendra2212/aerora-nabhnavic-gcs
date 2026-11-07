@@ -107,6 +107,7 @@ from common.gate_register import (
     dump_gate_register,
     guard_freedom,
     is_entry_id,
+    load_closure_record,
     load_gate_register,
     parse_screen_inventory,
     part_reference,
@@ -4299,6 +4300,22 @@ def _real_register() -> GateRegister:
     return load_gate_register(json.loads((REPO_ROOT / REGISTER_PATH).read_text(encoding="utf-8")))
 
 
+def _real_closure_records() -> dict[str, ClosureRecord]:
+    """Every Closure_Record the repository's own register names, keyed by the part that names it.
+
+    The shape :func:`guard_freedom` reads, so a test over the real register can ask whether a guard
+    is free by the same derivation the checks use rather than by a second reading of acceptance.
+    """
+    return {
+        part_reference(dossier.id, part.id): load_closure_record(
+            json.loads((REPO_ROOT / part.closure_record).read_text(encoding="utf-8"))
+        )
+        for dossier in _real_register().gates
+        for part in dossier.parts
+        if part.closure_record is not None
+    }
+
+
 def _real_screens() -> dict[str, ScreenRecord]:
     return {record.id: record for record in _real_register().screens}
 
@@ -4368,20 +4385,38 @@ def test_the_register_records_each_retained_entry_count_of_criterion_eleven(
 
 @pytest.mark.parametrize("symbol", sorted(MECHANICAL_GUARDS))
 def test_the_register_records_each_guard_of_criterion_five(symbol: str) -> None:
-    """Requirement 4 criterion 5's nine guards, each at the value the criterion names.
+    """Requirement 4 criterion 5's nine guards, each at the value the criterion names while pinned.
 
     The ninth names no value, because it is the static MAVLink-identifier check rather than a
     symbol, and the register records it as a `check` holding no value at all. The other eight carry
     the criterion's value in `recordedValue` whatever their kind: a predicate records the value the
     criterion states *and* the expression its source carries, which is why the two are separate
     fields.
+
+    The value is read while the guard is pinned, which is ``_guard_coverage``'s rule and is read
+    here through the same derivation rather than restated. Criterion 6 lets a recorded value move
+    once every part permitted to change a guard has permitted it, so a test demanding the
+    criterion's value unconditionally would fail on the one state Requirement 4 exists to allow --
+    and it did, when both `DG-TLM` parts permitted the fact-group registrar guard and its recorded
+    value moved to true. What stays protected is the drift that matters: a guard leaving the
+    criterion's value with no recorded permission behind it.
     """
-    guard = next((item for item in _real_register().guards if item.symbol == symbol), None)
+    register = _real_register()
+    guard = next((item for item in register.guards if item.symbol == symbol), None)
     expected = MECHANICAL_GUARDS[symbol]
 
     assert guard is not None, f"the registry records no entry for {symbol}"
-    assert guard.recorded_value == expected
     assert guard.holds_open or guard.holds_no_gate_open is True
+    if expected is None:
+        assert guard.recorded_value is None
+        return
+    assert (
+        guard.recorded_value == expected
+        or guard_freedom(register, _real_closure_records())[symbol].is_free
+    ), (
+        f"{symbol} records {guard.recorded_value!r} rather than the criterion's {expected!r}, and "
+        f"no part the registry records as permitted to change it has permitted it"
+    )
 
 
 @pytest.mark.parametrize(("item", "gate"), sorted(FORBIDDEN_UNTIL_ITEMS.items()))
