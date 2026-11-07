@@ -157,8 +157,8 @@
             "Firmware",
             "Product"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-TLM.dialect.json",
           "elements": [
             {
               "name": "for each Aerora fact, the fact name, the unit, the value range, the enumeration members, the owning fact group among the six the telemetry interface control document names, the freshness class, and the inbound message that populates the fact",
