@@ -14,6 +14,7 @@
 #include "AeroraPowerModel.h"
 #include "AeroraTelemetrySet.h"
 #include "AeroraVehicleCapabilities.h"
+#include "AeroraVehicleFactGroupRegistrar.h"
 #include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleMock.h"
 #include "AeroraVehicleServices.h"
@@ -576,16 +577,21 @@ void AeroraVehicleIntegrationTest::_domainServicesOpenNoActuatorPath()
     // as a literal holding a value.
     QVERIFY(!AeroraCorePlugin::isAuthorizationEnforced());
 
-    // AeroraVehicleFactGroupRegistrar::isRegistrationAvailable() gets no assertion here, and the
-    // omission is a decision rather than an oversight.
+    // The registration guard, asserted at true. Both DG-TLM parts the Gate_Register records as
+    // permitting it are accepted - Tab 1 signed the ADR-016 core edit and the dialect part is
+    // signed - so the register records true and this is the assertion that was held back until
+    // that permission existed.
     //
-    // The ADR-016 pair is applied in this tree - the friend declaration is in src/Vehicle/Vehicle.h
-    // and AERORA_VEHICLE_FACTGROUP_FRIENDSHIP is in aerora/CMakeLists.txt - so the function returns
-    // true. Asserting false would fail CI; asserting true would record an unauthorised core edit as
-    // the expected state and launder it into a passing test. The Gate_Register carries the gap
-    // instead, as a recorded disagreement naming Tab 1 as the owner and both remedies, and it
-    // prints on every run of the Gate_Review. The assertion belongs in whichever change resolves
-    // it: Tab 1 signs the core-edit part, or the definition is withdrawn.
+    // What it catches is withdrawal of either half of the ADR-016 pair: the friend declaration in
+    // src/Vehicle/Vehicle.h or AERORA_VEHICLE_FACTGROUP_FRIENDSHIP in aerora/CMakeLists.txt.
+    // Dropping the define alone is not a compile error - this class stays valid and simply refuses
+    // every registration - so without this assertion the regression would surface as Aerora values
+    // missing from the value picker and the CSV record in flight.
+    //
+    // The library's answer is read rather than the test's own preprocessor state. The function is
+    // compiled in AeroraVehicleFactGroupRegistrar.cc, so this observes what the shipped build can
+    // do; an #ifdef here would assert the test target's flags against themselves.
+    QVERIFY(AeroraVehicleFactGroupRegistrar::isRegistrationAvailable());
 
     // No payload command path is installed, so a request cannot leave the ground station.
     QVERIFY(!payload->isCommandPathInstalled());

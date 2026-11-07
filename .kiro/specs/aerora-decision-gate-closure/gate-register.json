@@ -1858,8 +1858,10 @@
       "symbol": "AeroraVehicleFactGroupRegistrar::isRegistrationAvailable()",
       "kind": "literal",
       "declaredIn": "aerora/src/Telemetry/AeroraVehicleFactGroupRegistrar.cc",
-      "recordedValue": "false",
-      "assertedIn": [],
+      "recordedValue": "true",
+      "assertedIn": [
+        "aerora/test/Vehicle/AeroraVehicleIntegrationTest.cc"
+      ],
       "holdsOpen": [
         "DG-TLM"
       ],
@@ -1867,22 +1869,7 @@
       "permittedToChangeBy": [
         "DG-TLM:dialect",
         "DG-TLM:adr-016-core-edit"
-      ],
-      "assertedNowhere": true,
-      "disagreement": {
-        "observedValue": "true",
-        "against": [
-          "7.17",
-          "7.18"
-        ],
-        "owner": "Firmware",
-        "remedies": [
-          "DG-TLM:dialect is accepted, which is the remaining part permitting the guard to read true; Tab 1 accepted the ADR-016 core-edit part on 2026-11-05, so the authorisation of the applied pair is no longer what holds it",
-          "the AERORA_VEHICLE_FACTGROUP_FRIENDSHIP definition is withdrawn from aerora/CMakeLists.txt CUSTOM_DEFINITIONS, returning the guard to false, which Tab 1 declined in the accepted core-edit record"
-        ],
-        "handOnRow": "finding-1"
-      },
-      "remedy": "DG-TLM:dialect is accepted, at which point the recorded value moves to true and the assertion is added in the same change. Asserting true before then would record a value the register pins at false, and asserting false would fail against the source, so the recorded absence stays until the remaining permission exists. The core-edit authorisation is no longer what holds it."
+      ]
     },
     {
       "symbol": "AeroraCorePlugin::isAuthorizationEnforced()",

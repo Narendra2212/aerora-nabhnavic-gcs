@@ -23,8 +23,8 @@ class Vehicle;
 /// `FactGroup::_addFactGroup()` is `protected`. Calling it on a `Vehicle` requires friendship, which
 /// upstream grants to exactly two classes for exactly this purpose
 /// (`src/Vehicle/Vehicle.h:108, 115`). `Vehicle` now names this class as a friend as well
-/// (`src/Vehicle/Vehicle.h:123`); whether that grant carries the authorisation it needs is
-/// unresolved and is Tab 1's to record (ADR-016).
+/// (`src/Vehicle/Vehicle.h:123`), and Tab 1 authorised that grant in the accepted `DG-TLM`
+/// core-edit Closure_Record (ADR-016).
 ///
 /// So the single privileged statement is compiled only when \c AERORA_VEHICLE_FACTGROUP_FRIENDSHIP
 /// is defined, which the overlay does in `CUSTOM_DEFINITIONS`, so \c isRegistrationAvailable()
