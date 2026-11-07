@@ -144,7 +144,7 @@
     },
     {
       "id": "DG-TLM",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 4",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -157,7 +157,7 @@
             "Firmware",
             "Product"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-TLM.dialect.json",
           "elements": [
             {
@@ -1192,7 +1192,7 @@
     },
     {
       "id": "SCR-LIV-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1509,7 +1509,7 @@
     },
     {
       "id": "SCR-TEL-01",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {

@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-TLM",
   "part": "dialect",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-05",
-  "entryCommit": null,
+  "entryCommit": "3d8c03106008504330d5558fbc1c79213ec98aa0",
   "signatures": [
     {
       "owner": "Firmware",
