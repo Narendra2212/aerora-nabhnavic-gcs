@@ -1,0 +1,58 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-PAY",
+  "part": "power",
+  "state": "submitted",
+  "signOffDate": "2026-11-07",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-07"
+    },
+    {
+      "owner": "engineering",
+      "date": "2026-11-07"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-PAY-SOC-02",
+      "satisfied": true,
+      "reviewer": "engineering",
+      "date": "2026-11-07",
+      "note": "The one item in the set is vehicle-reported: the accepted DG-TLM:dialect record declares tetherMode a fact of the Aerora power group populated by an inbound NAMED_VALUE_INT. What this verdict has to answer is why the set is one item. P7-PWR-006 asks for tether state where reported, and the only tether signal the firmware model carries is TETHER_MODE; it carries no tether measurement of any kind, so there is no reported voltage, current or temperature to name. IF-PWR-013 carries tether supply as an interface item and is deliberately not in this set: its evidence class is MODEL rather than issued, no reporting message is settled for it, and what a supply token means is held by Q-025. So the honest set today is one item, and a supply item joins it by amendment when Q-025 settles rather than being signed here on an interface that is still PROPOSED. Recording one item is not the same as recording that the aircraft reports nothing, and the distinction is the point: the panel shows a reported mode and reports no measurement, rather than showing a measurement the aircraft never sends."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraPowerModel::kDefinedThresholdCount",
+      "permits": false,
+      "reason": "This record settles a reported item set and names no threshold. The count stays at zero because a threshold is a value with an operating limit behind it, and nothing here supplies one: the battery reserve and the refusal of tethered-flight readiness below it remain unsettled. A reported mode is not a threshold."
+    },
+    {
+      "symbol": "kAutomaticSourceTransitionImplemented",
+      "permits": false,
+      "reason": "Knowing that the aircraft reports a tether mode does not permit the station to transition between power sources. The transfer is electrical and the station is forbidden from participating, which the register carries as a recorded hazard, and no part of this record changes that."
+    },
+    {
+      "symbol": "kRemainingEnergyEstimationImplemented",
+      "permits": false,
+      "reason": "No item in this set is an energy quantity and no consumption or discharge model is settled anywhere, so there is nothing for an estimate to be derived from. Permitting it on a mode report would be exactly the station-derived projection without an approved method that criterion 7 holds a part open for."
+    }
+  ],
+  "settled": [
+    {
+      "element": "for each reported tether item, the item name, the unit, the value range, the enumeration members, and the reporting message",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "tetherMode",
+          "exception": true,
+          "value": "Settled as a reported item with an unsettled enumeration, on the terms the accepted DG-TLM:dialect record already set for this same item against an identically worded criterion. Four of the five attributes are known: the item name is tetherMode, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, and its reporting message is NAMED_VALUE_INT. Only the member set is unsettled. The firmware model carries TETHER_MODE beside AUTO_MAX_VEL, AUTO_ALT_MIN_M and AUTO_SP_TIMEOUT_S, which implies an AUTO mode without enumerating the set, so the members stay unsettled rather than inferred from neighbouring parameter names. Recorded as an explicit exception rather than guessed, for the reason NAMED_VALUE_INT makes permanent: the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. The station reports the integer as its own source with its own freshness, which is what P7-PWR-006 asks for, and interprets none of it until the members are settled by amendment.",
+          "source": "DG-TLM:dialect"
+        }
+      ]
+    }
+  ]
+}

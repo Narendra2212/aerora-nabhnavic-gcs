@@ -1,0 +1,97 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-PAY",
+  "part": "payload",
+  "state": "submitted",
+  "signOffDate": "2026-11-07",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-07"
+    },
+    {
+      "owner": "engineering",
+      "date": "2026-11-07"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-PAY-SOC-01",
+      "satisfied": true,
+      "reviewer": "engineering",
+      "date": "2026-11-07",
+      "note": "Every item is vehicle-reported, and the evidence is the inbound message rather than the item's name: each of the five is populated by a NAMED_VALUE_INT or NAMED_VALUE_FLOAT arriving from the aircraft, which the accepted DG-TLM:dialect record settles as the Aerora reporting mechanism. sprayPumpCommand is the one that reads like a counter-example and is not: the name describes what the value is, the pump command the flight controller computed, and the station only ever receives it. No item here is a station-originated request, a parameter write or a station-derived projection, so criterion 7 does not engage and the guard verdicts below keep the outbound direction shut. The two gimbal items the firmware model carries are deliberately not in the set: the accepted dialect record declares no gimbal fact, a gimbal is a camera concern upstream already models, and whether it is Aerora content at all is an open Product question rather than something this signature answers."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "kGroundStationActuatorPathImplemented",
+      "permits": false,
+      "reason": "Settling which values the aircraft reports settles the inbound direction and nothing else. Knowing that sprayEnabled and sprayPumpCommand arrive as NAMED_VALUE_* does not permit the station to drive the applicator, which stays the payload controller's concern. The same verdict DG-ROL:authorization-scope reached on this guard, for the same reason read from the other side."
+    },
+    {
+      "symbol": "kAutonomousPayloadActionImplemented",
+      "permits": false,
+      "reason": "Nothing in a reported item set permits the station to originate a payload action without an operator asking for one. P7-PAY-004's reported-values-only rule is recorded as excluded from this Gate precisely because it is not what a signature here decides."
+    }
+  ],
+  "settled": [
+    {
+      "element": "for each reported payload item, the item name, the unit, the value range, the enumeration members, and the reporting message",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "sprayEnabled",
+          "value": {
+            "itemName": "sprayEnabled",
+            "unit": "none, it is an enumeration",
+            "valueRange": "the int32 range NAMED_VALUE_INT carries",
+            "enumerationMembers": "Off = 0, On = 1",
+            "reportingMessage": "NAMED_VALUE_INT"
+          },
+          "source": "DG-TLM:dialect"
+        },
+        {
+          "key": "sprayRate",
+          "value": {
+            "itemName": "sprayRate",
+            "unit": "not evidenced; the model signal carries no unit suffix",
+            "valueRange": "the IEEE 754 single-precision range the message carries; no narrower range is asserted, and the operating limits are held by the applicator ICD",
+            "enumerationMembers": "none, it is a scalar",
+            "reportingMessage": "NAMED_VALUE_FLOAT"
+          },
+          "source": "DG-TLM:dialect"
+        },
+        {
+          "key": "sprayPumpCommand",
+          "value": {
+            "itemName": "sprayPumpCommand",
+            "unit": "not evidenced; the model signal carries no unit suffix",
+            "valueRange": "the IEEE 754 single-precision range the message carries; no narrower range is asserted, and the operating limits are held by the applicator ICD",
+            "enumerationMembers": "none, it is a scalar",
+            "reportingMessage": "NAMED_VALUE_FLOAT"
+          },
+          "source": "DG-TLM:dialect"
+        },
+        {
+          "key": "payloadEmergencyStop",
+          "value": {
+            "itemName": "payloadEmergencyStop",
+            "unit": "none, it is an enumeration",
+            "valueRange": "the int32 range NAMED_VALUE_INT carries",
+            "enumerationMembers": "Inactive = 0, Active = 1",
+            "reportingMessage": "NAMED_VALUE_INT"
+          },
+          "source": "DG-TLM:dialect"
+        },
+        {
+          "key": "sprayGateState",
+          "exception": true,
+          "value": "Settled as a reported item with an unsettled enumeration, on the terms the accepted DG-TLM:dialect record already set for this same item against an identically worded criterion. Four of the five attributes are known: the item name is sprayGateState, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, and its reporting message is NAMED_VALUE_INT. Only the member set is unsettled, because the interlock is a Stateflow chart and the firmware archive does not enumerate its states. Recorded as an explicit exception rather than guessed: with NAMED_VALUE_INT the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. Appending members later is safe; renumbering silently rewrites records already on disk. The station displays the reported integer and interprets none of it until the members are settled by amendment.",
+          "source": "DG-TLM:dialect"
+        }
+      ]
+    }
+  ]
+}

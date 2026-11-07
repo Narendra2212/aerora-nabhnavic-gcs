@@ -440,8 +440,8 @@
             "Product",
             "engineering"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.payload.json",
           "elements": [
             {
               "name": "for each reported payload item, the item name, the unit, the value range, the enumeration members, and the reporting message",
@@ -471,8 +471,8 @@
             "Product",
             "engineering"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.power.json",
           "elements": [
             {
               "name": "for each reported tether item, the item name, the unit, the value range, the enumeration members, and the reporting message",
