@@ -10,7 +10,7 @@ is what Product and engineering would sign; writing it does not close the Gate.
 | This document | `PROPOSED` -- `DG-PAY` remains `OPEN` on all four parts |
 | Item names and units | Derived from the firmware model, named below with the signal each came from |
 | Operating limits set here | **NONE.** Every numeric value is recorded as configurable and unset |
-| Reporting messages | **NOT DERIVABLE from this model.** See section 2, and it is why the Gate cannot close on this document alone |
+| Reporting messages | `NAMED_VALUE_FLOAT` and `NAMED_VALUE_INT`, decided by Product and Firmware on 2026-11-05. See section 7 |
 | Aerora MAVLink messages introduced | **Zero.** The model references common-dialect messages only |
 
 ## 1. Where this comes from
@@ -171,3 +171,45 @@ holds, so the items reach `aerora/src/` when the Gate closes and not before.
 
 Defined programme-wide in [00-README.md](00-README.md#status-vocabulary). This document redefines
 none of them and claims `VERIFIED` for nothing: no part of this has been built, compiled or run.
+
+## 7. The reporting mechanism
+
+**Decision: Aerora values are reported as `NAMED_VALUE_FLOAT` and `NAMED_VALUE_INT`. No Aerora
+dialect is created.** Product and Firmware, 2026-11-05.
+
+Section 2 recorded that the model reports no payload value at all: it references only `STATUSTEXT`
+and `SET_ACTUATOR` beyond the basics, with no `NAMED_VALUE_FLOAT`, `DEBUG_VECT`, `ESC_TELEMETRY`,
+`SERVO_OUTPUT_RAW` or `GIMBAL_DEVICE_*`. So the firmware commands the payload and speaks in text,
+and its payload signals never leave the aircraft. There was no message to look up, only a mechanism
+to choose.
+
+Both messages are common-dialect: a string name and one scalar. QGroundControl already parses them,
+so no identifier is allocated and nothing is forked.
+
+### What this costs, recorded now rather than discovered
+
+The name is the contract. These messages are untyped and unversioned, so renaming a value breaks
+every log already recorded under the old name, and nothing in the protocol will say so. Each
+carries one scalar, so a unit or an enumeration is convention rather than schema: `sprayEnabled`
+travels as a `NAMED_VALUE_INT` whose members are agreed here and asserted nowhere on the wire.
+
+This is the trade that was taken deliberately. A typed Aerora dialect was the alternative and is
+what Class B of the telemetry ICD was reserved for, but that ICD records it as a programme rather
+than a decision: a controlled fork pinned to an immutable commit, a version reported in telemetry,
+a four-axis compatibility matrix, and an allocation discipline in which an identifier is never
+reused even for a withdrawn message, because a field recording is forever. The permanence that
+discipline protects is the reason it was declined for now: committing identifiers before the item
+set has settled would spend it on guesses.
+
+### Why this unblocks the value range as well
+
+`valueRange` is required for every item, and section 2 recorded the model marking its limits as
+placeholders. The mechanism resolves that without inventing anything, because the question changes:
+the range a `NAMED_VALUE_FLOAT` carries is the IEEE 754 single-precision range, which is a fact
+about the message rather than a judgement about the payload.
+
+So each item records the range the message carries and asserts no narrower one. The *operating*
+limits -- standoff, clearance, tilt, rate -- stay where they already are, held by the applicator ICD
+and reported unperformable by the `GeometryLimits` check until they arrive. A transport range and an
+operating limit are different things, and conflating them is what would have turned a placeholder
+into a signed value.
