@@ -1,0 +1,124 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-STO",
+  "part": "tamper-evidence",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Tab 2",
+      "date": "2026-11-05"
+    },
+    {
+      "owner": "security architecture",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-STO-SOC-01",
+      "satisfied": true,
+      "reviewer": "security architecture",
+      "date": "2026-11-05",
+      "note": "A backend is named for each of the five target platforms and no exception is taken. The headless Linux case is known and handled at runtime rather than by exception: libsecret needs a running Secret Service, and where none exists the station reports not tamper-evident instead of claiming protection. An exception would have withheld the capability even where the platform provides it. A file-based Linux fallback was declined because a key beside the database gives an attacker with disk access both."
+    },
+    {
+      "id": "DG-STO-SOC-02",
+      "satisfied": true,
+      "reviewer": "Tab 2",
+      "date": "2026-11-05",
+      "note": "The write-failure behaviour is defined and operator-visible: the lost-record count increments and a non-zero count shows as a degraded state, so a lost record is counted rather than silently dropped. Whether the operation proceeds stays with DG-ROL, which settles it per command class."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraAuditSink::isTamperEvident()",
+      "permits": true,
+      "reason": "The chain construction and the anchor are both settled, so the sink may report tamper-evidence once they are implemented. It stays false where the protector is unavailable at runtime, which is a state and not a gap."
+    },
+    {
+      "symbol": "AeroraAuditSink::isDurable()",
+      "permits": true,
+      "reason": "A hash chain and an anchor are worth nothing over a write that may not have reached the disk, so settling them is what lets durability be claimed. The guard may become true once the durable write path is implemented."
+    },
+    {
+      "symbol": "AeroraCommandAuthorizer::lostAuditRecordCount()",
+      "permits": true,
+      "reason": "The write-failure accounting behaviour is settled, so the counter may be incremented and surfaced. The register records its value as an expression, which this record does not change."
+    }
+  ],
+  "settled": [
+    {
+      "element": "the audit chain construction",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "A per-record hash chain. Each audit record stores a SHA-256 digest over its own canonical fields together with the digest of the record before it, so editing any field or removing any row breaks the chain at that point and the break is localised to the exact record. The construction needs no key, so it is identical on all five target platforms and cannot silently degrade on one of them, which is why it was preferred to signing records: signing proves origin as well as integrity, but it ties audit integrity to key availability, so a platform with no protector would have no integrity at all rather than reduced integrity. A periodic checkpoint digest was declined because it cannot say which record changed, only that something in the block did. It detects tampering inside the file and says nothing about substitution of the whole file, which the anchor settles. The existing posture is reinforced rather than replaced: AuditRecords already uses ON DELETE RESTRICT where every other table uses CASCADE, so pruning a session cannot remove audit records as a side effect, and the chain now makes a direct deletion detectable as well as refused.",
+          "source": "Q-037"
+        }
+      ]
+    },
+    {
+      "element": "the protected chain anchor of D-DAT-05",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "Yes. The chain head is written to the platform key store when a session closes, and verified against the database when the station starts, so a substituted database presents a head that does not match the stored anchor. One protected write per session rather than one per record. The undetected window is recorded rather than glossed: a replacement performed during the current session is caught at the next startup and not immediately. Per-record anchoring is the stronger option and was declined on cost grounds that are explicitly unmeasured - one key-store write per audit record would become the slowest step in the audit path, and no measurement of key-store write latency on the target platforms exists to justify it. Periodic anchoring every N records was declined because N would be a second number needing its own justification while leaving everything after the last anchor unprotected. Where the platform protector is unavailable at runtime there is no anchor, and the station reports isTamperEvident() as false rather than claiming protection it does not have; the chain still stands in that state, so the log remains evident against editing and not against wholesale replacement.",
+          "source": "D-DAT-05"
+        }
+      ]
+    },
+    {
+      "element": "the AeroraPlatformKeyProtector backend for each target platform",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "Windows",
+          "value": {
+            "backend": "DPAPI"
+          },
+          "source": "Q4-003"
+        },
+        {
+          "key": "Linux",
+          "value": {
+            "backend": "libsecret, through the Secret Service"
+          },
+          "source": "Q4-003"
+        },
+        {
+          "key": "macOS",
+          "value": {
+            "backend": "Keychain"
+          },
+          "source": "Q4-003"
+        },
+        {
+          "key": "Android",
+          "value": {
+            "backend": "Android Keystore"
+          },
+          "source": "Q4-003"
+        },
+        {
+          "key": "iOS",
+          "value": {
+            "backend": "Keychain"
+          },
+          "source": "Q4-003"
+        }
+      ]
+    },
+    {
+      "element": "the write-failure accounting behaviour",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "The sink increments AeroraCommandAuthorizer::lostAuditRecordCount(), which the register records as the sum of the dropped and failed audit-write counts, and a non-zero count is surfaced as a degraded state on SCR-SEC-03 and on the security posture page. A lost record is therefore counted rather than silently dropped, which is Requirement 12 criterion 6, and it is surfaced rather than only counted, because a count an operator never sees is an artefact rather than a safeguard. Whether the operation itself proceeds is deliberately not settled here. DG-ROL already settles it: an unauditable allow is denied for the actuating classes, payload and manual-control, and counted but allowed for command, parameter and mission. Restating it would create two rules on one question that can disagree, after which neither is authoritative. Both uniform alternatives were declined for the reasons that record gives - denying everywhere turns a storage fault into a flight-control fault, so a full disk would begin refusing commands in flight including the command to land, and allowing everywhere leaves the trail with a hole exactly where actuation happened.",
+          "source": "Q-037"
+        }
+      ]
+    }
+  ]
+}
