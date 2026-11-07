@@ -28,6 +28,7 @@ claimed anywhere.
 | 10 | [Parameter Write Path and Authorization Boundary](10-parameter-write-path-and-authorization-boundary.md) | WP9-A: who can write a vehicle parameter, from where, and what the current gate does and does not cover |
 | 11 | [Mission Command Set and Coverage Items](11-mission-command-set-and-coverage-items.md) | The content `DG-MIS` settles: the command set, the one Aerora complex item, its parameters, the geometry and the plan-file key |
 | 12 | [Payload, Tether and Gimbal Item Sets](12-payload-tether-and-gimbal-item-sets.md) | The content `DG-PAY` waits on, derived from the firmware model: the reported item names and the units the model evidences |
+| 13 | [Autonomy Source Path and Companion Topology](13-autonomy-source-path-and-companion-topology.md) | The owner's answer to `Q3-005`: companion traffic terminated at the flight controller, what that settles for `DG-AUT`, and the clock obligation it creates |
 
 Document numbers are allocated by Tab 1 **before** a document is created. 09 was briefly used twice
 and Tab 9's was renumbered to 10; see

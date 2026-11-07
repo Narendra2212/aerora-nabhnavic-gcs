@@ -217,3 +217,10 @@ Recorded so the read-only property cannot be eroded by a later feature arriving 
 Both positions are preserved. The interface rows above name the companion as producer where the
 message is companion-originated, and the flight controller where it is a relay — which is why
 `IF-FC-010` and `IF-GPU-002` are separate interfaces rather than one. Recorded as Q3-005.
+
+The owner has since answered Position A: companion traffic is terminated at the flight controller,
+which is the command centre. The rows above are left as they stand, because applying the answer
+changes `IF-GPU-002`'s producer, retires the three `IF-GPU-001` firmware obligations and adds a
+timestamp obligation to the summary — a revision of this document rather than a note on it. The
+answer and the full consequence list are recorded in
+[13-autonomy-source-path-and-companion-topology.md](../05-product-completion/13-autonomy-source-path-and-companion-topology.md).

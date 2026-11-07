@@ -230,6 +230,14 @@ that depends on the answer.
 companion traffic is bridged onto the radio link or terminated at the flight controller. Phase 2.1
 evidence matrix items 9 and 21 cover the topology; neither covers the message path.
 
+**Answered outside this phase.** The owner has since stated the summarised reading: companion
+traffic is terminated at the flight controller, which is the command centre, and the station hears
+the flight controller. Recorded with its consequences in
+[13-autonomy-source-path-and-companion-topology.md](../05-product-completion/13-autonomy-source-path-and-companion-topology.md),
+including the obligation the answer creates — that the summary carry the companion's own timestamp,
+without which `AERORA-GPU-REQ-006` is satisfied against the wrong clock. This note records where the
+answer lives and does not close the question here, because this document closes none.
+
 ---
 
 ### Q3-006
