@@ -254,8 +254,8 @@
           "signingOwners": [
             "Product"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-FRS.freshness-budget.json",
           "elements": [
             {
               "name": "for each freshness class, a threshold value, the unit of the threshold, and the source the value is drawn from",

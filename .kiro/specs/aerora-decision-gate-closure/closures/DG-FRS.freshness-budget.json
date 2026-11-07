@@ -1,0 +1,81 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-FRS",
+  "part": "freshness-budget",
+  "state": "submitted",
+  "signOffDate": "2026-11-05",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-05"
+    }
+  ],
+  "signOffConditionVerdicts": [
+    {
+      "id": "DG-FRS-SOC-01",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "Four classes are named and each carries exactly one threshold rule. Three carry the derived rule and Configuration carries an explicit exception, so no class carries two and none is silently absent."
+    },
+    {
+      "id": "DG-FRS-SOC-02",
+      "satisfied": true,
+      "reviewer": "Product",
+      "date": "2026-11-05",
+      "note": "The three-outcome evaluation and the latched STALE verdict are preserved and depended on rather than merely permitted. Configuration resolves to ObservedFreshnessUnevaluated by design, which is the outcome that keeps an unevaluated class distinguishable from a fresh one."
+    }
+  ],
+  "guardPermissions": [
+    {
+      "symbol": "AeroraTelemetryState::ObservedFreshnessUnevaluated",
+      "permits": true,
+      "reason": "A threshold rule now exists for three classes, so the guard stops being the only outcome they can reach once the expected intervals are configured. It stays the recorded outcome for Configuration, which carries an explicit exception, for any class whose expected interval is not yet configured, and for any class DG-TLM names that this record did not budget - which requirement 8 criterion 5 settles by amendment rather than by reopening the Gate."
+    }
+  ],
+  "settled": [
+    {
+      "element": "for each freshness class, a threshold value, the unit of the threshold, and the source the value is drawn from",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "Attitude",
+          "value": {
+            "thresholdValue": "ten times the expected update interval of this class",
+            "unit": "multiple of the expected update interval, resolved to microseconds at configuration time",
+            "source": "Product decision: the rule is settled here and the absolute value is resolved per deployment from the expected update rate, so no number is compiled in",
+            "carries": "Attitude and angular rates, expected at tens of Hz."
+          },
+          "source": "Q-036"
+        },
+        {
+          "key": "Position",
+          "value": {
+            "thresholdValue": "ten times the expected update interval of this class",
+            "unit": "multiple of the expected update interval, resolved to microseconds at configuration time",
+            "source": "Product decision: the rule is settled here and the absolute value is resolved per deployment from the expected update rate, so no number is compiled in",
+            "carries": "Position, velocity and altitude, expected at a few Hz."
+          },
+          "source": "Q-036"
+        },
+        {
+          "key": "System",
+          "value": {
+            "thresholdValue": "ten times the expected update interval of this class",
+            "unit": "multiple of the expected update interval, resolved to microseconds at configuration time",
+            "source": "Product decision: the rule is settled here and the absolute value is resolved per deployment from the expected update rate, so no number is compiled in",
+            "carries": "Battery, link, flight mode and payload state, expected at about 1 Hz."
+          },
+          "source": "Q-036"
+        },
+        {
+          "key": "Configuration",
+          "exception": true,
+          "value": "No threshold, by exception rather than by omission. Capability, parameters and identity arrive on change or on request rather than periodically, so elapsed time cannot judge them: an unchanged value is valid and not stale. The class resolves to ObservedFreshnessUnevaluated, which is the third outcome the evaluation exists to provide, so an unevaluated value stays distinguishable from a fresh one rather than being read as lenient. A derived threshold is unavailable here for the same reason an absolute one is wrong: there is no expected update interval to take a multiple of.",
+          "source": "Q-036"
+        }
+      ]
+    }
+  ]
+}
