@@ -440,7 +440,7 @@
             "Product",
             "engineering"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.payload.json",
           "elements": [
             {
@@ -471,7 +471,7 @@
             "Product",
             "engineering"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.power.json",
           "elements": [
             {

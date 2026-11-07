@@ -2,9 +2,9 @@
   "$schema": "../closure-record.schema.json",
   "gate": "DG-PAY",
   "part": "power",
-  "state": "submitted",
+  "state": "accepted",
   "signOffDate": "2026-11-07",
-  "entryCommit": null,
+  "entryCommit": "548a16ce8189254c31e5d8820f36d494b1ffc95c",
   "signatures": [
     {
       "owner": "Product",
