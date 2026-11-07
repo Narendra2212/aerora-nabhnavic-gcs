@@ -213,3 +213,38 @@ limits -- standoff, clearance, tilt, rate -- stay where they already are, held b
 and reported unperformable by the `GeometryLimits` check until they arrive. A transport range and an
 operating limit are different things, and conflating them is what would have turned a placeholder
 into a signed value.
+
+## 8. Fact-set scope and enumeration members
+
+Two decisions by Product and Firmware, 2026-11-05, completing what this document can settle.
+
+### Scope: only the groups the firmware model evidences
+
+`DG-TLM` declares facts for the **payload** and **power** groups and records the other four as
+carrying no fact yet. The telemetry ICD names six, and declaring all six was rejected for a reason
+the ICD itself supplies: the product group is `PLACEHOLDER` and the autonomy group waits on
+`DG-AUT`, which has no issued interface document, so a third of the set would have been names with
+no firmware behind them. Groups fill in by amendment as firmware adds reporting, which requirement
+8 criterion 5 already provides for.
+
+This keeps the rule the ICD is strictest about intact: all six groups are still created at vehicle
+construction, because a group appearing later shifts every column of the telemetry record. Carrying
+no fact is not the same as not existing.
+
+### Members: appended, never renumbered
+
+With `NAMED_VALUE_INT` the integer is what travels, so a value already written to a flight log keeps
+whatever meaning is assigned now. Appending a member is safe; reordering or renumbering silently
+rewrites the meaning of records already on disk. That asymmetry is why only the member set that is
+actually known gets written.
+
+| Fact | Members | Basis |
+| --- | --- | --- |
+| `sprayEnabled` | `Off` = 0, `On` = 1 | Binary in the model: `Spray_On_Off` |
+| `sprayGateState` | **Recorded exception** | The interlock is a Stateflow chart and its states are not enumerated in the archive |
+| `tetherMode` | **Recorded exception** | The model carries `TETHER_MODE` beside `AUTO_*` parameters, which implies an AUTO mode and does not enumerate the set |
+
+Both exceptions are declared facts with unsettled member sets, not omitted facts. The distinction
+matters: an operator reading the telemetry explorer sees the item exists and that its vocabulary is
+not yet known, rather than not seeing it at all. Guessing the sets was the alternative and was
+declined, because a guessed integer becomes permanent the moment firmware sends it once.
