@@ -120,7 +120,7 @@ interfaces with nothing behind them. `Q-029` is why.
 | `AeroraFactGroupBase` | `Telemetry/AeroraFactGroupBase.{h,cc}` | none (derives `FactGroup`) | `IMPLEMENTED-UNCOMPILED` |
 | The six Aerora fact groups | — | — | **`CONTRACT-ONLY`** — none has a message to parse |
 | `AeroraFactGroupRegistrar` | `Telemetry/AeroraFactGroupRegistrar.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` (interface) |
-| `AeroraVehicleFactGroupRegistrar` | `Telemetry/AeroraVehicleFactGroupRegistrar.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` — **`isRegistrationAvailable()` returns `true`**: both halves of the `ADR-016` pair are applied, and the authorisation of the applied pair is unresolved and owned by Tab 1 |
+| `AeroraVehicleFactGroupRegistrar` | `Telemetry/AeroraVehicleFactGroupRegistrar.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` — **`isRegistrationAvailable()` returns `true`**: both halves of the `ADR-016` pair are applied and Tab 1 authorised them in the accepted `DG-TLM` core-edit Closure_Record |
 | `AeroraTelemetrySet` | `Telemetry/AeroraTelemetrySet.{h,cc}` | **none** | `IMPLEMENTED-UNCOMPILED` — deliberately not QML-registered |
 | `AeroraTelemetrySource` | `Telemetry/AeroraTelemetrySource.{h,cc}` | none | `IMPLEMENTED-UNCOMPILED` — attribution is `IF-MAV-022`, `OPEN` |
 
@@ -333,18 +333,18 @@ corresponding implementation fails a test rather than silently shipping. That is
 `ADR-016` pair are applied at `e7b38eef1`: the friend declaration at `src/Vehicle/Vehicle.h:123` and
 `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` in `aerora/CMakeLists.txt` `CUSTOM_DEFINITIONS`. The
 privileged call is therefore compiled and the function returns `true`
-(`aerora/src/Telemetry/AeroraVehicleFactGroupRegistrar.cc:22-28`). The `true` in the table records
-what the tree holds; it is not an approval. Whether the applied pair carries the authorisation
-`ADR-016` hands to Tab 1 is **unresolved** and is Tab 1's to record — this record asserts neither
-that it is authorised nor that it is not. The table's four columns cannot carry that, which is why
-it is recorded in prose.
+(`aerora/src/Telemetry/AeroraVehicleFactGroupRegistrar.cc:22-28`). The `true` in the table now
+records an approval as well as what the tree holds: Tab 1 signed the `ADR-016` core-edit part of
+`DG-TLM` on 2026-11-05, permitting the applied pair rather than changing it.
 
-Two things follow for this row. The paragraph above does not cover it: no test under
-`aerora/test/**` asserts this function's value, so the value changing failed nothing. And the
-remaining telemetry gate is the dialect rather than the registration path — all six fact groups are
-still `CONTRACT-ONLY`, so a registrar that can register has nothing to register. See
-[ADR-016](../03-implementation-specification/32-integration-adrs.md) for the authorisation question
-and [§6](#6-qgroundcontrol-core-modifications) for the applied pair's core-edit assessment.
+Two things follow for this row. It is asserted now, which it was not while the authorisation was
+open: `AeroraVehicleIntegrationTest` pins the function at `true` at the composition root, so
+withdrawing either half of the pair fails a test instead of passing silently — which matters
+because dropping the compile definition alone is not a compile error. And the remaining telemetry
+gate was the dialect rather than the registration path; that part is accepted too, so `DG-TLM` is
+`CLOSED`. See [ADR-016](../03-implementation-specification/32-integration-adrs.md) for the
+authorisation record and [§6](#6-qgroundcontrol-core-modifications) for the applied pair's
+core-edit assessment.
 
 ## 5. Interface completion
 
@@ -412,7 +412,7 @@ Nine tracked files, all from Phase 6, all enumerated here because `P7-ARCH-021` 
 | --- | --- |
 | Files touched | 9 tracked, 2 added |
 | Lines added to core | ~220, of which ~167 are the two new signing-store files |
-| Changes that alter default behaviour with no overlay | **None.** `authorizeMavCommand()` base returns `true`; the friend declaration names a class no stock build defines. The overlay defines `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` in `CUSTOM_DEFINITIONS`, so in an Aerora build the registrar's privileged call is compiled and `isRegistrationAvailable()` returns `true` — an applied pair whose authorisation is unresolved and owned by Tab 1 |
+| Changes that alter default behaviour with no overlay | **None.** `authorizeMavCommand()` base returns `true`; the friend declaration names a class no stock build defines. The overlay defines `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` in `CUSTOM_DEFINITIONS`, so in an Aerora build the registrar's privileged call is compiled and `isRegistrationAvailable()` returns `true` — an applied pair Tab 1 authorised in the accepted `DG-TLM` core-edit Closure_Record |
 | Changes that could break an upstream rebase | The `MavCommandQueue.cc` insertion point and the `Vehicle.cc` calibration seam. Both are localised and would surface as merge conflicts, not silent behaviour changes |
 
 This is a defensible core footprint. `P7-ARCH-021` is satisfied, and no Phase 7 work should enlarge

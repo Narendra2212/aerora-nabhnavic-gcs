@@ -815,16 +815,25 @@ Constraints every task inherits:
   register, which is the first time in this spec they have — every earlier checkpoint recorded them
   failing on the absent register, which was the error contract working rather than a defect.
 
-  Four findings print on every run and none blocks, which is the intended steady state:
+  At this checkpoint four findings printed on every run and none blocked, which was the intended
+  steady state:
 
-  | Finding | Why it does not block |
+  | Finding | Why it did not block |
   | --- | --- |
-  | `guard-value` on `isRegistrationAvailable()` | The recorded disagreement observes exactly the value the source holds, names Tab 1 and both remedies, and tracks it at `finding-1` |
-  | `guard-assertion` on the same guard | Recorded `assertedNowhere` with its remedy: asserting either value today would record the wrong state |
+  | `guard-value` on `isRegistrationAvailable()` | The recorded disagreement observed exactly the value the source held, named Tab 1 and both remedies, and tracked it at `finding-1` |
+  | `guard-assertion` on the same guard | Recorded `assertedNowhere` with its remedy: asserting either value then would have recorded the wrong state |
   | `adr-016-pair` | The same applied pair, reported once more against the two files Requirement 7 criterion 17 names |
 
-  Zero recorded disagreements is the target and there is one. It is the only optional escape the
-  register has, it is confined to a guard, and the derivations have none at all.
+  Zero recorded disagreements was the target and there was one. It was the only optional escape the
+  register has, it was confined to a guard, and the derivations had none at all.
+
+  **All four have since been retired, and the target is met.** Tab 1 signed the `ADR-016` core-edit
+  part and the dialect part was accepted, so both parts the register records as permitting
+  `isRegistrationAvailable()` had permitted it. The recorded value moved to `true`,
+  `AeroraVehicleIntegrationTest` gained the assertion the slot had documented as deliberately
+  withheld, and the disagreement, the `assertedNowhere` record and its remedy were removed
+  together. Both entry points now print **no finding at all**, and the register records **zero**
+  recorded disagreements and **zero** guards asserted nowhere.
 
   **CI is the remaining evidence.** Everything under task 11 is C++ and this host has no compiler
   and no Qt, so the local evidence for it stops at byte hygiene and the manifest check — both of

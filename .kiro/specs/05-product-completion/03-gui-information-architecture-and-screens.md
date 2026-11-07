@@ -547,7 +547,7 @@ substantially less QML than writing it by hand.
 
 | ID | Screen | Class | Seam | Status | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SCR-TEL-01` | Telemetry explorer | O | `analyzePages()`; iterates `AeroraTelemetrySet` fact groups | `DESIGNED` | 4 + 7 | `Q4-002` — all 6 fact groups are `CONTRACT-ONLY`, so there is nothing to explore. `isRegistrationAvailable()` returns `true` (both ADR-016 halves applied, authorisation unresolved and owned by Tab 1), so the registration path is not what blocks this screen |
+| `SCR-TEL-01` | Telemetry explorer | O | `analyzePages()`; iterates `AeroraTelemetrySet` fact groups | `DESIGNED` | 4 + 7 | `Q4-002` — all 6 fact groups are `CONTRACT-ONLY`, so there is nothing to explore. `isRegistrationAvailable()` returns `true` (both ADR-016 halves applied and authorised by Tab 1), so the registration path is not what blocks this screen |
 | `SCR-TEL-02` | Event timeline | O | `analyzePages()` | `SPECIFIED-NOT-DESIGNED` | 4 | `P7-TEL-004`; needs the local store (`P7-DAT-002`) |
 | `SCR-TEL-03` | Freshness / quality dashboard | O | `analyzePages()` | `DESIGNED` | 4 + 7 | `Q-036` — no budget values exist |
 

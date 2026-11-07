@@ -118,8 +118,8 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
     // purpose. The class is defined in the Aerora overlay, so in a stock build this names a class
     // that is never defined, which is legal and has no effect. The registrar's privileged call is
     // additionally gated on AERORA_VEHICLE_FACTGROUP_FRIENDSHIP, which the overlay defines in
-    // CUSTOM_DEFINITIONS, so isRegistrationAvailable() returns true in an Aerora build. Whether this
-    // applied pair carries the authorisation it needs is unresolved and is Tab 1's to record.
+    // CUSTOM_DEFINITIONS, so isRegistrationAvailable() returns true in an Aerora build. Tab 1
+    // authorised the applied pair in the accepted DG-TLM core-edit Closure_Record.
     friend class AeroraVehicleFactGroupRegistrar;
 
 public:

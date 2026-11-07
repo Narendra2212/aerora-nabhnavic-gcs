@@ -1396,10 +1396,19 @@ does not change it.
 
 | Item | Owner | What it needs |
 | --- | --- | --- |
-| The `ADR-016` pair is applied while its guard is recorded at `false` ([Finding 1](#finding-1--the-adr-016-core-edit-is-applied-and-its-guard-disagrees-with-the-register)) — the one recorded disagreement in the register, and the target for that count is zero | Tab 1 | Either a signature on the `DG-TLM` core-edit part, or withdrawal of `AERORA_VEHICLE_FACTGROUP_FRIENDSHIP` from `CUSTOM_DEFINITIONS` and from the two CI assertion lists. Three documents also disagree with each other about the define's state: `src/Vehicle/Vehicle.h`'s own comment records it as "deliberately NOT defined yet", `32-integration-adrs.md` records it as `NOT DEFINED`, and `aerora/src/Vehicle/README.md` records both halves as applied |
-| The inventory's declared totals disagree with its own rows: 45 screens across 12 areas against 52 rows across 13 area tables, and 30 undelivered against 37 ([Finding 2](#finding-2--the-screen-inventorys-row-count-and-its-declared-total-disagree)) | Tab 7 | Correct the totals, or correct the rows. The register records no count and the check reports the disagreement either way. The Release_Sets the requirements enumerate are consistent with 37 |
-| requirements.md carries the same 45/30 figures | Tab 1 | Follows whichever way Finding 2 resolves |
 | `hypothesis` added to the `test` dependency group | Tab 1 | One new test-only dependency, with `tools/uv.lock` regenerated through the existing `uv-lock` hook |
 | Signatures are recorded identities, not cryptographic ones | Tab 1 | `.github/CODEOWNERS` exists with every rule commented out, so it routes no review. Requiring code-owner review on the register path needs a branch-protection setting outside this repository |
 | Two blocking entries carry no identifier | Tab 7 | `SCR-VID-01`'s absent video overlay seam and `SCR-SET-01`'s accessor naming constraint each need a register key and a matching inventory substring before `entry-classification` can compare the two documents for them |
 | The inventory's "re-read against that distinction" entry count | Tab 7 | §8 states "the remaining 33 entries". The figure has not moved while the undelivered count went 41 → 39 → 37 across three revisions, so it derives from nothing the document maintains. What "entry" counts — a screen with a blocking cell, or an item inside one — is what `entry-classification` and the register's `blockingEntries` settle, so the number is left for the pass that classifies them |
+
+## Items this design handed on that are now closed
+
+Kept rather than deleted, because this design's own discipline is that an absence is recorded and
+not inferred: a row that simply vanished would leave no evidence the item was ever handed on, or
+that anybody answered it.
+
+| Item | Closed by |
+| --- | --- |
+| [Finding 1](#finding-1--the-adr-016-core-edit-is-applied-and-its-guard-disagrees-with-the-register) — the `ADR-016` pair applied while its guard was recorded at `false`, the register's one recorded disagreement | Tab 1 signed the `DG-TLM` core-edit part on 2026-11-05 and declined the withdrawal remedy; with the dialect part accepted, both parts permitting the guard had permitted it, so the recorded value moved to `true`, `AeroraVehicleIntegrationTest` gained the assertion, and the disagreement was retired. **Recorded disagreements are now zero, which the row named as the target.** The documents that disagreed about the define's state were reconciled in `8e93636b0` and now record the authorisation |
+| [Finding 2](#finding-2--the-screen-inventorys-row-count-and-its-declared-total-disagree) — the inventory's declared totals against its own rows | Tab 7, in `8e93636b0`: corrected to 52 screens across 13 areas and 37 not delivered, against unchanged `VERIFIED` and `SUPERSEDED` counts, with no area heading, screen row or `Status` cell changed. `inventory-totals` passes, and the figure agrees with the Release_Sets the requirements enumerate |
+| requirements.md carrying the same 45/30 figures | Followed Finding 2. requirements.md now states no screen total, so there is no second figure to keep in step |
