@@ -186,7 +186,7 @@ method.
 | `IF-FC-008` | GPS state | — | — | — | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-FC-009` | Estimator state | — | — | — | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-FC-010` | Autonomy state and proposals | `AERORA-GPU-REQ-005`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `MODEL` | `OPEN` | `HIL` |
-| `IF-FC-011` | Companion health and presence | `AERORA-GPU-REQ-001`, `AERORA-GPU-REQ-007` | R-014 | Q-008 | `ARTIFACT-OBSERVED`, `NOT-EVIDENCED` | `PROPOSED` | `HIL` |
+| `IF-FC-011` | Companion health and presence | `AERORA-GPU-REQ-007` | R-014 | Q-008 | `ARTIFACT-OBSERVED` | `PROPOSED` | `HIL` |
 | `IF-FC-012` | Payload state, health, safety state | `AERORA-PAYLOAD-REQ-006`, `AERORA-PAYLOAD-REQ-008` | R-002 | Q-009, Q-023 | `BASELINE-ASSERTED`, `PLACEHOLDER` | `OPEN` | `BENCH` |
 | `IF-FC-013` | Command acknowledgement | `AERORA-GCS-REQ-015`, `AERORA-GCS-REQ-018` | R-025 | Q-036 | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-FC-014` | Mission state and current index | `AERORA-MISSION-REQ-006` | R-002 | — | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
@@ -200,7 +200,7 @@ method.
 | `IF-FC-022` | Mission transfer | `AERORA-MISSION-REQ-001`, `AERORA-MISSION-REQ-007` | R-002, R-012 | Q-041 | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-FC-023` | Parameter write | `AERORA-BUILD-REQ-011` | — | — | `GCS-VERIFIED` | `CONFIRMED` | `INTEGRATION` |
 | `IF-FC-024` | Ground station heartbeat | — | — | — | `GCS-VERIFIED` | `CONFIRMED` | `UNIT` |
-| `IF-GPU-001` | Companion addressing | `AERORA-GPU-REQ-001`, `AERORA-GPU-REQ-002` | R-014 | — | `NOT-EVIDENCED` | `OPEN` | `INTEGRATION` |
+| `IF-GPU-001` | Companion addressing | — | R-014 | `Q3-005` | `ARTIFACT-OBSERVED` | `PROPOSED` | `INTEGRATION` |
 | `IF-GPU-002` | Proposal | `AERORA-GPU-REQ-004`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `MODEL` | `OPEN` | `INTEGRATION` |
 | `IF-GPU-003` | Proposal outcome | `AERORA-GPU-REQ-005` | R-014 | Q-008 | `NOT-EVIDENCED` | `OPEN` | `INTEGRATION` |
 | `IF-GPU-004` | Companion health | `AERORA-GPU-REQ-006` | — | — | `NOT-EVIDENCED` | `OPEN` | `INTEGRATION` |
@@ -425,8 +425,8 @@ no requirement to point at; it needs a decision, and ADR-005 is that decision.
 | --- | --- |
 | Phase 2 requirements published | 120 |
 | Active | 119 |
-| Referenced by at least one interface row | **111** |
-| Not referenced by an interface row | 9 |
+| Referenced by at least one interface row | **110** |
+| Not referenced by an interface row | 10 |
 
 | Not referenced | Reason | Carried by |
 | --- | --- | --- |
@@ -439,10 +439,13 @@ no requirement to point at; it needs a decision, and ADR-005 is that decision.
 | `AERORA-TEST-REQ-008` | Mechanical drift checking — tooling | [22-phase-3-verification-plan.md](22-phase-3-verification-plan.md) |
 | `AERORA-TEST-REQ-009` | Use the upstream test framework unmodified — process | [22-phase-3-verification-plan.md](22-phase-3-verification-plan.md) |
 | `AERORA-UI-REQ-009` | **Withdrawn** in Phase 2 as a duplicate of `AERORA-SEC-REQ-014` | Nothing. Correctly unreferenced |
+| `AERORA-GPU-REQ-001` | **Subject removed by an answered question.** It requires the companion to share the flight controller's system id, and its rationale is the ground station's message-delivery filter. `Q3-005` answered that companion traffic terminates at the flight controller, so no companion message is exposed to that filter and the requirement has no subject on any interface here | [product-completion 13](../05-product-completion/13-autonomy-source-path-and-companion-topology.md), and `IF-GPU-001`'s failure row. **Whether it is withdrawn or re-scoped to the companion-to-flight-controller link is the requirement owner's**, and is open |
 
-Eight of the nine are build, test or process requirements with no boundary to cross, and they are
+Eight of the ten are build, test or process requirements with no boundary to cross, and they are
 referenced by the two Phase 3 documents that cover build and verification. The ninth is withdrawn,
-and referencing it would have been an error.
+and referencing it would have been an error. The tenth is `AERORA-GPU-REQ-001`, whose subject an
+answered question removed — it is still an active requirement in the register, so it is listed here
+as unreferenced rather than quietly dropped, which is the distinction this section exists to make.
 
 **There is no requirement in the Phase 2 set that Phase 3 has silently dropped.**
 

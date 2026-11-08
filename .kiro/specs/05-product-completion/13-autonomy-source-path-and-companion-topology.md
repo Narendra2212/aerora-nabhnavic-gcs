@@ -163,7 +163,7 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 
 | Left alone | Reason |
 | --- | --- |
-| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Both are `PROPOSED` requirements in the ratified architecture register, and both lose their subject under this answer: the first requires the companion to share the flight controller's system id, the second forbids it the autopilot component id, and the companion now addresses the station with nothing. Retiring a ratified requirement is the requirement owner's act, not this document's. `IF-GPU-001`'s failure row records that they have no subject and names the owner |
+| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Both are active `PROPOSED` requirements in the ratified architecture register, and **withdrawal is not obviously the right action** — see section 7. Their *rationales* are ground-station-specific and this answer removes them; their *statements* are about the companion's MAVLink identity, which may still have a subject on the companion-to-flight-controller link. Retiring a ratified identifier is the requirement owner's act either way |
 | The interface and question counts in [19-interface-traceability.md](../02-interface-specification/19-interface-traceability.md) | No row was added or removed, so the counts hold. `Q3-005` is now cited in Evidence columns rather than Questions columns, and that document records the distinction so the unchanged count does not read as an error |
 | `IF-UIS-004` staleness presentation | It presents a stale marking and an age, and that is unchanged. What changed is *whose* age, which is the clock obligation in section 3 and belongs to the producer rather than to the presentation |
 
@@ -175,4 +175,39 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 | The proposal schema: fields, update rate, and the message that carries it | Architecture, with the external interface authority | `IF-FC-010` carries `UNKNOWN` for crossing, update and freshness. This is the whole of what `DG-AUT:source-interface` now waits on |
 | The MAVLink carrier for a proposal | Architecture, with the external interface authority | Section 4. The `NAMED_VALUE_*` mechanism that unblocked `DG-PAY` cannot carry a proposal's four fields, and both closed Gates record zero new Aerora identifiers |
 | `Q-008`: whether the flight controller reports proposal outcomes explicitly | Firmware | Unaffected by this answer. The interface control document's fallback stands: proposal and effective state side by side, no causal link asserted |
-| Retiring `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Requirement owner | Recorded above |
+| Whether `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` are withdrawn or re-scoped | Requirement owner, with Firmware | Section 7. The answer turns on whether the companion speaks MAVLink to the flight controller, which this answer did not cover |
+
+## 7. Withdrawal is not the obvious action, and why
+
+The two companion-addressing requirements look like the clean casualty of this answer. They are not,
+and recording why is the point of this section, because the register has a legal withdrawal path and
+taking it wrongly retires an identifier that is never reused.
+
+| | `AERORA-GPU-REQ-001` | `AERORA-GPU-REQ-002` |
+| --- | --- | --- |
+| Statement | The companion shares the flight controller's MAVLink system id and uses a distinct component id | The companion does not emit messages using the autopilot component id |
+| Recorded rationale | The ground station's message delivery filters on system id only | An autopilot component id would create a phantom second vehicle in the ground station |
+| Does the rationale survive this answer? | **No.** No companion message reaches that filter | **No.** No companion heartbeat reaches vehicle creation |
+| Does the statement survive? | **Possibly.** It constrains the companion's MAVLink identity, not the ground station's view of it | **Possibly**, on the same ground |
+
+The reason the statements may survive is in this document's own transport diagram: the flight
+controller's "MAVLink subsystem receives autonomy commands", evidence `MODEL`. If the companion
+speaks MAVLink to the flight controller over the UART, then its system id and component id still
+matter — to the flight controller's routing rather than to the station's filters. This answer settled
+where companion traffic *terminates*; it did not say whether the companion speaks MAVLink on the
+link that terminates there.
+
+So there are two defensible actions and they are not interchangeable:
+
+| Action | When it is right | Cost of getting it wrong |
+| --- | --- | --- |
+| **Withdraw**, status `WITHDRAWN` and ratification class `REJECT/WITHDRAW` | The companion does not speak MAVLink to the flight controller at all | A real constraint on the internal link is retired, and the identifier cannot be reused to restate it |
+| **Re-scope**, keeping the identifiers and replacing the ground-station rationale with the flight-controller one | The companion speaks MAVLink over the UART | Two requirements keep a rationale that names the wrong consumer, which is the weaker failure and the reversible one |
+
+`AERORA-GPU-REQ-002` has a second reason to be careful with it: `IF-VID-002` cites it for the rule
+that a non-autopilot component is not promoted to a vehicle, and that rule is `GCS-VERIFIED` upstream
+behaviour which holds whatever the companion does. That citation stands on its own and does not
+depend on this answer.
+
+Nothing is withdrawn here. The question needs one fact — does the companion emit MAVLink to the
+flight controller — and that is Firmware's to state.

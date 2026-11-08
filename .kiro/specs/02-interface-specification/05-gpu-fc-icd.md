@@ -146,7 +146,7 @@ with Firmware, and nothing here chooses it.
 
 | ID | Failure behaviour | Requirements | Risks | Questions | Verification |
 | --- | --- | --- | --- | --- | --- |
-| `IF-GPU-001` | Not applicable — no companion-addressed path exists. `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` were written against the direct reading and have no subject under this one; retiring them is the requirement owner's | — | R-014 | `Q3-005`, answered | `INTEGRATION` |
+| `IF-GPU-001` | Not applicable — no companion-addressed path exists. `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` lose the rationale they were written against, but their statements may survive re-scoped to the companion-to-flight-controller link; whether they are withdrawn or re-scoped is the requirement owner's, and neither is assumed here | — | R-014 | `Q3-005`, answered | `INTEGRATION` |
 | `IF-GPU-002` | Stale proposals marked stale, then absent; never retained as current. **Staleness is measured on the summary**, so it detects a stale proposal only where the summary carries the companion's own timestamp | `AERORA-GPU-REQ-004`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-003` | Absent outcome means the proposal and the effective state are shown side by side with **no causal link asserted** | `AERORA-GPU-REQ-005` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-004` | Health unknown; not inferred from proposal activity | `AERORA-GPU-REQ-006` | — | — | `INTEGRATION` |
