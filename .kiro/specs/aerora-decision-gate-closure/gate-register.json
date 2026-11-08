@@ -427,7 +427,7 @@
     },
     {
       "id": "DG-PAY",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementingOwner": "Tab 6",
       "rationale": {
         "document": "05-product-completion/03-gui-information-architecture-and-screens.md",
@@ -523,7 +523,7 @@
             "Product",
             "engineering"
           ],
-          "state": "submitted",
+          "state": "accepted",
           "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.consumable.json",
           "elements": [
             {
@@ -1135,7 +1135,7 @@
     },
     {
       "id": "SCR-SHL-02",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1205,7 +1205,7 @@
     },
     {
       "id": "SCR-LIV-03",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1218,7 +1218,7 @@
     },
     {
       "id": "SCR-LIV-04",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1361,7 +1361,7 @@
     },
     {
       "id": "SCR-MIS-05",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
@@ -1380,7 +1380,7 @@
     },
     {
       "id": "SCR-MIS-06",
-      "released": false,
+      "released": true,
       "observation": null,
       "blockingEntries": [
         {
