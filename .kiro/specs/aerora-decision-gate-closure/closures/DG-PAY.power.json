@@ -49,10 +49,27 @@
         {
           "key": "tetherMode",
           "exception": true,
-          "value": "Settled as a reported item with an unsettled enumeration, on the terms the accepted DG-TLM:dialect record already set for this same item against an identically worded criterion. Four of the five attributes are known: the item name is tetherMode, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, and its reporting message is NAMED_VALUE_INT. Only the member set is unsettled. The firmware model carries TETHER_MODE beside AUTO_MAX_VEL, AUTO_ALT_MIN_M and AUTO_SP_TIMEOUT_S, which implies an AUTO mode without enumerating the set, so the members stay unsettled rather than inferred from neighbouring parameter names. Recorded as an explicit exception rather than guessed, for the reason NAMED_VALUE_INT makes permanent: the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. The station reports the integer as its own source with its own freshness, which is what P7-PWR-006 asks for, and interprets none of it until the members are settled by amendment.",
+          "value": "Settled as a reported item with an unsettled enumeration, on the terms the accepted DG-TLM:dialect record already set for this same item against an identically worded criterion. Four of the five attributes are known: the item name is tetherMode, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, and its reporting message is NAMED_VALUE_INT with the name field aeTethMode. Only the member set is unsettled. The firmware model carries TETHER_MODE beside AUTO_MAX_VEL, AUTO_ALT_MIN_M and AUTO_SP_TIMEOUT_S, which implies an AUTO mode without enumerating the set, so the members stay unsettled rather than inferred from neighbouring parameter names. Recorded as an explicit exception rather than guessed, for the reason NAMED_VALUE_INT makes permanent: the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. The station reports the integer as its own source with its own freshness, which is what P7-PWR-006 asks for, and interprets none of it until the members are settled by amendment.",
           "source": "DG-TLM:dialect"
         }
       ]
+    }
+  ],
+  "amendments": [
+    {
+      "key": "tetherMode",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "engineering",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
     }
   ]
 }

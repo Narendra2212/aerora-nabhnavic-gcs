@@ -59,7 +59,7 @@
             "enumerationMembers": "Off = 0, On = 1",
             "owningFactGroup": "Aerora payload",
             "freshnessClass": "System",
-            "inboundMessage": "NAMED_VALUE_INT"
+            "inboundMessage": "NAMED_VALUE_INT, name field aeSprayEn"
           },
           "source": "Q4-002"
         },
@@ -67,12 +67,12 @@
           "key": "sprayRate",
           "value": {
             "factName": "sprayRate",
-            "unit": "not evidenced; the model signal carries no unit suffix",
+            "unit": "ml/s. The volumetric flow rate of the tethered supply tube, measured in tether supply mode; a flow per unit time and not an application rate per unit area",
             "valueRange": "the IEEE 754 single-precision range the message carries; no narrower range is asserted, and the operating limits are held by the applicator ICD",
             "enumerationMembers": "none, it is a scalar",
             "owningFactGroup": "Aerora payload",
             "freshnessClass": "System",
-            "inboundMessage": "NAMED_VALUE_FLOAT"
+            "inboundMessage": "NAMED_VALUE_FLOAT, name field aeSprayRt"
           },
           "source": "Q4-002"
         },
@@ -85,7 +85,7 @@
             "enumerationMembers": "none, it is a scalar",
             "owningFactGroup": "Aerora payload",
             "freshnessClass": "System",
-            "inboundMessage": "NAMED_VALUE_FLOAT"
+            "inboundMessage": "NAMED_VALUE_FLOAT, name field aeSprayPmp"
           },
           "source": "Q4-002"
         },
@@ -98,23 +98,115 @@
             "enumerationMembers": "Inactive = 0, Active = 1",
             "owningFactGroup": "Aerora payload",
             "freshnessClass": "System",
-            "inboundMessage": "NAMED_VALUE_INT"
+            "inboundMessage": "NAMED_VALUE_INT, name field aePldEStop"
           },
           "source": "Q4-002"
         },
         {
           "key": "sprayGateState",
           "exception": true,
-          "value": "Declared as a fact with an unsettled enumeration. Six of the seven attributes are known: the fact name is sprayGateState, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, its owning fact group is Aerora payload, its freshness class is System, and its inbound message is NAMED_VALUE_INT. Only the member set is unsettled: the interlock is a Stateflow chart and the archive does not enumerate its states. Recorded as an exception rather than guessed, because with NAMED_VALUE_INT the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. Appending members later is safe; renumbering silently rewrites records already on disk.",
+          "value": "Declared as a fact with an unsettled enumeration. Six of the seven attributes are known: the fact name is sprayGateState, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, its owning fact group is Aerora payload, its freshness class is System, and its inbound message is NAMED_VALUE_INT with the name field aeSprayGt. Only the member set is unsettled: the interlock is a Stateflow chart and the archive does not enumerate its states. Recorded as an exception rather than guessed, because with NAMED_VALUE_INT the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. Appending members later is safe; renumbering silently rewrites records already on disk.",
           "source": "Q4-002"
         },
         {
           "key": "tetherMode",
           "exception": true,
-          "value": "Declared as a fact with an unsettled enumeration, on the same terms. The fact name is tetherMode, no unit because it is an enumeration, the int32 range NAMED_VALUE_INT carries, owning fact group Aerora power, freshness class System, inbound message NAMED_VALUE_INT. The model carries TETHER_MODE beside AUTO_MAX_VEL, AUTO_ALT_MIN_M and AUTO_SP_TIMEOUT_S, which implies an AUTO mode without enumerating the set, so the members stay unsettled rather than inferred from neighbouring parameter names.",
+          "value": "Declared as a fact with an unsettled enumeration, on the same terms. The fact name is tetherMode, no unit because it is an enumeration, the int32 range NAMED_VALUE_INT carries, owning fact group Aerora power, freshness class System, inbound message NAMED_VALUE_INT with the name field aeTethMode. The model carries TETHER_MODE beside AUTO_MAX_VEL, AUTO_ALT_MIN_M and AUTO_SP_TIMEOUT_S, which implies an AUTO mode without enumerating the set, so the members stay unsettled rather than inferred from neighbouring parameter names. The owner has since stated that the aircraft runs tether supply normally and switches to onboard battery where the tether cannot reach, with an automatic hardware failover on tether loss, so at least two modes exist; the integers they travel as are still unsettled and are what this exception holds.",
           "source": "Q4-002"
         }
       ]
+    }
+  ],
+  "amendments": [
+    {
+      "key": "sprayEnabled",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
+    },
+    {
+      "key": "sprayRate",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
+    },
+    {
+      "key": "sprayPumpCommand",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
+    },
+    {
+      "key": "payloadEmergencyStop",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
+    },
+    {
+      "key": "sprayGateState",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
+    },
+    {
+      "key": "tetherMode",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
     }
   ]
 }

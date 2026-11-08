@@ -3503,6 +3503,13 @@
       "acceptedBy": "Architecture"
     },
     {
+      "id": "named-value-wire-key-permanence",
+      "statement": "Aerora values are carried by NAMED_VALUE_FLOAT and NAMED_VALUE_INT, whose name field is a fixed ten-byte array: src/Comms/MockLink/MockLink.cc records it as such and the inspector reads it into char[LEN + 1] to terminate it. Two consequences were not recorded when the mechanism was chosen. Four of the six fact names the accepted DG-TLM:dialect record settled exceed ten bytes, so as first recorded four facts could not be identified on the wire by the message bound to them. And the name is the only discriminator the message carries, on a channel ArduPilot and PX4 already use for their own debug values, so an Aerora key colliding with a firmware debug key is indistinguishable to the station.",
+      "severity": "a fact that cannot be routed on arrival, and a wire key that is permanent in every flight log from first transmission",
+      "mitigation": "Each fact carries an explicit ten-byte wire key, settled by amendment against the key it belongs to and recorded inside the reportingMessage and inboundMessage attributes that were already required, so no element definition changed and no accepted part reopened. Every key carries the two-byte ae prefix to make a collision with an autopilot debug value unlikely rather than merely unlucky. The keys are owner-chosen and not derived by tooling, for the reason the enumeration members are exceptions: the key is untyped and unversioned, so renaming one silently reinterprets every record already on disk and nothing in the protocol reports it. The element requiredAttributes were written before the carrier was chosen, which is why closure-completeness could not have caught this; that ordering is the general lesson and not specific to this gate.",
+      "acceptedBy": "Firmware"
+    },
+    {
       "id": "agent-drafted-closure-content",
       "statement": "Nine accepted Gate parts once carried Decision_Content the coding agent composed, recorded under owner signatures the owner had not given item by item. A Closure_Record is read as a named party having decided, and nothing in the register distinguished those parts from the ones the owner answered directly. All nine have since been resolved; this record is retained because the exposure existed and a retired hazard is evidence of a closed gap rather than of one that never opened.",
       "severity": "a Gate_Review that reads a signature as a decision, and an owner bound to content they did not choose",

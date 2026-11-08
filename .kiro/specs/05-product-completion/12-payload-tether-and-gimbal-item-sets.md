@@ -193,6 +193,50 @@ every log already recorded under the old name, and nothing in the protocol will 
 carries one scalar, so a unit or an enumeration is convention rather than schema: `sprayEnabled`
 travels as a `NAMED_VALUE_INT` whose members are agreed here and asserted nowhere on the wire.
 
+#### The name is also ten bytes, which this section first missed
+
+`NAMED_VALUE_FLOAT.name` and `NAMED_VALUE_INT.name` are a **fixed ten-byte array**.
+`src/Comms/MockLink/MockLink.cc` records it — "a fixed 10-byte field; pack_chan memcpys 10 bytes
+unconditionally" — and the inspector reads it into `char[LEN + 1]` precisely to terminate it.
+
+The paragraph above got permanence right and width not at all, and four of the six fact names it
+was written against do not fit: `sprayEnabled` is 12 bytes, `sprayGateState` 14,
+`sprayPumpCommand` 16 and `payloadEmergencyStop` 20. Only `sprayRate` at 9 and `tetherMode` at 10
+ever fitted. As first recorded, four of six Aerora facts could not be identified on the wire by the
+message bound to them.
+
+What was missing is a distinction this section collapsed: the **fact name** is station-side and
+unbounded — it appears in QML, the value picker and the telemetry record column header — while the
+**wire key** is the ten-byte discriminator that tells the receiver which fact a given message
+carries. The decision settled the fact name and the message and never settled the key, and without
+one, two facts arriving as `NAMED_VALUE_FLOAT` are indistinguishable.
+
+The keys, settled by amendment on 2026-11-08 and carried inside the `reportingMessage` and
+`inboundMessage` attributes that were already required, so no element definition changed and no
+accepted part reopened:
+
+| Fact | Wire key | Bytes |
+| --- | --- | --- |
+| `sprayEnabled` | `aeSprayEn` | 9 |
+| `sprayRate` | `aeSprayRt` | 9 |
+| `sprayPumpCommand` | `aeSprayPmp` | 10 |
+| `sprayGateState` | `aeSprayGt` | 9 |
+| `payloadEmergencyStop` | `aePldEStop` | 10 |
+| `tetherMode` | `aeTethMode` | 10 |
+
+The two-byte `ae` prefix is not decoration. `NAMED_VALUE_FLOAT` is MAVLink's debug-variable
+channel and both ArduPilot and PX4 emit their own values on it, with no namespace protection
+whatever. An Aerora key colliding with a firmware debug key of the same name is indistinguishable
+to the station, which would bind whichever arrived; two bytes make that unlikely rather than merely
+unlucky.
+
+Why the Gate_Review could not have caught this: the element's `requiredAttributes` were written
+before the carrier was chosen, so choosing `NAMED_VALUE_*` created a required attribute the element
+does not demand. `closure-completeness` enforced exactly the attributes it was given. The register
+carries this as the `named-value-wire-key-permanence` hazard, and the general lesson is the
+ordering rather than the message: an element written before its mechanism cannot demand what the
+mechanism turns out to require.
+
 This is the trade that was taken deliberately. A typed Aerora dialect was the alternative and is
 what Class B of the telemetry ICD was reserved for, but that ICD records it as a programme rather
 than a decision: a controlled fork pinned to an immutable commit, a version reported in telemetry,
