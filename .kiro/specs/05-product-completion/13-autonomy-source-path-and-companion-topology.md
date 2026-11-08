@@ -13,7 +13,7 @@ topology question and closes no Gate.
 | Interfaces this answer shapes | `IF-FC-010`, `IF-FC-011`, `IF-GPU-001` through `IF-GPU-005`, `IF-TLM-007`, `IF-UIS-003` |
 | New Contract_Values introduced | **None.** No field, identifier, threshold or message name is authored here |
 | Cascade through the interface rows | **Applied.** See section 5 for what changed and what deliberately did not |
-| Which monotonic clock the ordering key resolves to | **Still open.** Named in section 3 and chosen nowhere |
+| Which monotonic clock the ordering key resolves to | **Decided: the companion's**, with the flight controller's relay stamp carried alongside it. Section 3.1 |
 | Document number | 13, allocated here rather than by Tab 1. [00-README.md](00-README.md) reserves that to Tab 1, so the number needs confirming |
 
 ## 1. The answer
@@ -91,7 +91,45 @@ the companion's monotonic clock is not the flight controller's and neither is th
 | The flight controller's summary carries the companion's own timestamp, not only the re-emission time | Firmware |
 | The pair the accepted proposal model settles resolves to the companion's clock for `monotonicUs`, or the ordering guarantee applies to the summary rather than to the inference and the record says which | Architecture, with Firmware |
 
-Neither is authored here. Both are named because this answer is what creates them.
+## 3.1 The clock, decided
+
+`monotonicUs` is **the companion's** production clock, and the flight controller's summary carries
+**both** it and the flight controller's own relay stamp.
+
+### Why not either of the other two
+
+| Candidate | Why it fails |
+| --- | --- |
+| The **station's** clock, stamped at parse | It stamps arrival, not production. Two proposals computed five seconds apart and relayed in one burst get near-identical stamps, so `AERORA-GPU-REQ-006` is satisfied against a clock on which **nothing is ever stale** — arrival is always now |
+| The **flight controller's** clock | Better, but it stamps relay rather than production. If the companion stops producing and the flight controller keeps re-emitting its last value, the stamp advances while the content ages: the same failure with a shorter fuse |
+| The **companion's** clock | The only one that answers what the field exists to answer — which proposal came first, and how old is this one |
+
+### Why both stamps rather than only the companion's
+
+A companion monotonic value alone is useless to the station, because it shares no timebase with
+anything the station holds and cannot be compared against station or flight-controller time.
+Carrying both is what makes the pair usable:
+
+| The station can | Because |
+| --- | --- |
+| Order the proposal queue stably | The companion's `monotonicUs` is the production order, and it does not reorder when a wall clock is corrected mid-flight, which is the reason the accepted record chose a monotonic key |
+| Report a true end-to-end age | Production to relay from the two carried stamps, plus relay to parse from its own stamp at the parse point, which `IF-TLM-010` already applies to every message |
+| **Detect a stalled companion** | A relay stamp that advances while the companion's `monotonicUs` stays frozen is a companion that has stopped producing. With one stamp that state is invisible; with both it is arithmetic |
+
+The last row is why this is a decision and not a preference. The obligation above is that a summary
+stamped at re-emission is indistinguishable from a fresh one. Carrying both stamps is what makes it
+distinguishable, and it turns the obligation from something the station must trust firmware to
+honour into something the station can check.
+
+### What this does not make the station do
+
+Subtracting two reported timestamps is observation, not projection. The station already stamps every
+message at the parse point under `IF-TLM-010`, and already evaluates and presents staleness under
+`IF-UIS-004`, whose own text records that a stale value is marked and aged rather than hidden or
+shown plain. Nothing here computes a value the aircraft did not report, which is the line
+`kRemainingEnergyEstimationImplemented` and `P7-ARCH-005` both draw elsewhere.
+
+No numeric budget is set. How old is too old stays a freshness threshold, and `DG-FRS` holds those.
 
 ## 4. What this does not settle
 
@@ -171,7 +209,7 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 
 | Open | Owner | Why it is still open |
 | --- | --- | --- |
-| Which monotonic clock `monotonicUs` resolves to | Architecture, with Firmware | Three candidates exist under the summarised path and the accepted `DG-AUT:proposal-model` record names none. This is the one question this answer created and did not settle |
+| That the flight controller's summary carries **two** stamps, the companion's production clock and its own relay clock | Firmware | Section 3.1 decides which clock the ordering key is; carrying both is what makes a stalled companion detectable, and only firmware can emit them |
 | The proposal schema: fields, update rate, and the message that carries it | Architecture, with the external interface authority | `IF-FC-010` carries `UNKNOWN` for crossing, update and freshness. This is the whole of what `DG-AUT:source-interface` now waits on |
 | The MAVLink carrier for a proposal | Architecture, with the external interface authority | Section 4. The `NAMED_VALUE_*` mechanism that unblocked `DG-PAY` cannot carry a proposal's four fields, and both closed Gates record zero new Aerora identifiers |
 | `Q-008`: whether the flight controller reports proposal outcomes explicitly | Firmware | Unaffected by this answer. The interface control document's fallback stands: proposal and effective state side by side, no causal link asserted |

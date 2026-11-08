@@ -201,18 +201,55 @@ through the station at all. So the contradiction is a defect in the record rathe
 in the aircraft — and it becomes live the moment a grant is wired to real enforcement, which is
 exactly when it would be hardest to notice.
 
-### The two resolutions, which differ in whether a station failure costs the pilot the aircraft
+### The recommended resolution: the grant gates entry, not continuation
 
-Not decided here. This is Firmware with Architecture, and it carries a safety case.
+Both obvious readings are wrong, and seeing why points at a third that is better than either.
 
-| Resolution | What it means |
+| Reading | Where it fails |
 | --- | --- |
-| The flight controller reverts to a **defined autonomous failsafe** on expiry — return to launch, or land | Manual control is not needed after a station loss because the aircraft recovers itself. Criteria 4 and 5 stand, and criterion 6 records the failsafe. The hazard mitigation's final clause still needs rewriting, because the ability *is* withdrawn |
-| Manual authority is **dominant regardless of grant**, and the grant records rather than gates | A station failure costs the pilot nothing. Criterion 4 would have to be rewritten, and the firmware model's `CONFIRMED` position that "manual authority is structurally dominant" points this way |
+| Expiry reverts the aircraft to an **autonomous failsafe** | Consider the case that matters: the station's link drops while a pilot is actively flying close to a wall. The aircraft stops answering the sticks and initiates a recovery the pilot did not ask for, possibly into the surface being painted or into the tether. Taking control away from a pilot mid-manoeuvre is the worst available moment to do it |
+| Manual authority is **dominant regardless of grant** | Then the grant gates nothing, and anyone with a transmitter on the right binding can fly an aircraft the station never authorised. The station's authority becomes a record of a decision it does not actually make |
 
-The firmware model's recorded position and Requirement 2 criterion 4 are not the same claim, and
-which of them governs is the decision. The register carries this as the
-`manual-authority-on-station-loss` hazard.
+The first is unsafe and the second is insecure, and the reason both fail is that they treat one
+question as if it were one: *may manual control begin* and *may manual control continue* are
+different questions with different answers.
+
+**So: an unexpired Manual_Authority_Grant is required to *enter* manual control authority, and
+expiry does not *end* it.**
+
+| Case | Behaviour |
+| --- | --- |
+| No grant has been issued, someone moves the sticks | The flight controller does not enter manual authority. This is the security case, and it holds |
+| A grant is in force, the pilot takes manual control, the station's link then drops | The grant expires and is recorded as expired. Manual authority **continues**. The pilot keeps the aircraft |
+| A grant has expired and the pilot wants manual control again | Entry requires a grant, so it requires the station. The station's authority is real |
+| The RC link itself is lost | Untouched by any of this. RC loss has its own firmware failsafe and always did; conflating the two is what produced the contradiction |
+
+### Why this is the right answer and not a compromise
+
+It makes the signed mitigation **true again, as written**. "A stalled host withdraws permission to
+fly manually and never withdraws the ability to" is exactly this behaviour: permission is the grant,
+which a stalled host stops being able to issue or refresh, and the ability is manual authority
+already in force, which expiry leaves alone. The mitigation was right. Criterion 4 is what is wrong,
+and it is wrong in one word: it says the flight controller shall accept no manual control *input*
+where it should say shall not *enter* manual control authority.
+
+It also matches how flight controllers actually behave. Manual mode is entered by the pilot and is
+dominant once entered; a ground station link is a separate failsafe axis with its own action. The
+firmware model's `CONFIRMED` position that "manual authority is structurally dominant" is about
+continuation, and Requirement 2 criterion 4 is about entry — read that way the two were never in
+conflict, and the register recorded a contradiction that exists only in the wording.
+
+### What this needs, and from whom
+
+| Action | Owner |
+| --- | --- |
+| Rewrite Requirement 2 criterion 4 from "shall accept no manual control input" to "shall not enter manual control authority" | The spec owner for `aerora-fleet-and-authority`. **Not done here** — editing an acceptance criterion of a completed spec should be a visible request rather than a quiet edit |
+| Settle criterion 6 as: on in-flight expiry with manual authority in force, the flight controller continues to accept manual input and reports the grant expired; it does not revert to autonomous. RC link loss retains its own independent failsafe | Firmware with Architecture, and it carries the safety case |
+| Retire the `manual-authority-on-station-loss` hazard once both land | Architecture |
+
+The register carries this as the `manual-authority-on-station-loss` hazard with this resolution
+recorded as the proposed repair. It stays open until signed, because a recommendation on a safety
+case is not a safety case.
 
 ## What signing this would and would not do
 
