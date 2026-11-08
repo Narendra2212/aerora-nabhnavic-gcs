@@ -3437,16 +3437,10 @@
   ],
   "linkProfiles": [
     {
-      "linkClass": "lora",
+      "linkClass": "lora-wifi",
       "parameters": {},
       "heldBy": "Q-015",
-      "revision": "r0-values-absent"
-    },
-    {
-      "linkClass": "wifi",
-      "parameters": {},
-      "heldBy": "Q-015",
-      "revision": "r0-values-absent"
+      "revision": "r1-lora-wifi-merged"
     },
     {
       "linkClass": "tether",

@@ -29,6 +29,7 @@ claimed anywhere.
 | 11 | [Mission Command Set and Coverage Items](11-mission-command-set-and-coverage-items.md) | The content `DG-MIS` settles: the command set, the one Aerora complex item, its parameters, the geometry and the plan-file key |
 | 12 | [Payload, Tether and Gimbal Item Sets](12-payload-tether-and-gimbal-item-sets.md) | The content `DG-PAY` waits on, derived from the firmware model: the reported item names and the units the model evidences |
 | 13 | [Autonomy Source Path and Companion Topology](13-autonomy-source-path-and-companion-topology.md) | The owner's answer to `Q3-005`: companion traffic terminated at the flight controller, what that settles for `DG-AUT`, and the clock obligation it creates |
+| 14 | [Ground Link Classes and Control Authority](14-ground-link-classes-and-control-authority.md) | The owner's answer on the ground links: `lora-wifi` as one Link_Class, capability-based routing, the three taxonomies that are not the same set, and the RC wiring question that blocks the authority model |
 
 Document numbers are allocated by Tab 1 **before** a document is created. 09 was briefly used twice
 and Tab 9's was renumbered to 10; see
