@@ -103,6 +103,19 @@
           "source": "Q4-002"
         },
         {
+          "key": "paintRemainingVolume",
+          "value": {
+            "factName": "paintRemainingVolume",
+            "unit": "L",
+            "valueRange": "the IEEE 754 single-precision range the message carries; no narrower range is asserted, and the tank capacity is held by the applicator ICD",
+            "enumerationMembers": "none, it is a scalar",
+            "owningFactGroup": "Aerora payload",
+            "freshnessClass": "System",
+            "inboundMessage": "NAMED_VALUE_FLOAT, name field aePntRem"
+          },
+          "source": "P7-ARCH-005"
+        },
+        {
           "key": "sprayGateState",
           "exception": true,
           "value": "Declared as a fact with an unsettled enumeration. Six of the seven attributes are known: the fact name is sprayGateState, it carries no unit because it is an enumeration, its value range is the int32 range NAMED_VALUE_INT carries, its owning fact group is Aerora payload, its freshness class is System, and its inbound message is NAMED_VALUE_INT with the name field aeSprayGt. Only the member set is unsettled: the interlock is a Stateflow chart and the archive does not enumerate its states. Recorded as an exception rather than guessed, because with NAMED_VALUE_INT the integer is what travels, so a guessed member becomes permanent in every flight log the first time firmware sends it. Appending members later is safe; renumbering silently rewrites records already on disk.",
@@ -207,6 +220,21 @@
         }
       ],
       "entryCommit": "5bb4ad658c5be720ac4f6e27249ba3ed726d6b48"
+    },
+    {
+      "key": "paintRemainingVolume",
+      "signOffDate": "2026-11-08",
+      "signatures": [
+        {
+          "owner": "Firmware",
+          "date": "2026-11-08"
+        },
+        {
+          "owner": "Product",
+          "date": "2026-11-08"
+        }
+      ],
+      "entryCommit": null
     }
   ]
 }

@@ -1,0 +1,47 @@
+{
+  "$schema": "../closure-record.schema.json",
+  "gate": "DG-PAY",
+  "part": "consumable",
+  "state": "submitted",
+  "signOffDate": "2026-11-08",
+  "entryCommit": null,
+  "signatures": [
+    {
+      "owner": "Product",
+      "date": "2026-11-08"
+    },
+    {
+      "owner": "engineering",
+      "date": "2026-11-08"
+    }
+  ],
+  "signOffConditionVerdicts": [],
+  "guardPermissions": [],
+  "settled": [
+    {
+      "element": "the reported consumable item set",
+      "shape": "keyed",
+      "entries": [
+        {
+          "key": "paintRemainingVolume",
+          "value": {
+            "itemName": "paintRemainingVolume",
+            "unit": "L",
+            "reportingMessage": "NAMED_VALUE_FLOAT, name field aePntRem"
+          },
+          "source": "P7-ARCH-005"
+        }
+      ]
+    },
+    {
+      "element": "the approved consumption model that P7-ARCH-005 requires before any consumption projection is displayed",
+      "shape": "single",
+      "entries": [
+        {
+          "value": "There is no station-side consumption model, and that is the settlement rather than an omission. The payload controller reports remaining volume directly as a quantity, so the only projection in the system is the vehicle's own and the station displays it. P7-ARCH-005 prohibits a consumption projection without an approved method; the method here belongs to the payload controller and the station neither holds a copy of it nor derives a second answer from the flow rate it also receives. That separation is the point of the decision. The station receives both sprayRate in ml/s and paintRemainingVolume in L, and integrating the first to check or replace the second is exactly the station-derived projection this element excludes: it would drift with nothing to re-zero against, and it would put a ground-station estimate beside a vehicle-reported fact with no way for an operator to tell them apart. So the station is forbidden from computing remaining volume even though it holds the inputs that would let it, which is the same shape as kRemainingEnergyEstimationImplemented holding at false while BATTERY_STATUS supplies both current and consumed charge. Two consequences are recorded rather than left to be discovered. Where the aircraft reports no tank capability the item reads Unavailable and never zero, which is the State_Vocabulary rule the accepted DG-PAY:capability record settles: Unavailable is producible only from a capability report, so tether supply mode with no onboard tank in play is distinguishable from a tank that is genuinely empty. And where the tank is present but the live Telemetry_Tier omits the item, it reads not carried by that tier rather than Unknown, which is the DG-TLM freshness mechanism unchanged.",
+          "source": "P7-ARCH-005"
+        }
+      ]
+    }
+  ]
+}

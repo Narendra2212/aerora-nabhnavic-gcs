@@ -523,8 +523,8 @@
             "Product",
             "engineering"
           ],
-          "state": "open",
-          "closureRecord": null,
+          "state": "submitted",
+          "closureRecord": ".kiro/specs/aerora-decision-gate-closure/closures/DG-PAY.consumable.json",
           "elements": [
             {
               "name": "the reported consumable item set",
