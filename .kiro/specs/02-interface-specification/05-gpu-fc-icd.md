@@ -44,9 +44,17 @@ GROUND STATION
 | Transport between them | UART | `ARTIFACT-OBSERVED` | `CONFIRMED` |
 | Protocol configuration, baud, connector assignment | **`UNKNOWN`** — baseline 50 requires these frozen in the interface control document before implementation | — | `OPEN` |
 | Companion module identity | **`UNKNOWN`** | — | `OPEN` |
+| Whether companion traffic is bridged onto the radio link or terminated at the flight controller | **Terminated.** The flight controller summarises and re-emits; it is the command centre | Owner-answered, `Q3-005` | `PROPOSED` |
 
 The architecture depends on the **topology**, not the parameters. The topology is observed; the
 parameters are open and do not affect the ground station.
+
+The message path was the one thing the topology did not settle, and it is now answered: companion
+traffic terminates at the flight controller. That is `Q3-005`, and
+[product-completion 13](../05-product-completion/13-autonomy-source-path-and-companion-topology.md)
+carries the answer with its consequences. The rows below are written against it. Every row that
+depends on the answer reads `PROPOSED` rather than `CONFIRMED`, because the document carrying the
+answer is itself unsigned.
 
 ## The two interfaces, kept separate
 
@@ -69,6 +77,12 @@ both are contracts.
 
 ## How companion data reaches the ground station
 
+**Not by this path, now that `Q3-005` is answered.** The four behaviours below are what would carry
+*companion-addressed* traffic to the vehicle model, and under the summarised reading the companion
+addresses the ground station with nothing. They are retained because they are verified upstream
+behaviour and they still describe how any non-autopilot component would be handled — but the
+proposal path is `IF-FC-010`, and it needs none of them.
+
 Verified in QGroundControl source. Two existing filters pull in opposite directions, and the
 combination is exactly what is wanted.
 
@@ -84,33 +98,56 @@ vehicle and no core edit**.
 
 ### What that requires of the vehicle side
 
-| Requirement | Owner | Evidence | Failure if violated |
-| --- | --- | --- | --- |
-| The companion shares the flight controller's system id | Firmware | `NOT-EVIDENCED` | Every companion message is discarded by the system-id filter |
-| The companion uses a non-autopilot component id | Firmware | `NOT-EVIDENCED` | A phantom second vehicle appears in the vehicle list |
-| The companion does not impersonate the autopilot in any message | Firmware | `NOT-EVIDENCED` | Component-scoped handling throughout QGroundControl assumes component 1 is the autopilot |
+These were the three obligations, and they were the first thing to confirm with the firmware team.
+`Q3-005`'s answer **retires all three**: each exists only where the companion is a MAVLink component
+the ground station receives from, and under the summarised reading it is not. There is no system-id
+filter to satisfy and no phantom second vehicle to avoid.
 
-Three firmware obligations, none recorded as a decision. They are the first thing to confirm with
-the firmware team, because a companion using its own system id turns a zero-cost integration into a
-transport problem.
+| Retired obligation | Why it no longer applies |
+| --- | --- |
+| The companion shares the flight controller's system id | No companion message is addressed to the ground station, so no message is exposed to the system-id filter |
+| The companion uses a non-autopilot component id | No companion heartbeat reaches vehicle creation, so no phantom vehicle can appear |
+| The companion does not impersonate the autopilot in any message | The companion emits nothing onto the radio link, so the impersonation surface does not exist |
+
+### The obligation that replaces them
+
+One obligation takes their place, and it is heavier than the three it replaces because getting it
+wrong is silent.
+
+| Obligation | Owner | Status | Failure if violated |
+| --- | --- | --- | --- |
+| The flight controller's summary carries the **companion's own timestamp**, not only the time of re-emission | Firmware | `OPEN` — created by `Q3-005`'s answer | `AERORA-GPU-REQ-006` is satisfied against the wrong clock: a perception result computed seconds earlier, or one the companion stopped producing, reads as current |
+
+`Q3-005` states this directly — under the summarised reading the requirement "is satisfied against
+the wrong clock unless the summary carries the companion's own timestamp". The ground station cannot
+detect the violation, because a summary stamped at re-emission is indistinguishable from a fresh
+one. That is why it is recorded as an interface obligation on the producer rather than as something
+the station can check.
+
+**Which clock the ordering key resolves to is not settled here.** The accepted
+`DG-AUT:proposal-model` Closure_Record settles the proposal timestamp as two values carried
+together, `occurredUtcMs` for wall time and `monotonicUs` as the ordering source of truth. Under the
+summarised path there are three candidate monotonic clocks — the companion's, the flight
+controller's and the ground station's — and the record does not say which. It needs Architecture
+with Firmware, and nothing here chooses it.
 
 ## Interface contracts
 
 | ID | Interface | Direction | Producer | Consumer | Crossing | Update | Freshness | Authority | Evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `IF-GPU-001` | Companion addressing | Companion to GCS | Companion | Vehicle model | System id and component id in every message | Every message | Not applicable | Non-authoritative | `NOT-EVIDENCED` | `OPEN` |
-| `IF-GPU-002` | Proposal | Companion to GCS | Companion | Autonomy module | A proposal: class, content, and its own identity | `UNKNOWN` | Per-class threshold; stale is visible | **Proposal only** | `MODEL`, partly future work | `OPEN` |
+| `IF-GPU-001` | Companion addressing | **None — companion traffic terminates at the flight controller** | — | — | Nothing reaches the ground station under a companion component id | — | Not applicable | **No authority** | `ARTIFACT-OBSERVED` topology; message path answered by `Q3-005` | `PROPOSED` |
+| `IF-GPU-002` | Proposal | **None direct — carried by `IF-FC-010`** | Flight controller, summarising companion output | Autonomy module, via `IF-FC-010` | A proposal: class, content, and its own identity, re-emitted by the flight controller | `UNKNOWN` | Per-class threshold on the summary; see the clock obligation below | **Proposal only** | `MODEL`, partly future work; producer answered by `Q3-005` | `OPEN` |
 | `IF-GPU-003` | Proposal outcome | Vehicle to GCS | Flight controller | Autonomy module | Accepted, rejected, with a reason | `UNKNOWN` | Stamped at parse | Flight controller | `NOT-EVIDENCED` | `OPEN` |
-| `IF-GPU-004` | Companion health | Companion to GCS | Companion | Autonomy module, diagnostics | Health, reported load, perception status | `UNKNOWN` | Per-class threshold | Non-authoritative | `NOT-EVIDENCED` | `OPEN` |
-| `IF-GPU-005` | Companion presence | Companion to GCS | Companion | Autonomy module | Presence, as distinct from reporting nothing | `UNKNOWN` | Absence detected by threshold | Non-authoritative | `NOT-EVIDENCED` | `OPEN` |
+| `IF-GPU-004` | Companion health | **None direct — carried by `IF-FC-011`** | Flight controller, summarising companion health | Autonomy module, diagnostics | Health, reported load, perception status, re-emitted by the flight controller | `UNKNOWN` | Per-class threshold on the summary | Non-authoritative | `NOT-EVIDENCED`; producer answered by `Q3-005` | `OPEN` |
+| `IF-GPU-005` | Companion presence | **None direct — carried by `IF-FC-011`** | Flight controller, summarising companion presence | Autonomy module | Presence, as distinct from reporting nothing, re-emitted by the flight controller | `UNKNOWN` | Absence detected by threshold on the summary | Non-authoritative | `NOT-EVIDENCED`; producer answered by `Q3-005` | `OPEN` |
 | `IF-GPU-006` | Effective state for corroboration | Vehicle to GCS | Flight controller | Authority module | The effective authority mode and relevant vehicle state | Streamed | Stamped at parse | Flight controller | `MODEL` | `PROPOSED` |
 | `IF-GPU-007` | Autonomy capability | Vehicle to GCS | Flight controller | Capability model | Which autonomy modes and proposal classes exist | On connection | Current for the connection | Vehicle | `NOT-EVIDENCED` | `OPEN` |
 | `IF-GPU-008` | Ground station to companion | **None — prohibited** | — | — | Nothing | — | — | **No authority** | `GCS-DECIDED` | `CONFIRMED` |
 
 | ID | Failure behaviour | Requirements | Risks | Questions | Verification |
 | --- | --- | --- | --- | --- | --- |
-| `IF-GPU-001` | Wrong system id discards all companion data silently; wrong component id creates a phantom vehicle | `AERORA-GPU-REQ-001`, `AERORA-GPU-REQ-002` | R-014 | — | `INTEGRATION` |
-| `IF-GPU-002` | Stale proposals marked stale, then absent; never retained as current | `AERORA-GPU-REQ-004`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `INTEGRATION` |
+| `IF-GPU-001` | Not applicable — no companion-addressed path exists. `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` were written against the direct reading and have no subject under this one; retiring them is the requirement owner's | — | R-014 | `Q3-005`, answered | `INTEGRATION` |
+| `IF-GPU-002` | Stale proposals marked stale, then absent; never retained as current. **Staleness is measured on the summary**, so it detects a stale proposal only where the summary carries the companion's own timestamp | `AERORA-GPU-REQ-004`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-003` | Absent outcome means the proposal and the effective state are shown side by side with **no causal link asserted** | `AERORA-GPU-REQ-005` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-004` | Health unknown; not inferred from proposal activity | `AERORA-GPU-REQ-006` | — | — | `INTEGRATION` |
 | `IF-GPU-005` | Absent companion distinguished from a companion reporting no proposal | `AERORA-GPU-REQ-007` | — | — | `INTEGRATION` |
@@ -208,19 +245,23 @@ Recorded so the read-only property cannot be eroded by a later feature arriving 
 | Ground-side perception or inference | Would raise the question of whether a ground-side result could become authoritative |
 | Video | QGroundControl's video pipeline; the only overlap is that a perception overlay needs both a frame and a proposal |
 
-## Conflicts recorded
+## Conflicts recorded, and the one that is answered
 
-| Conflict | Position A | Position B | Authority needed |
+| Conflict | Position A | Position B | Authority |
 | --- | --- | --- | --- |
-| Whether autonomy proposals reach the ground station directly from the companion or summarised by the flight controller | The topology implies everything passes through the flight controller | The firmware model's MAVLink subsystem receives companion commands, which suggests the companion speaks MAVLink and could address the ground station directly on a shared system id | Firmware owner. The difference changes whether `IF-GPU-002`'s producer is the companion or the flight controller, and therefore what the reporting-source field records |
+| Whether autonomy proposals reach the ground station directly from the companion or summarised by the flight controller | The topology implies everything passes through the flight controller | The firmware model's MAVLink subsystem receives companion commands, which suggests the companion speaks MAVLink and could address the ground station directly on a shared system id | **Answered by the Firmware owner: Position A.** Companion traffic terminates at the flight controller, which is the command centre |
 
-Both positions are preserved. The interface rows above name the companion as producer where the
-message is companion-originated, and the flight controller where it is a relay — which is why
-`IF-FC-010` and `IF-GPU-002` are separate interfaces rather than one. Recorded as Q3-005.
+Recorded as `Q3-005`. Both positions were preserved until it was answered, which is why `IF-FC-010`
+and `IF-GPU-002` were written as two interfaces rather than one.
 
-The owner has since answered Position A: companion traffic is terminated at the flight controller,
-which is the command centre. The rows above are left as they stand, because applying the answer
-changes `IF-GPU-002`'s producer, retires the three `IF-GPU-001` firmware obligations and adds a
-timestamp obligation to the summary — a revision of this document rather than a note on it. The
-answer and the full consequence list are recorded in
-[13-autonomy-source-path-and-companion-topology.md](../05-product-completion/13-autonomy-source-path-and-companion-topology.md).
+The answer collapses them. `IF-FC-010` is the interface that exists; `IF-GPU-002` carries no direct
+path and its producer is the flight controller. The rows above are written against that, the three
+`IF-GPU-001` addressing obligations are retired, and the summary's timestamp obligation replaces
+them. The answer and its full consequence list are in
+[product-completion 13](../05-product-completion/13-autonomy-source-path-and-companion-topology.md).
+
+What the answer does **not** settle: the proposal schema itself. `IF-FC-010` carries `UNKNOWN` for
+its crossing, update rate and freshness, and no message carries a proposal yet — so
+`DG-AUT:source-interface` stays `OPEN` on the schema element, and `DG-AUT-SOC-01` still wants an
+issued interface control document cited for it. Resolving `Q3-005` narrowed that part from three
+open elements to one.

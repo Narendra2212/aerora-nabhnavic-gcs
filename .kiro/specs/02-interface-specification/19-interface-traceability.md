@@ -502,6 +502,11 @@ the body text of the documents that raise them, because each concerns the shape 
 group rather than one row. All nine are defined in
 [20-phase-3-open-questions.md](20-phase-3-open-questions.md).
 
+`Q3-005` has since been answered and the rows it shapes now cite it in their **Evidence** column,
+which is where an answered question belongs rather than in `Questions`. The count above is of
+`Questions`-column citations and is unchanged. The answer is in
+[product-completion 13](../05-product-completion/13-autonomy-source-path-and-companion-topology.md).
+
 The questions carried by the most interfaces:
 
 | Question | Interfaces | Subject |

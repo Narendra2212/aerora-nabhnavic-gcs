@@ -12,6 +12,8 @@ topology question and closes no Gate.
 | `DG-AUT:source-interface` | Still `OPEN`. The transport element is settled; the schema element is not |
 | Interfaces this answer shapes | `IF-FC-010`, `IF-FC-011`, `IF-GPU-001` through `IF-GPU-005`, `IF-TLM-007`, `IF-UIS-003` |
 | New Contract_Values introduced | **None.** No field, identifier, threshold or message name is authored here |
+| Cascade through the interface rows | **Applied.** See section 5 for what changed and what deliberately did not |
+| Which monotonic clock the ordering key resolves to | **Still open.** Named in section 3 and chosen nowhere |
 | Document number | 13, allocated here rather than by Tab 1. [00-README.md](00-README.md) reserves that to Tab 1, so the number needs confirming |
 
 ## 1. The answer
@@ -139,3 +141,38 @@ which is what the `autonomy-source` check holds absent while the Gate is open.
 
 Defined programme-wide in [00-README.md](00-README.md#status-vocabulary). This document redefines
 none of them and claims `VERIFIED` for nothing.
+
+## 5. The cascade, as applied
+
+Every row `Q3-005` names as affected, and what the answer did to it. Each changed row reads
+`PROPOSED` and not `CONFIRMED` where it depends on this answer, because this document is unsigned.
+
+| Row | Change |
+| --- | --- |
+| `IF-GPU-001` companion addressing | Recorded as **no path** — nothing reaches the station under a companion component id. Follows the `IF-GPU-008` pattern of retaining the row and recording non-existence |
+| `IF-GPU-002` proposal | No direct path; carried by `IF-FC-010`, producer the flight controller. Its failure row now records that staleness is measured on the summary |
+| `IF-GPU-004` companion health | No direct path; carried by `IF-FC-011`, producer the flight controller |
+| `IF-GPU-005` companion presence | No direct path; carried by `IF-FC-011`, producer the flight controller |
+| `IF-FC-010` autonomy state and proposals | Producer hedge "relaying or summarising" resolved to **summarising**; freshness cell records that the summary carries the companion's own timestamp |
+| `IF-FC-011` companion health and presence | Direction "Companion to GCS, via shared system id" becomes **Vehicle to GCS**; producer becomes the flight controller; the `NOT-EVIDENCED` addressing clause is gone because no companion addressing is required. `AERORA-GPU-REQ-001` dropped from its requirement list |
+| `IF-TLM-007` autonomy telemetry | Producer "Companion" becomes the flight controller summarising; direction already read "Companion via flight controller" and was already correct |
+| `IF-UIS-003` proposed state presentation | Authority records companion content **as reported by the flight controller and never verified by the station as originating there**, which is the same principle `Q3-004` settled for the watchdog: the reporting source is the sender, never presented as the originator |
+| `IF-GPU-003`, `IF-GPU-006`, `IF-GPU-007`, `IF-GPU-008` | Unchanged. All four were already flight-controller-sourced or already prohibited |
+
+### Not changed, and why
+
+| Left alone | Reason |
+| --- | --- |
+| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Both are `PROPOSED` requirements in the ratified architecture register, and both lose their subject under this answer: the first requires the companion to share the flight controller's system id, the second forbids it the autopilot component id, and the companion now addresses the station with nothing. Retiring a ratified requirement is the requirement owner's act, not this document's. `IF-GPU-001`'s failure row records that they have no subject and names the owner |
+| The interface and question counts in [19-interface-traceability.md](../02-interface-specification/19-interface-traceability.md) | No row was added or removed, so the counts hold. `Q3-005` is now cited in Evidence columns rather than Questions columns, and that document records the distinction so the unchanged count does not read as an error |
+| `IF-UIS-004` staleness presentation | It presents a stale marking and an age, and that is unchanged. What changed is *whose* age, which is the clock obligation in section 3 and belongs to the producer rather than to the presentation |
+
+## 6. What is still open after this
+
+| Open | Owner | Why it is still open |
+| --- | --- | --- |
+| Which monotonic clock `monotonicUs` resolves to | Architecture, with Firmware | Three candidates exist under the summarised path and the accepted `DG-AUT:proposal-model` record names none. This is the one question this answer created and did not settle |
+| The proposal schema: fields, update rate, and the message that carries it | Architecture, with the external interface authority | `IF-FC-010` carries `UNKNOWN` for crossing, update and freshness. This is the whole of what `DG-AUT:source-interface` now waits on |
+| The MAVLink carrier for a proposal | Architecture, with the external interface authority | Section 4. The `NAMED_VALUE_*` mechanism that unblocked `DG-PAY` cannot carry a proposal's four fields, and both closed Gates record zero new Aerora identifiers |
+| `Q-008`: whether the flight controller reports proposal outcomes explicitly | Firmware | Unaffected by this answer. The interface control document's fallback stands: proposal and effective state side by side, no causal link asserted |
+| Retiring `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Requirement owner | Recorded above |

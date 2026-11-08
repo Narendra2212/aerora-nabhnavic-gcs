@@ -90,7 +90,7 @@ display. The reporting-source half depends on messages identifying their origina
 | `IF-TLM-004` | Aerora product telemetry | Vehicle to GCS | Payload controller via flight controller | Product-specific fact group | `UNKNOWN` | Stamped at parse | `PLACEHOLDER` | `OPEN` |
 | `IF-TLM-005` | Aerora power telemetry | Vehicle to GCS | Power system via flight controller | Aerora power fact group | `UNKNOWN` | Stamped at parse | `BASELINE-ASSERTED` | `PROPOSED` |
 | `IF-TLM-006` | Aerora link telemetry | Vehicle to GCS | Flight controller arbitration | Aerora link fact group | `UNKNOWN` | Stamped at parse | `MODEL` | `PROPOSED` |
-| `IF-TLM-007` | Aerora autonomy telemetry | Companion via flight controller | Companion | Aerora autonomy fact group | `UNKNOWN` | Per-class threshold | `MODEL`, partly future work | `OPEN` |
+| `IF-TLM-007` | Aerora autonomy telemetry | Companion via flight controller | Flight controller, summarising companion output | Aerora autonomy fact group | `UNKNOWN` | Per-class threshold on the summary, which carries the companion's own timestamp | `MODEL`, partly future work; producer answered by `Q3-005` | `OPEN` |
 | `IF-TLM-008` | Fact group registration | GCS internal | Firmware abstraction | Vehicle model | On vehicle construction | Not applicable | `GCS-VERIFIED` | `CONFIRMED` |
 | `IF-TLM-009` | Fact metadata | GCS internal | Aerora metadata files | Fact system | Build time | Not applicable | `GCS-VERIFIED` | `CONFIRMED` |
 | `IF-TLM-010` | Freshness stamping | GCS internal | Parse point | All consumers | Every message | The stamp itself | `GCS-DECIDED` | `PROPOSED` |
