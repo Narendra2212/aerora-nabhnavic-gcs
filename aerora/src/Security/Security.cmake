@@ -53,12 +53,22 @@ set(AERORA_SECURITY_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 # Production sources
 #
-# No authorization policy appears here, and no role or permission name appears in any of these
-# files. Q-029 is OPEN; the policy interface is injected and no implementation is shipped.
+# No role name and no permission name appears in any of these files, and that rule is unchanged.
+# What changed is the reason: Q-029 has closed and the role set is settled and signed, so
+# AeroraRolePolicy now ships as a table-driven evaluator whose table is deployment configuration.
+# WP2-C prohibited a policy because "a policy over an unapproved role set is an invented policy";
+# the set is approved, and a role name compiled in would be the remaining mistake rather than the
+# original one.
+#
+# The policy is NOT installed anywhere. AeroraCommandAuthorizer::isFullyConfigured() stays false
+# until a deployment installs an identity provider, a role resolver and a configured policy
+# together, so the shipped posture is unchanged by its presence.
 #
 # No platform key-protection backend appears here either. D-002 approved the abstraction;
-# AeroraPlatformKeyProtector::createForCurrentPlatform() returns nullptr on every platform while
-# D-006 leaves the host unable to compile or test one.
+# AeroraPlatformKeyProtector::createForCurrentPlatform() returns nullptr on every platform. D-006
+# has narrowed to this host rather than the programme, since the Aerora CI legs build and test the
+# overlay - but an untested crypto backend is still worse than none, and WP2-C's prohibition on one
+# rests on that rather than on where the compiler is.
 # ----------------------------------------------------------------------------
 
 set(AERORA_SECURITY_SOURCES
@@ -70,6 +80,8 @@ set(AERORA_SECURITY_SOURCES
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.cc
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.h
     ${AERORA_SECURITY_DIR}/AeroraPlatformKeyProtector.h
+    ${AERORA_SECURITY_DIR}/AeroraRolePolicy.cc
+    ${AERORA_SECURITY_DIR}/AeroraRolePolicy.h
     ${AERORA_SECURITY_DIR}/AeroraSecurityStatus.cc
     ${AERORA_SECURITY_DIR}/AeroraSecurityStatus.h
     ${AERORA_SECURITY_DIR}/AeroraSigningKeyStore.cc
@@ -114,6 +126,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraRolePolicyTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraRolePolicyTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityStatusTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityStatusTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityTestDoubles.h
@@ -147,6 +161,7 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraCalibrationEnforcementTest
     AeroraFleetAuthorizationTest
     AeroraManualAuthorityTest
+    AeroraRolePolicyTest
     AeroraSecurityStatusTest
     AeroraSigningKeyStoreTest
 )

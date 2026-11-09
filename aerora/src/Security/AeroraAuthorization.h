@@ -8,9 +8,11 @@
 /// Authorization abstraction for Aerora. Deliberately contains no role names, no
 /// permission names and no credential handling.
 ///
-/// Q-029 (the operator role set) is OPEN. Every type here is role-agnostic: roles are
-/// opaque identifiers supplied by configuration, and the policy is an interface with no
-/// built-in content. Nothing in this file may grow a hard-coded role comparison.
+/// Q-029 (the operator role set) has closed and the set is settled and signed. Every type here
+/// stays role-agnostic anyway: the signed set is deployment configuration, so roles remain opaque
+/// identifiers supplied by configuration and the policy remains an interface with no built-in
+/// content. Nothing in this file may grow a hard-coded role comparison. `AeroraRolePolicy` is the
+/// shipped implementation and holds its table rather than naming any member of it.
 ///
 /// The chain is:
 ///
