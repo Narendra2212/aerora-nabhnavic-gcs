@@ -274,3 +274,11 @@ its crossing, update rate and freshness, and no message carries a proposal yet �
 `DG-AUT:source-interface` stays `OPEN` on the schema element, and `DG-AUT-SOC-01` still wants an
 issued interface control document cited for it. Resolving `Q3-005` narrowed that part from three
 open elements to one.
+
+[Product-completion 13 § 14](../05-product-completion/13-autonomy-source-path-and-companion-topology.md#14-the-firmware-model-relayed-what-it-supersedes-and-what-it-does-not)
+records an owner-relayed reading of the firmware model which, if confirmed, says the
+flight-controller-to-station message set carries **no proposal at all**. That does not change a row
+here, because a relayed reading sits below `MODEL` and is citable for nothing. It changes who the
+schema element waits on: firmware work first, then the issued document. It also raises one question
+against this document's own `IF-GPU-008` row — whether ground-station MAVLink traverses the
+companion computer — which is recorded there as Firmware's to answer.

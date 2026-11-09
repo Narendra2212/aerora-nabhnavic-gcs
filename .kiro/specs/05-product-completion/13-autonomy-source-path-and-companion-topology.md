@@ -9,9 +9,10 @@ topology question and closes no Gate.
 | --- | --- |
 | This document | `PROPOSED` — owner-answered, unsigned |
 | `Q3-005` | **Answered: the summarised reading.** Companion traffic is terminated at the flight controller |
-| `DG-AUT:source-interface` | Still `OPEN`. The transport element is settled; the schema element is not |
+| `DG-AUT:source-interface` | Still `OPEN`. The transport element is settled; the schema element is not, and section 14 finds it needs firmware work before it can be specified at all |
 | Interfaces this answer shapes | `IF-FC-010`, `IF-FC-011`, `IF-GPU-001` through `IF-GPU-005`, `IF-TLM-007`, `IF-UIS-003` |
 | New Contract_Values introduced | **None.** No field, identifier, threshold or message name is authored here |
+| Owner-relayed firmware-model reading | Recorded in section 14, at a provenance class **below `MODEL`**. No row of it is citable for a Gate or for an interface status |
 | Cascade through the interface rows | **Applied.** See section 5 for what changed and what deliberately did not |
 | Which monotonic clock the ordering key resolves to | **Decided: the companion's**, with the flight controller's relay stamp carried alongside it. Section 3.1 |
 | Document number | 13, allocated here rather than by Tab 1. [00-README.md](00-README.md) reserves that to Tab 1, so the number needs confirming |
@@ -233,8 +234,10 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 | Open | Owner | Why it is still open |
 | --- | --- | --- |
 | That the flight controller's summary carries **two** stamps, the companion's production clock and its own relay clock | Firmware | Section 3.1 decides which clock the ordering key is; carrying both is what makes a stalled companion detectable, and only firmware can emit them |
-| The proposal schema: fields, update rate, and the message that carries it | Architecture, with the external interface authority | `IF-FC-010` carries `UNKNOWN` for crossing, update and freshness. This is the whole of what `DG-AUT:source-interface` now waits on |
-| The MAVLink carrier for a proposal | Architecture, with the external interface authority | Section 4. The `NAMED_VALUE_*` mechanism that unblocked `DG-PAY` cannot carry a proposal's four fields, and both closed Gates record zero new Aerora identifiers |
+| The proposal schema: fields, update rate, and the message that carries it | **Firmware first**, then Architecture with the external interface authority | `IF-FC-010` carries `UNKNOWN` for crossing, update and freshness. This is the whole of what `DG-AUT:source-interface` now waits on, and section 14 records a relayed message set that carries no proposal at all, so there is nothing yet for a document to specify |
+| The MAVLink carrier for a proposal | Architecture, with the external interface authority | Section 4. The `NAMED_VALUE_*` mechanism that unblocked `DG-PAY` cannot carry a proposal's four fields, and both closed Gates record zero new Aerora identifiers. Section 14 leaves the section 9 recommendation standing and unconfirmed rather than superseded |
+| Whether ground-station MAVLink traverses the companion computer | Firmware | Section 14. A relayed sentence describes the companion forwarding the flight controller's telemetry to the station, which neither `IF-GPU-008`'s topology basis nor document 14's link axes record |
+| Which axis each of the two mode encodings belongs to | Firmware | Section 14. The command-authority document keeps flight mode and authority mode apart and records the mapping between them as `UNKNOWN`; `R-028` is the hazard of collapsing them |
 | `Q-008`: whether the flight controller reports proposal outcomes explicitly | Firmware | Unaffected by this answer. The interface control document's fallback stands: proposal and effective state side by side, no causal link asserted |
 | Whether `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` are withdrawn or re-scoped | Requirement owner, with Firmware | Section 7. The answer turns on whether the companion speaks MAVLink to the flight controller, which this answer did not cover |
 
@@ -387,6 +390,10 @@ closure** of `DG-AUT:source-interface`: the carrier and its schema are the exter
 authority's to issue, and `DG-AUT-SOC-01` is met only by citing that issued document, which does not
 yet exist.
 
+Section 14 examines a relayed firmware reading that arrived with the conclusion that it supersedes
+this recommendation. It does not. The reading describes interface B and this recommends a carrier on
+interface A, so the recommendation is left standing and unconfirmed.
+
 The recommendation rests on one point. `TUNNEL`'s only disadvantage against the split-message
 candidate is that its schema sits in the interface control document rather than in a message
 definition — and that is not a cost here, because `DG-AUT-SOC-01` requires an issued interface
@@ -496,6 +503,10 @@ expiry routes a proposal to Absent and the aircraft continues under the mode in 
 mode is ever one that holds the aircraft in an unsafe state awaiting instruction, the accepted
 expiry rule stops being conservative. Settling the safe-mode identity is what makes the rule sound,
 and it is Firmware's with the baseline owner.
+
+Section 14 records a relayed answer for that mode's identity and why the row stays `OPEN` anyway.
+The short version is that the mode offered is a pilot-on-the-sticks one, which is the case this
+paragraph names rather than an exception to it.
 
 Nothing in this section changes the accepted record. The expiry rule and the transition map stand as
 signed.
@@ -678,3 +689,157 @@ inactive. It follows directly from the clock decision and is not settled here.
 Neither consequence introduces a Contract_Value. No proximity distance, no timeout and no envelope
 limit is authored anywhere in this document; those are the applicator and airframe limits that
 `kDefinedThresholdCount` is pinned at zero to keep the station out of.
+
+## 14. The firmware model, relayed: what it supersedes and what it does not
+
+`PROPOSED`, unsigned, and it closes nothing. The owner has relayed a reading of the flight
+controller's model-based firmware that bears directly on sections 9 and 10. The first thing to get
+right about it is its provenance, because the content is load-bearing and the act behind it is thin.
+
+### Provenance, before content
+
+The artifact is a Simulink model of the flight-controller firmware. **It is not in this repository,
+it was not opened in this pass, and what follows is a relay of an earlier reading rather than an
+inspection.** Phase 3.1 already had to correct this tree's `MODEL` and `ARTIFACT-OBSERVED` classes
+to mean a baseline description rather than an inspected artifact, recorded as finding `F3.1-06` in
+[24-phase-3.1-correction-audit.md](../02-interface-specification/24-phase-3.1-correction-audit.md).
+A relayed reading sits below even that. Nothing in this section earns `MODEL`, and no row of it is
+citable as evidence for a Gate or for an interface status.
+
+No number is transcribed. The relay carries mode codes, a companion-loss budget, a cell count, and a
+connector and pin assignment. This document's status table records that no identifier, threshold or
+message name is authored here, and a relayed number is the weakest possible basis on which to break
+that. Where a value matters below, what it is *about* is named and the value stays with the issued
+document.
+
+### The `TUNNEL` supersession claim, corrected
+
+The relay arrived with the conclusion that it supersedes section 9's carrier recommendation, on the
+ground that the firmware uses standard commands and standard telemetry rather than a vendor `TUNNEL`
+payload. That comparison puts the two interfaces back together, which is the one thing section 9
+exists to keep apart.
+
+| | What the relay describes | What section 9 recommends |
+| --- | --- | --- |
+| Interface | **B**, companion to flight controller, which the station does not participate in | **A**, flight controller to station |
+| Object | The setpoint and mode-request stream | The **proposal** an operator reviews |
+| Standing | What the firmware does today | A candidate carrier for a message that does not exist yet |
+
+A command the companion sends to the flight controller cannot supersede a candidate carrier for a
+message the flight controller would send to the station. Section 9's recommendation is therefore not
+contradicted, and it is not confirmed either. It is untouched.
+
+What the relay does change is narrower than a carrier choice and more consequential.
+
+### The finding that matters: nothing carries a proposal today
+
+The relayed flight-controller-to-station set is common-dialect telemetry that QGroundControl already
+parses — heartbeat, system status, attitude, global position, GPS, battery, head-up values and status
+text — and **it contains no proposal-carrying message at all.** The station is described as observing
+the mode, an autonomy-active indication and status text.
+
+Read against section 4, that moves the schema element rather than settling it:
+
+| Before the relay | After it |
+| --- | --- |
+| The response half of the schema is open, and `DG-AUT-SOC-01` wants an issued interface control document cited for it | The response half is open **and the producer emits nothing to specify.** A schema cannot be issued for a message the firmware does not send |
+| The element waits on Architecture with the external interface authority, which is a documentation act | It waits on **firmware work first**, and on that documentation act second |
+
+This is worse for the Gate and better for the record. `DG-AUT:source-interface` was readable as one
+document away from closing; on the relay it is a firmware change away from being specifiable at all.
+The four screens the Gate holds — `SCR-AIS-01`, `SCR-AIS-02`, `SCR-AIS-03` and the proposal half of
+`SCR-LIV-05` — stay unreleased, for a stronger reason than before.
+
+It also sharpens section 12. `IF-GPU-002`'s class field is load-bearing rather than descriptive, and
+a station that had to recover a proposal's class from a mode value and a status string would be
+inferring it, which is the direction section 12 names as the dangerous one.
+
+### Two mode encodings, and the axis each belongs to
+
+The relay gives single-digit mode values. [09-command-authority-icd.md](../02-interface-specification/09-command-authority-icd.md)
+records three mode sentinels as three-digit values, evidence `MODEL`, status `CONFIRMED` as observed.
+Handed both lists, a reader reconciles them by assuming one is wrong.
+
+Neither has to be. That document already separates two axes and records the mapping between them as
+unresolved:
+
+| | Flight mode | Authority mode |
+| --- | --- | --- |
+| Answers | What is the aircraft doing | Who may command it |
+| Carried by | The standard heartbeat base and custom mode | Aerora reporting, candidate |
+| Mapping between them | **`UNKNOWN`**, part of `Q-007` | |
+
+The relay's values attach to a standard mode-setting command, which is the flight-mode mechanism.
+The sentinels sit in the authority-mode table. So the likely reading is that the two lists describe
+the two axes rather than disagreeing about one — and collapsing them is exactly `R-028`, the hazard
+that document raises for a conflated value reaching the display, the log schema and the audit trail
+together.
+
+Likely is not established. Which axis each list belongs to is Firmware's to state, and until it
+does, **neither list may be cited for the other axis.**
+
+### The safe-or-default mode: an answer offered, and why it is not taken
+
+Section 10 names this as load-bearing. The expiry rule is conservative only if the mode an expired
+deviation falls back to is one the aircraft holds safely with nobody instructing it, and the
+command-authority document carries that mode's identity as `OPEN`, flagged in the baseline as
+requiring confirmation.
+
+The relay offers a value for it. The row stays `OPEN`, on three reasons that stack:
+
+| Reason | |
+| --- | --- |
+| Provenance | A relayed reading does not meet the bar for a row the baseline flags as requiring confirmation |
+| Axis | The offered value is a flight mode, and the `OPEN` row sits in the authority-mode table. The previous subsection is why that is not a detail |
+| Content | The mode named is an attitude-stabilised one, which is a **pilot-on-the-sticks** mode |
+
+The third reason is the one to act on. Section 10's soundness argument needs a fallback the aircraft
+holds without instruction, and it already names the failure: if that mode is ever one that holds the
+aircraft in an unsafe state awaiting instruction, the accepted expiry rule stops being conservative.
+A fallback that requires a human on the sticks is that case, not a counter-example to it.
+
+So the relay does not close section 10's premise. It raises the priority of confirming it, and it
+narrows the question to one Firmware can answer directly: does the fallback mode fly the aircraft,
+or does it wait for a pilot?
+
+### Three more relayed items, and where each belongs
+
+None is this document's to settle. Each is named so it is not lost.
+
+| Relayed item | Where it belongs | What it does here |
+| --- | --- | --- |
+| A companion-loss budget past which the aircraft lands by itself, in the autonomous and supervised modes | Firmware, and the failsafe rows of the command-authority document | Gives section 13's "stale perception must degrade, not fail silently" a concrete shape. There is a point past which the aircraft acts, and the station owes the operator the reason it acted |
+| The companion-setpoint validation is marked placeholder and rejects by default | Firmware | The interface shape is described and the deciding logic is future work. `IF-GPU-006` corroboration cannot be observed against a gateway that rejects everything, so the station's side of the autonomy path is not integration-testable yet |
+| A generic autopilot identifier, and the airframe type | `Q-018`, and [hardware-firmware-evidence-matrix.md](../01-aerora-architecture/hardware-firmware-evidence-matrix.md) | `Q-018` asks whether the flight controller reports a **distinct** Aerora autopilot identifier, and a generic value would answer it in the negative, which decides firmware-plugin registration. Referred and not answered: `Q-018` is classed `HARDWARE`, and a relay is not a hardware observation |
+
+### The relay's one architectural complication
+
+Recorded last because it has the widest consequence and the least support.
+
+The relay describes the companion as forwarding the flight controller's telemetry onward to the
+ground station. If that is what happens, the station's link partner is the companion's network stack
+carrying the flight controller's messages, and three recorded positions need re-reading:
+
+| Recorded | What a forwarding companion does to it |
+| --- | --- |
+| Section 1: companion traffic terminates at the flight controller and is not bridged onto the radio link, with video named as the only companion-to-station stream | **Survives in substance; its scoping table is incomplete.** Forwarding carries the flight controller's messages under the flight controller's identity, so no proposal is bridged and the companion becomes no one's MAVLink peer. But the station would receive flight-controller telemetry *through* the companion, and the table does not cover that |
+| `IF-GPU-008`, ground station to companion, **None — prohibited**, `GCS-DECIDED`, `CONFIRMED` | **Harder to hold structurally.** A forwarding node is addressable at the transport layer by definition, and a station-to-flight-controller command would transit it. The prohibition is on MAVLink addressing rather than on packet transit, so the row is probably still true as written, and "probably" is not the status it carries |
+| [Document 14](14-ground-link-classes-and-control-authority.md)'s link axes | The operator link mode and the Link_Class the station's MAVLink traverses would both be describing a path with a companion in it, which neither axis records |
+
+Each of those is a `CONFIRMED` or applied position being questioned by a single relayed sentence.
+That is not enough to move any of them and it is more than enough to ask. **The question for
+Firmware is one sentence: does ground-station MAVLink traverse the companion computer?** The answer
+either moves `IF-GPU-008`'s basis from topology to policy or leaves it on topology, and those are
+not the same row.
+
+### What this section does to the Gate
+
+Nothing, by design.
+
+| | |
+| --- | --- |
+| `DG-AUT:source-interface` | Still `OPEN`. The transport element stays settled by section 1. The schema element is now understood to need firmware work before it can be specified, which is a weaker position than before rather than a stronger one |
+| `DG-AUT-SOC-01` | Unmet. An issued interface control document is still required and this section is not one. A Simulink model is not an interface control document, and a relayed reading of one is not evidence |
+| The act of issuance | The owner's, and not this document's. [The Closure_Record directory](../aerora-decision-gate-closure/closures/README.md) records why: writing the content of a signature is the engineering forging the thing the signature exists to demand |
+| Contract_Values | Still none authored here |
+| The overlay | Still nothing. No autonomy-source type, enumerator or accessor is declared, so the `autonomy-source` check stays in force |
