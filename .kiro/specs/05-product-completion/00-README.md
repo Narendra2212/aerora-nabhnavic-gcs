@@ -30,6 +30,7 @@ claimed anywhere.
 | 12 | [Payload, Tether and Gimbal Item Sets](12-payload-tether-and-gimbal-item-sets.md) | The content `DG-PAY` waits on, derived from the firmware model: the reported item names and the units the model evidences |
 | 13 | [Autonomy Source Path and Companion Topology](13-autonomy-source-path-and-companion-topology.md) | The owner's answer to `Q3-005`: companion traffic terminated at the flight controller, what that settles for `DG-AUT`, and the clock obligation it creates |
 | 14 | [Ground Link Classes and Control Authority](14-ground-link-classes-and-control-authority.md) | The owner's answer on the ground links: `lora-wifi` as one Link_Class, capability-based routing, the three taxonomies that are not the same set, and the RC wiring question that blocks the authority model |
+| 15 | [Operator Identity and the Single-Role Deployment](15-operator-identity-and-the-single-role-deployment.md) | The owner's login statement, why "one role" is a deployment rather than a change to the signed `Q-029` role set, and the three installables that are all that hold enforcement open |
 
 Document numbers are allocated by Tab 1 **before** a document is created. 09 was briefly used twice
 and Tab 9's was renumbered to 10; see
@@ -82,7 +83,7 @@ In the order they gate the most work. None is a UI screen.
 | 1 | **`D-006` build host.** Nothing in this programme has been compiled, linted or executed. 21 commits of overlay source are `IMPLEMENTED-UNCOMPILED` | User / Tab 8 | Every `VERIFIED` claim, and the first real measurement of ~130 overlay sources |
 | 2 | **HO-TAB7-04** Qt Quick Test target | Tab 1 + Tab 7 | `SCR-SHL-01`'s two safety-relevant QML behaviours are guarded by review only — the fail-safe enforcement derivation is a `P7-AUTH-002` claim with no test that can reach it |
 | 3 | **`Q4-002` core edit** — one `friend` line in `src/Vehicle/Vehicle.h` plus a define | Tab 1 authorises | Aerora telemetry reaching the value picker and the CSV record; `SCR-TEL-01` |
-| 4 | **`Q-029` / ADR-014** authorization policy | Product + architecture | Any enforcement beyond "not enforced", `SCR-SEC-01/02` |
+| 4 | ~~**`Q-029` / ADR-014** authorization policy~~ | Tab 2 | **DECIDED.** `DG-ROL` is `CLOSED`: the role set is signed and ADR-014 is selected as Option C. What is left is the identity provider, the role resolver and a configured policy, which is implementation. Doc 15 |
 | 5 | **`Q-037`** audit durability and tamper evidence | Tab 2 | `SCR-SEC-03`, `SCR-LOG-01`, and the audit rows the hub currently reports as false |
 | 6 | **`HO-TAB1-11`** `AERORA_TELEMETRY_TEST_NAMES` absent | Tab 4 | Two telemetry test targets are unreachable from CTest; the manifest check fails on it |
 

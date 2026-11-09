@@ -16,14 +16,15 @@ Status vocabulary: [00-README](00-README.md#status-vocabulary).
 
 ## 1. Blockers
 
-Four. Each stops a class of work entirely.
+**Two.** `D-005` and `Q-029` have since resolved and their rows are kept rather than deleted, so the
+register reads as a history instead of only as a snapshot.
 
 | ID | Blocker | Owner | Stops | Status |
 | --- | --- | --- | --- | --- |
 | `D-006` | **Build host.** No `cmake`, `ninja`, `qmake`, `ctest`, `qmllint`, `clang-format`, `clang-tidy`, `pre-commit` or `just`. `C:\Qt` absent. Disk insufficient; no administrator elevation — two separate gates | **User** | Every compile, lint, test, launch and `VERIFIED` claim | `NO-GO` — re-measured this pass, unchanged |
-| `D-005` | **Aerora git origin.** `origin` is `https://github.com/mavlink/qgroundcontrol.git`, fetch **and push** | **User** | Any Aerora push | `BLOCKED` |
 | `D-007` | **Product authorization.** External evidence required | **External** | Every product feature (`P7-PROF-003`) | `EXTERNAL EVIDENCE REQUIRED` |
-| `Q-029` | **Operator role set.** No approved roles exist, so the authorization gate evaluates nothing | **Product + operations** | All authorization, all operator action controls, the payload sink, autonomy approval | `OPEN` |
+| ~~`D-005`~~ | **Aerora git origin.** `origin` stays `https://github.com/mavlink/qgroundcontrol.git` and has never been pushed to | **User** | — | **RESOLVED.** An `aerora` remote is configured and `aerora/phase7-product-completion` is published on it |
+| ~~`Q-029`~~ | **Operator role set** | **Product + operations** | — | **RESOLVED.** `DG-ROL` is `CLOSED`; the role set is settled and signed in `closures/DG-ROL.role-set.json`. See below |
 
 ### Why `D-006` is listed first
 
@@ -34,12 +35,23 @@ reviewed source rather than verified software, and the gap between those two is 
 
 **The build-host prohibition is unchanged by Phase 7.** No build was attempted.
 
-### Why `Q-029` is a blocker, not a decision
+### `Q-029` was a blocker as well as a decision, and it has resolved
 
-It is both, but its effect is a hard stop. `AeroraCorePlugin::authorizeMavCommand()` returns `true`
-and warns once, and `isAuthorizationEnforced()` reports `false`. The station is honest about it,
-which is the best available position, and it means **the product's second differentiator does not
+It was both, and its effect was a hard stop: `AeroraCorePlugin::authorizeMavCommand()` returns `true`
+and warns once, and `isAuthorizationEnforced()` reports `false`. The station was honest about it,
+which was the best available position, and it meant **the product's second differentiator did not
 exist yet** ([02 §7.2](02-gcs-reference-benchmark.md#72-operator-roles-permissions-and-a-command-audit-trail)).
+
+`DG-ROL` has since closed over both parts. The role set is settled and signed, `ADR-014` is selected
+as Option C and signed, and both accepted records carry a `guardPermissions` verdict permitting
+`isAuthorizationEnforced()` to become true. What remains is the three installables the predicate
+reads — identity provider, role resolver and a configured policy — which is implementation rather
+than decision. [15](15-operator-identity-and-the-single-role-deployment.md) records what specifies
+each, and the one input still owed by Product: what authenticates an operator, as distinct from what
+identifies them.
+
+The source still reports `false` and that is still correct. It changes when something is installed,
+not when a document says it may be.
 
 ## 2. Open decisions
 
@@ -49,7 +61,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 
 | ID | Decision | Blocks | Status |
 | --- | --- | --- | --- |
-| `Q-029` | Operator role set | See [§1](#1-blockers) | `OPEN` |
+| ~~`Q-029`~~ | Operator role set | — | **SETTLED AND SIGNED.** Four roles, `closures/DG-ROL.role-set.json`, Product and operations, 2026-11-05. See [§1](#1-blockers) and [15](15-operator-identity-and-the-single-role-deployment.md) |
 | `Q-021` / `Q-023` | Aerora complex item and mission command set | 5 screens, journeys 6.1 and 6.5 | `OPEN` |
 | `Q-036` | Freshness budget values | `P7-MOD-013`, `P7-TEL-002`, `SCR-TEL-03` content | `OPEN` — **no value invented** |
 | `Q-024` | Mission/payload command interaction | Fact-group implementation gate | `OPEN` |
@@ -65,7 +77,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
-| `ADR-014` | Outbound authorization scope, Options A/B/C | Architecture | Any general authorization claim | `OPEN — ARCHITECTURAL DECISION REQUIRED` |
+| ~~`ADR-014`~~ | Outbound authorization scope, Options A/B/C | Architecture | — | **SELECTED: Option C**, signed in `closures/DG-ROL.authorization-scope.json`, Architecture, 2026-11-05. [Doc 30's own ADR-014 status line still reads `OPEN`](../03-implementation-specification/30-outbound-command-security-audit.md#adr-014-outbound-authorization-scope) and is Architecture's to update |
 | `P7-DAT-002` | Local persistence design | Tab 1 | 7 screens; carries `Q-037` durability but not tamper-evidence | **CLOSED — `DESIGNED`.** [09](09-local-persistence-architecture.md). Seven new decisions `D-DAT-01`..`07` fall out of it, four of them product calls |
 | `P7-AI-004` | GPU/autonomy interface | Architecture + external | 2 screens, journey 6.4 | `OPEN` — **no endpoint, schema or response may be invented** |
 | `D-UI-06` | Multi-station authority | Architecture | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — [new, §3](#3-new-open-decisions-raised-by-the-benchmark) |

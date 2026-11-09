@@ -49,8 +49,9 @@ struct AeroraOperatorIdentity {
 /// \brief Roles resolved for an identity.
 ///
 /// \c roleIds are opaque strings originating from configuration. This type never
-/// enumerates or validates specific role names, because the role set is Q-029 and
-/// remains an unresolved product decision.
+/// enumerates or validates specific role names. Q-029 has since settled the role set, so the
+/// reason is no longer that the set is unknown: it is that the set is deployment configuration,
+/// and a role name compiled in here could not be changed without a release.
 ///
 struct AeroraRoleAssignment {
     QStringList roleIds;
