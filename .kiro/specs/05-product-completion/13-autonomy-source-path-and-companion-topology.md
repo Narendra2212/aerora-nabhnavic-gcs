@@ -201,7 +201,7 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 
 | Left alone | Reason |
 | --- | --- |
-| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Both are active `PROPOSED` requirements in the ratified architecture register, and **withdrawal is not obviously the right action** — see section 7. Their *rationales* are ground-station-specific and this answer removes them; their *statements* are about the companion's MAVLink identity, which may still have a subject on the companion-to-flight-controller link. Retiring a ratified identifier is the requirement owner's act either way |
+| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | Both are active `PROPOSED` requirements in the ratified architecture register, and the answer in section 7 is that they are **re-scoped rather than withdrawn**: the companion speaks MAVLink, so both statements keep a subject on the internal link. Only their ground-station rationales are void. Changing a ratified rationale is the requirement owner's act |
 | The interface and question counts in [19-interface-traceability.md](../02-interface-specification/19-interface-traceability.md) | No row was added or removed, so the counts hold. `Q3-005` is now cited in Evidence columns rather than Questions columns, and that document records the distinction so the unchanged count does not read as an error |
 | `IF-UIS-004` staleness presentation | It presents a stale marking and an age, and that is unchanged. What changed is *whose* age, which is the clock obligation in section 3 and belongs to the producer rather than to the presentation |
 
@@ -215,7 +215,42 @@ Every row `Q3-005` names as affected, and what the answer did to it. Each change
 | `Q-008`: whether the flight controller reports proposal outcomes explicitly | Firmware | Unaffected by this answer. The interface control document's fallback stands: proposal and effective state side by side, no causal link asserted |
 | Whether `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` are withdrawn or re-scoped | Requirement owner, with Firmware | Section 7. The answer turns on whether the companion speaks MAVLink to the flight controller, which this answer did not cover |
 
-## 7. Withdrawal is not the obvious action, and why
+## 7. Answered: re-scope, not withdraw
+
+**The companion speaks MAVLink to the flight controller.** Owner-stated, and it decides the question
+this section was written to hold open. The analysis below is kept because it is the reasoning the
+answer resolves, and because the alternative it rejected would have been irreversible.
+
+| Consequence | |
+| --- | --- |
+| `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` | **Re-scoped, not withdrawn.** The companion has a MAVLink identity, so both statements have a subject. What is void is their *rationales*, which cite the ground station's message-delivery filter and its vehicle list — and `Q3-005` settled that companion traffic never reaches either |
+| Their re-scoped subject | The flight controller's own routing. A system id and component id are what let the flight controller's MAVLink subsystem distinguish companion traffic from the ground station's |
+| Evidence matrix item 9 | **Vindicated as written.** Its `ARTIFACT-OBSERVED` row — "the model receives autonomy commands through a MAVLink subsystem" — reads correctly on the plain reading. An earlier draft of this document reconciled that row by supposing the commands came from the ground station; that reconciliation was wrong and the row was right |
+| `Q3-005`'s resolution | **Unaffected.** MAVLink on the internal link does not mean bridged to the radio. The owner states the flight controller is the command centre and the station hears only it, so companion traffic still terminates rather than bridging, and Position A stands |
+
+### Why re-scoping leaves them worth keeping
+
+Not merely a formality. Under the summarised topology both requirements become **defence in depth
+against an accidental bridge**, which is the one failure that would break `Q3-005`'s resolution.
+
+If the companion shares the flight controller's system id and the flight controller ever bridges a
+companion message onto the radio link — by deliberate change or by a routing mistake — that message
+reaches the ground station. `AERORA-GPU-REQ-002` is then what stops it being mistaken for the
+autopilot and creating a phantom second vehicle. The requirement protects against the mistake that
+the architecture is relying on nobody making.
+
+So a withdrawal would have retired, permanently and unreusably, the two requirements that guard the
+assumption the autonomy topology rests on.
+
+### What this does not change
+
+The three `IF-GPU-001` obligations stay retired **as ground-station-facing interface obligations**,
+because the station receives nothing from the companion and no companion message is exposed to its
+filters. They survive as constraints on the internal link, which is a different document's concern:
+the flight-controller-to-companion interface, which baseline 07 requires to be specified separately
+from the ground-station-to-flight-controller one even though they share a dialect.
+
+## 8. The analysis this answer resolved
 
 The two companion-addressing requirements look like the clean casualty of this answer. They are not,
 and recording why is the point of this section, because the register has a legal withdrawal path and

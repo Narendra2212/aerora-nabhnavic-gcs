@@ -107,7 +107,16 @@ filter to satisfy and no phantom second vehicle to avoid.
 | --- | --- |
 | The companion shares the flight controller's system id | No companion message is addressed to the ground station, so no message is exposed to the system-id filter |
 | The companion uses a non-autopilot component id | No companion heartbeat reaches vehicle creation, so no phantom vehicle can appear |
-| The companion does not impersonate the autopilot in any message | The companion emits nothing onto the radio link, so the impersonation surface does not exist |
+| The companion does not impersonate the autopilot in any message | The companion emits nothing onto the radio link, so the impersonation surface does not exist on this interface |
+
+**Retired here, not everywhere.** The owner states the companion speaks MAVLink to the flight
+controller, so it does hold a MAVLink identity and all three constraints survive on the internal
+link — which baseline 07 requires to be specified separately from this one. What is retired is their
+standing as *ground-station-facing* obligations, because the station receives nothing from the
+companion and no companion message is exposed to its filters. `AERORA-GPU-REQ-001` and
+`AERORA-GPU-REQ-002` are therefore re-scoped rather than withdrawn, and under the summarised
+topology they also become defence in depth: if the flight controller ever bridges a companion
+message onto the radio link by mistake, they are what stops it being read as the autopilot.
 
 ### The obligation that replaces them
 
@@ -146,7 +155,7 @@ with Firmware, and nothing here chooses it.
 
 | ID | Failure behaviour | Requirements | Risks | Questions | Verification |
 | --- | --- | --- | --- | --- | --- |
-| `IF-GPU-001` | Not applicable — no companion-addressed path exists. `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` lose the rationale they were written against, but their statements may survive re-scoped to the companion-to-flight-controller link; whether they are withdrawn or re-scoped is the requirement owner's, and neither is assumed here | — | R-014 | `Q3-005`, answered | `INTEGRATION` |
+| `IF-GPU-001` | Not applicable — no companion-addressed path exists on this interface. `AERORA-GPU-REQ-001` and `AERORA-GPU-REQ-002` lose the ground-station rationale they were written against but keep their statements, **re-scoped to the companion-to-flight-controller link**, which the owner states is MAVLink. Not withdrawn | — | R-014 | `Q3-005`, answered | `INTEGRATION` |
 | `IF-GPU-002` | Stale proposals marked stale, then absent; never retained as current. **Staleness is measured on the summary**, so it detects a stale proposal only where the summary carries the companion's own timestamp | `AERORA-GPU-REQ-004`, `AERORA-GPU-REQ-006` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-003` | Absent outcome means the proposal and the effective state are shown side by side with **no causal link asserted** | `AERORA-GPU-REQ-005` | R-014 | Q-008 | `INTEGRATION` |
 | `IF-GPU-004` | Health unknown; not inferred from proposal activity | `AERORA-GPU-REQ-006` | — | — | `INTEGRATION` |
