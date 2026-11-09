@@ -105,8 +105,17 @@ permitted, so that command authority does not become a single point of failure f
 2. THE Aerora_Station SHALL issue a Manual_Authority_Grant as an authorized operation recorded in
    the audit trail.
 3. A Manual_Authority_Grant SHALL carry an expiry, and SHALL require refresh to remain in force.
-4. WHILE no unexpired Manual_Authority_Grant is in force, THE Flight_Controller SHALL accept no
-   manual control input.
+4. WHILE no unexpired Manual_Authority_Grant is in force, THE Flight_Controller SHALL NOT enter
+   manual control authority. **Corrected 2026-11-08**, from "SHALL accept no manual control input".
+   The original wording chained with criterion 5 to remove manual control from a pilot already
+   flying whenever the station's link dropped — the single point of failure for flight control this
+   requirement's own User Story exists to prevent, and a direct contradiction of the
+   `manual-control-latency` mitigation's recorded clause that a stalled host "never withdraws the
+   ability to" fly manually. The grant gates **entry** into manual authority and does not end it:
+   entry without a grant is refused, which keeps the security case, and expiry while a pilot is
+   flying records the expiry and leaves authority in force, which keeps the safety case. Reasoning
+   in [product-completion 14 §6](../05-product-completion/14-ground-link-classes-and-control-authority.md),
+   carried as the `manual-authority-on-station-loss` hazard.
 5. WHEN the Aerora_Station loses its link to a Flight_Controller, THE Manual_Authority_Grant SHALL
    expire without refresh.
 6. THE Gate_Register SHALL record the behaviour a Flight_Controller adopts when a

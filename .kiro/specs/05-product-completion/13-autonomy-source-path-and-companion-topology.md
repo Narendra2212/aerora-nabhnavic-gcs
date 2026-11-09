@@ -537,3 +537,40 @@ switched off.
 
 Neither consequence is settled here. The window is a Contract_Value with an applicator ICD behind
 it, and no number is authored anywhere in this document.
+
+## 12. A proposed class mapping for the named models
+
+`PROPOSED`, unsigned, and it settles nothing. `IF-GPU-007` carries the class set as
+**vehicle-reported** — "which autonomy modes and proposal classes exist" — so the set is firmware's
+to report and not this document's to declare. What is offered here is a mapping of the models the
+owner named onto the three-way partition of section 11, derived by applying one test, so that
+firmware has something concrete to confirm or correct rather than a blank.
+
+**The test.** If an output must take effect within human reaction time, it cannot be a proposal. If
+it is the next step of a plan already approved, it needs no approval of its own. Everything else is
+a deviation and needs one.
+
+| Named model | Proposed class | Why |
+| --- | --- | --- |
+| Obstacle detection | **Immediate** | Its whole value is acting faster than a human can. Routing it through approval would be the owner's original concern made real, and it must not appear on an approval surface at all |
+| Surface detection | **In-plan** | It keeps the applicator at the correct standoff and attitude while painting the approved pattern. Continuous, and already authorised by the plan; an approval here would sit directly in the wet-edge window |
+| Path planning | **Depends, and the split is the point** — in-plan while it is sequencing passes inside the approved coverage pattern, deviation when it proposes leaving it | The same model produces both, so the class belongs to the **output** rather than to the model that produced it. That is the finding worth carrying: a per-model partition would be wrong |
+| Object detection | **Neither — perception, not a command** | It reports what is seen. It becomes an input to one of the three above and is never itself approved. Displayed under `IF-UIS-003` and the autonomy fact group, read-only |
+
+### The consequence for `IF-GPU-002`
+
+`IF-GPU-002` already records that a proposal carries a **class**, which the partition needs. But the
+path-planning row above means the class cannot be derived from the producing model — it has to be
+**carried per proposal**, decided by the companion at the moment it emits one. A station that
+inferred class from source would misclassify exactly the model that spans two classes, and the
+misclassification is the dangerous direction: an in-plan continuation shown as a pending deviation
+pauses the paint, and a deviation shown as in-plan executes unreviewed.
+
+So `IF-GPU-002`'s class field is load-bearing rather than descriptive, and that is an argument for
+the `TUNNEL` candidate of section 9 over the split-across-messages one: a class and its content
+arriving in separate messages can arrive apart, and a proposal whose class has not yet arrived is
+not safely displayable in either direction.
+
+Nothing here is settled. The set is `IF-GPU-007`'s, the mapping is firmware's to confirm, and the
+safe-or-default mode that an expired deviation falls back to is still `OPEN` in the
+command-authority ICD.
