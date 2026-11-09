@@ -307,3 +307,78 @@ depend on this answer.
 
 Nothing is withdrawn here. The question needs one fact — does the companion emit MAVLink to the
 flight controller — and that is Firmware's to state.
+
+## 9. The setpoint stream and the proposal are two different objects
+
+`PROPOSED` analysis, unsigned, and it closes nothing. Written because asking which message carries
+the companion's instruction turned out to be the wrong question, and the right one is narrower.
+
+### The accepted proposal model does not fit a setpoint message
+
+The companion sends where the aircraft should be and when. In the common dialect that is the
+`SET_POSITION_TARGET_*` family, and `SET_POSITION_TARGET_LOCAL_NED` is **already in this tree** —
+`src/FirmwarePlugin/APM/APMFirmwarePlugin.cc:878` builds one for guided motion, with
+`coordinate_frame`, a `type_mask` selecting which fields are active, and target system and component.
+Zero new identifiers, already in the build.
+
+Now compare it against what the accepted `DG-AUT:proposal-model` record settles a proposal as
+carrying:
+
+| Proposal field, accepted | Present in a setpoint message |
+| --- | --- |
+| `source`, an opaque identifier of the autonomy source, stored verbatim | **No** |
+| `timestamp`, as `occurredUtcMs` **and** `monotonicUs` | Partially — a boot-time field, not the pair |
+| `subject`, named the way a telemetry item is named | **No** — a setpoint carries coordinates, not a subject |
+| `basis`, the evidence the source offers, carried verbatim | **No** |
+
+Nothing is wrong with either object. They are **different objects**, and the question conflated them:
+
+| | The setpoint stream | The proposal |
+| --- | --- | --- |
+| What it is | Control. Go to this position at this time | A decision artifact an operator reviews |
+| Rate | Continuous, high | One per decision, low |
+| Lifecycle | None. The next one supersedes it | Absent, Proposed, Approved, Expired — the accepted record |
+| Carries a basis | No | Yes, and `SCR-AIS-01` displays it |
+| Interface | **B**, companion to flight controller, which the station does not participate in | `IF-FC-010`, flight controller to station |
+
+### Why that matters for the Gate
+
+`DG-AUT:source-interface` is a ground-station Gate part. Its schema element is about what reaches
+the **station**, which under `Q3-005` is the flight controller's summary — so it is about the
+**proposal**, not the setpoint stream. The setpoint stream is interface B, which baseline 07 requires
+to be specified separately and in which the station is recorded as not participating at all.
+
+Read that way the mode behaviour the owner describes falls out without anything new:
+
+| Mode | What flows | What the station needs |
+| --- | --- | --- |
+| Autonomous, 101 | Setpoints, companion to flight controller | Autonomy state to display. **No proposal to approve** — there is no decision pending |
+| Hybrid, 102 | The same setpoints, but the firmware model records that 102 "requires explicit pilot confirmation before following a proposal" | A **proposal**, with its basis, and an approval surface |
+| Manual, 100 | Operator command | The same autonomy signals, presented as guidance rather than as a pending decision |
+
+So the proposal object earns its four fields exactly where the operator has something to decide,
+which is mode 102, and the setpoint stream needs none of them because nobody approves a setpoint
+individually.
+
+### What `DG-AUT:source-interface` still needs, narrowed
+
+| Needed | State |
+| --- | --- |
+| The autonomy source transport | **Settled.** Section 1 |
+| The request half of the schema | **Settled as empty.** `IF-GPU-008` |
+| The response half: the message and fields by which the flight controller reports a **proposal** to the station, and the autonomy state in modes where no proposal is pending | **Open.** This is the whole of it |
+| An issued interface control document to cite for that element | **Open**, and `DG-AUT-SOC-01` requires it |
+
+Two candidate shapes for the response half, both common-dialect and both introducing no identifier.
+Named as candidates for Firmware and the external interface authority to confirm or reject, and
+decided nowhere here, because `P7-AI-004` records that no endpoint, schema or response may be
+invented:
+
+| Candidate | Fits | Does not fit |
+| --- | --- | --- |
+| `TUNNEL`, with a vendor-defined payload type | Carries an opaque byte payload, so a `basis` of arbitrary length survives, and one message holds the whole proposal | The station must parse a payload the dialect does not describe, so the schema lives in the interface control document rather than in the message definition |
+| A set of `NAMED_VALUE_*` keys plus `STATUSTEXT` for the basis | Reuses the mechanism `DG-TLM` already settled, and the ten-byte key discipline is already recorded | A proposal is split across several messages with no atomicity, so a half-arrived proposal is representable. `STATUSTEXT` truncates a basis |
+
+The first is structurally better and the second is cheaper to reach from what is already built.
+Choosing between them is a decision with an issued document behind it, which is what the Gate is
+waiting for and what this section deliberately does not supply.
