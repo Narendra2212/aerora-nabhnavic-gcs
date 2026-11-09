@@ -72,6 +72,8 @@ set(AERORA_SECURITY_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 
 set(AERORA_SECURITY_SOURCES
+    ${AERORA_SECURITY_DIR}/AeroraAuditChain.cc
+    ${AERORA_SECURITY_DIR}/AeroraAuditChain.h
     ${AERORA_SECURITY_DIR}/AeroraAuditSink.cc
     ${AERORA_SECURITY_DIR}/AeroraAuditSink.h
     ${AERORA_SECURITY_DIR}/AeroraAuthorization.h
@@ -116,6 +118,8 @@ set(AERORA_SECURITY_TEST_DIR ${AERORA_SECURITY_DIR}/../../test/Security)
 cmake_path(NORMAL_PATH AERORA_SECURITY_TEST_DIR)
 
 set(AERORA_SECURITY_TEST_SOURCES
+    ${AERORA_SECURITY_TEST_DIR}/AeroraAuditChainTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraAuditChainTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditSinkTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditSinkTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraCalibrationAuthorizationTest.cc
@@ -156,6 +160,7 @@ set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES ${AERORA_SECURITY_TEST_DIR} ${CMAKE
 # ----------------------------------------------------------------------------
 
 set(AERORA_SECURITY_TEST_NAMES
+    AeroraAuditChainTest
     AeroraAuditSinkTest
     AeroraCalibrationAuthorizationTest
     AeroraCalibrationEnforcementTest

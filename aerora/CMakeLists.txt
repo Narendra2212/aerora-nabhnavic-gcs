@@ -304,6 +304,7 @@ if(QGC_BUILD_TESTING)
 
     include(QGCTest)
 
+    add_qgc_test(AeroraAuditChainTest LABELS Unit)
     add_qgc_test(AeroraAuditSinkTest LABELS Unit)
     add_qgc_test(AeroraCalibrationAuthorizationTest LABELS Unit)
     add_qgc_test(AeroraCalibrationEnforcementTest LABELS Integration Vehicle)

@@ -2,7 +2,21 @@
 
 Owner: **Tab 1**. Design for `P7-DAT-002`, `P7-DAT-005`, and the Q-037 assessment.
 
-Status: `DESIGNED`. No code exists. Every mechanism named below was verified against this checkout;
+Status: `DESIGNED`, with **one mechanism now built**. `AeroraAuditChain` implements the per-record
+hash chain of [§7](#7-q-037-assessment-can-this-carry-audit) and `DG-STO:tamper-evidence`, as a pure
+function over a record and its predecessor's digest: no store, no key, no thread, no I/O. It is the
+one piece of this design that needed none of the rest, because the accepted Closure_Record settles a
+keyless construction specifically so it "is identical on all five target platforms and cannot
+silently degrade on one of them". `AeroraAuditChainTest` covers it, including one case per record
+field, so a field added to `AeroraAuditEvent` and forgotten in the encoding fails rather than
+quietly stops being covered.
+
+**No honesty flag moved, and none may yet.** `isDurable()` stays false because no store exists, and
+`isTamperEvident()` stays false because the chain is the keyless half — [§7](#7-q-037-assessment-can-this-carry-audit)
+below is unchanged and is why. The register records both guards as *permitted* to become true by
+`DG-STO:tamper-evidence`, which is not the same as earned.
+
+Everything else here is still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.
 
 **The durability and tamper-evidence sections state what is *not* achievable as precisely as what
