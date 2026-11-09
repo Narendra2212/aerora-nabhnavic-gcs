@@ -411,10 +411,44 @@ reviewable and a sixth a decision.
 | --- | --- | --- |
 | `ADR-014`: whether a parameter write passes the boundary | Architecture | A second subject form. Nothing else, by construction |
 | `Q-015`: Link_Profile parameter values | Architecture | Every derived link figure; the shape is buildable now |
-| `DG-ROL`: the operator role policy | Product, operations | Every origination path: fleet transmission, grant issue, tether commands |
-| `DG-PAY`: capability vocabulary, interlock set, battery reserve | Product, engineering, Firmware | Capability resolution, the interlock list, tethered-flight readiness |
-| `DG-TLM`: tier membership | Firmware, Product | Which values each tier carries |
-| `DG-FRS`: per-class thresholds | Product | Freshness classification, though achievability is derivable now |
-| `DG-MIS`: the command namespace and its allocation rule | Product | Per-product mission commands |
 | The cloud and licensing boundary | Product | Held at the product owner's request |
 | Whether the fifteen-channel ceiling is raised | Architecture | Dual-link operation above seven aircraft |
+| **Requirement 2 criterion 4's wording** | This spec's owner | Criterion 4 reads that the Flight_Controller shall accept no manual control *input* while no unexpired grant is in force. With criterion 5 expiring the grant on station link loss, that chains to a station failure removing manual control — which this requirement's own user story exists to prevent, and which contradicts the `manual-control-latency` mitigation's clause that a stalled host never withdraws the ability to fly manually. The repair is one word: *shall not enter manual control authority*. Reasoning in [product-completion 14 §6](../05-product-completion/14-ground-link-classes-and-control-authority.md), carried as the `manual-authority-on-station-loss` hazard |
+
+### Five Gates have closed since this table was written
+
+`DG-ROL`, `DG-MIS`, `DG-FRS`, `DG-PAY` and `DG-TLM` are all recorded `CLOSED`. Three of them settled
+what this table expected of them and their rows are retired. **Two did not**, and that is the row
+below rather than a retirement.
+
+| Gate | What this table expected | What it settled |
+| --- | --- | --- |
+| `DG-ROL` | The operator role policy | The role set and the authorization scope. **Settled** |
+| `DG-MIS` | The command namespace and its allocation rule | The mission command set. **Settled** |
+| `DG-FRS` | The per-class freshness thresholds | A threshold, unit and source per freshness class. **Settled** |
+| `DG-PAY` | Capability vocabulary, interlock set, battery reserve | **Only the first.** See below |
+| `DG-TLM` | Tier membership | **Nothing of it.** See below |
+
+### Three items are now held by nothing
+
+This is the finding, and it is not a wording problem.
+
+| Item | Recorded as held by | What that Gate's parts actually settle |
+| --- | --- | --- |
+| The Tether_Interlock set | `DG-PAY`, power part | The power part's only Decision_Content element is *the reported tether item set*. No part of `DG-PAY` names an interlock |
+| The battery reserve, and refusing tethered-flight readiness below it | `DG-PAY`, power part | Same. No part of `DG-PAY` names a reserve |
+| Which values each Telemetry_Tier carries | `DG-TLM` | `DG-TLM`'s two elements are the per-fact dialect attributes and the `ADR-016` core edit. Neither is tier membership, and `DG-FRS` settled *freshness classes*, which are a different axis |
+
+All three were recorded as waiting on a Gate, that Gate has closed, and none of them was ever
+Decision_Content of any part of it. So they are not *late* — they are **unassigned**, and the Gate
+that was going to settle them cannot, because it is shut.
+
+Task 8.2 of this spec is the live consequence: it derives which tiers a Link_Class can carry "from
+the Link_Profile and the recorded tier memberships", and the recorded tier memberships do not exist.
+The derivation is built and has nothing to range over.
+
+**Why no check caught it.** `closure-completeness` verifies that every element a part *records* is
+settled. It cannot verify that everything another document *expected* is an element, because the
+expectation lived here and the element list lives in the Gate_Register. That is the same root cause
+as the ten-byte wire key: a requirement written in one document that the checked document was never
+told about. The register carries it as the `content-held-by-a-closed-gate` hazard.
