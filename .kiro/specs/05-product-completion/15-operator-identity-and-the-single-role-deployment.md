@@ -13,8 +13,11 @@ answer is not the question that is open.
 | `Q-029`, the role set | **Settled and signed.** Four roles, in `closures/DG-ROL.role-set.json` |
 | The owner's "one role, Pilot" | **Read as a deployment, not as a role set.** Section 3. On that reading it contradicts nothing signed |
 | The owner's login statement | **New, and the input that was actually missing.** Section 5 |
-| New Contract_Values introduced | **None.** No role name is invented here, no credential format is authored, and no permission is added to a signed role |
+| When the role takes effect | **Answered: at connection and sign-in.** That is `IF-SEC-003` as already written. Section 10 |
+| What authenticates an operator | **Answered: the Aeroradynamics cloud user database**, with registration as a separate prior act. Compatible with three `CONFIRMED` rows on the enrolment reading, and with none of them on a per-flight reading. Section 10 |
+| New Contract_Values introduced | **None.** No role name is invented here, no credential format or lifetime is authored, and no permission is added to a signed role |
 | What this unblocks | The identity provider, which is one of the three installables `isFullyConfigured()` requires. Section 7 |
+| What it newly blocks on | `F3.1-01`, key protection at rest. Offline credential validation needs a trust anchor and the station has nowhere to protect one, so `G-RELEASE` now holds authentication too. Section 13 |
 | Document number | 15, allocated here rather than by Tab 1, the same irregularity [13](13-autonomy-source-path-and-companion-topology.md) records about its own number |
 
 ## 1. Three things, conflated into one question
@@ -181,8 +184,10 @@ candidate.
 | --- | --- |
 | That the scheme is wrong. Identifying *which* aircraft and *which* pilot is exactly what an audit trail needs, and `AERORA-SEC-REQ-019` requires operator identity on every record | That `authenticated` is a separate field from `opaqueId` for this reason, and nothing stated so far sets it to true honestly |
 
-The question for Product is one sentence, and it is in section 9: what authenticates the pilot, as
-distinct from what identifies them?
+The question this section raised — what authenticates the pilot, as distinct from what identifies
+them — **is answered in section 10.** The answer is the Aeroradynamics cloud user database, which
+means neither stated login input has to carry secrecy: they identify the aircraft and the operator,
+and a separately issued credential authenticates. Sections 11 to 13 are what that costs.
 
 ## 7. What this unblocks, concretely
 
@@ -211,23 +216,36 @@ payload action.
 ## 8. What signing this would and would not do
 
 It would record the owner's login statement as the identity-provider input, record the one-role
-statement as a deployment rather than as a role-set change, and record the three findings of
-sections 4, 6 and 7.
+statement as a deployment rather than as a role-set change, and record the findings of sections 4, 6
+and 7. With sections 10 to 13 it would also record the identity authority by name, confirm
+`IF-SEC-003`'s resolution timing, and accept the three gaps that follow from authenticating against
+a cloud the station is forbidden to call.
 
 It would **not** close or reopen any Gate. `DG-ROL` is closed and this touches none of its
 Decision_Content. It would not add a role, remove one, or widen a signed class list, all of which
-section 2 shows have no path. It would not set a credential format, which section 6 refers to
-Product. It introduces nothing into the overlay: no role name, no permission and no identity scheme
-is declared in source by this document.
+section 2 shows have no path. It would not move any `CONFIRMED` row of the security or cloud
+interface control documents, which section 10 leaves standing and section 11 asks the interface
+owner to qualify. It would not set a credential format, a validity period or a key-protection
+mechanism, which sections 12 and 13 refer to Product and security architecture. It introduces
+nothing into the overlay: no role name, no permission and no identity scheme is declared in source
+by this document.
 
 ## 9. What is still open after this
+
+Sections 10 to 13 answer the second row below and replace it with four narrower items. The table is
+rewritten rather than appended to, so it reads as the current open set.
 
 | Open | Owner | Why it is still open |
 | --- | --- | --- |
 | Whether "one role, Pilot" means a **deployment** or a **retraction** of three signed roles | Product, with the process owner if it is the second | Section 3 reads it as the first because that reading is free and reversible. The second needs a retraction path the process does not have, and would reopen the Gate under criterion 11 |
-| What **authenticates** the pilot, as distinct from what identifies them | Product, with security architecture | Section 6. Neither a product code nor a pilot identifier is a secret, and `AERORA-SEC-REQ-011` requires the offline path to be the primary one |
+| ~~What authenticates the pilot~~ | — | **Answered.** The Aeroradynamics cloud user database, with registration as a separate prior act. Section 10 |
+| Whether registration is ever checked **at flight time** rather than only at enrolment | Product | Section 10. On the enrolment reading the answer satisfies `AERORA-SEC-REQ-011`, `IF-SEC-002` and `IF-CLD-004`; on a per-flight reading it breaks all three and grounds an aircraft that has no signal |
+| The **credential validity period**, which is the revocation latency | Product, with security architecture | Section 12. A revoked pilot flies until the cached credential expires, because `IF-SEC-010` means the station never calls out. It is a Contract_Value and no number is authored here |
+| Where the cached credential and its trust anchor are **stored**, given that no protected store exists | Security architecture, with Product | Section 13. `AeroraPlatformKeyProtector` returns `nullptr` on every platform and `F3.1-01` records that neither candidate route is an isolation. `AERORA-SEC-REQ-018` additionally clears the settings store on a schema bump |
+| Whether `IF-SEC-002`'s `CONFIRMED` offline guarantee should carry its **precondition** explicitly | The interface owner | Section 11. The guarantee holds for a previously cached operator and cannot hold for a first sign-in, and `AERORA-AWS-REQ-006`'s test outcome depends on which is assumed |
 | Whether the deployment provisions `Maintenance Technician` to anyone | Product | Section 4. If not, the station cannot write a vehicle parameter, which is a defensible posture and must be a chosen one |
 | Whether a retraction path should exist at all | The process owner | Raised by this document and not answered by it. Every Gate closed so far has been additive; this is the first request to take something back |
+| A product requirement for **registration as a prerequisite to flight** | Product | Nothing in the requirement set says an operator must be registered before flying. The statement is owner-stated and has no identifier behind it |
 
 ### Stale `Q-029` citations
 
@@ -255,6 +273,164 @@ Listed, not chased:
 
 The register itself is current. `tools/validate_gate_register.py` derives `DG-ROL` as `CLOSED` and
 the three screens as Released from the records, so the prose is what lags, not the data.
+
+## 10. The two answers, and the architecture they land on
+
+The owner has answered both questions section 9 raised.
+
+| Question | Answer, owner-stated |
+| --- | --- |
+| When does the role take effect? | At the time the aircraft connects and the operator logs in to the ground station |
+| What authenticates the operator? | The Aeroradynamics user database in the cloud. A pilot registers with Aeroradynamics **separately, before flying** |
+
+The first confirms a row that was already written. The second looks at first like a collision with a
+`CONFIRMED` requirement and is not, because the architecture already separates the two halves of it.
+
+### Role timing: this is `IF-SEC-003` as written
+
+[13-security-icd.md](../02-interface-specification/13-security-icd.md)'s `IF-SEC-003`, role
+resolution, carries its update semantics as **"On sign-in, and on credential refresh"**, and its
+freshness as "carried with the session; refreshed state replaces it wholly, never merges". The
+owner's answer is that row.
+
+The row was held `OPEN` with `Q-029` in its Questions column. `Q-029` is closed and the timing is now
+owner-stated, so what held it open is gone. The row is not moved here, because this document is
+unsigned and the row's evidence class is a separate judgement.
+
+One thing that follows and should be said before somebody implements the opposite. Binding a role at
+sign-in is **not** caching an authorization decision. `IF-SEC-004` is explicit that a decision is
+"decided at request time; a decision is not cached across a credential change", and
+`AeroraCommandAuthorizer` re-reads the role assignment inside the per-command path rather than
+holding one from sign-in. Both hold at once: the session carries the binding, the gate decides per
+command. A reader who read "role at connection" as licence to cache a verdict would break
+`AERORA-SEC-REQ-012`.
+
+### Authentication: the cloud is the authority, and it is already in the architecture
+
+`AERORA-SEC-REQ-011` is `CONFIRMED`: operator credential validation shall succeed **without network
+access as the primary path**. `IF-SEC-002` is `CONFIRMED` and states the failure behaviour as
+"validation must succeed with all network access blocked; a network error is not an authorisation
+outcome". `IF-CLD-004` is `CONFIRMED` and says no authorisation check, arming check or **identity
+resolution** blocks on a network service. The cloud interface control document lists cloud-gated
+authentication as the **first named trap** and refuses it by name.
+
+A reader could stop there and call the owner's answer a contradiction. It is not, because the same
+documents already carry the shape that reconciles it:
+
+| Recorded | Where |
+| --- | --- |
+| The backend's **identity and access** module maps to the station's security module as "offline-capable validation" | Cloud ICD, backend-to-counterpart table |
+| `IF-SEC-009`, credential reconciliation, **Cloud to GCS**, "Refreshed credential **and role data**", opportunistic and **never blocking** | Security ICD |
+| "A failed refresh leaves the local credential in force until its own expiry. **A refresh failure is not a sign-out**" | `IF-SEC-009` failure behaviour |
+| Operator sign-in: "Reconciled against the service" when the cloud is available, "Validated against cached credentials" when it is not | Cloud ICD, degradation table |
+| `IF-SEC-010`: no call from the security module into the cloud module exists. The dependency is one-way — cloud hands material in, security never calls out | Security ICD |
+
+So the architecture already has exactly one cloud identity authority, reaching the station by a
+non-blocking inbound path. The owner's answer **names** it. Aeroradynamics is the identity and access
+backend that `IF-SEC-009` was written against, and nothing in the owner's statement asks the station
+to call out.
+
+The reconciliation is the word "separately" in the owner's own sentence:
+
+| Act | When | Network | Satisfies |
+| --- | --- | --- | --- |
+| **Registration** with Aeroradynamics | Once, before flying, as a separate act | Online, necessarily | The owner's statement |
+| **Sign-in** on the station, each flight | At connection | Offline, against the cached credential | `AERORA-SEC-REQ-011`, `IF-SEC-002`, `IF-CLD-004` |
+| **Reconciliation** of credential and role data | Opportunistically, whenever the cloud is reachable | Online, never blocking | `IF-SEC-009` |
+
+Registration is enrolment and it is not in the pre-flight sequence. If it ever becomes a per-flight
+check, three `CONFIRMED` rows break at once and a pilot with no signal cannot fly — which for an
+aircraft painting the inside of a structure or a facade in an industrial area is an operational
+failure, not a spec disagreement.
+
+**That is the one thing to hold onto from this section.** The answer is compatible on the enrolment
+reading and incompatible on the per-flight reading, and the difference between them is whether the
+aircraft flies without a network.
+
+## 11. `IF-SEC-002`'s precondition, which is unstated and now matters
+
+`IF-SEC-002`'s `CONFIRMED` failure row says validation must succeed with all network access blocked.
+It states no precondition. With a cloud-registered identity there is one, and it is load-bearing:
+
+> Offline validation succeeds only for an operator whose credential has **already** been cached on
+> **this** station by a previous successful online sign-in.
+
+Three cases the row does not distinguish, and only the first is the one it was written about:
+
+| Case | Offline outcome | Correct? |
+| --- | --- | --- |
+| A pilot who has signed in on this station before | Validated against the cached credential | **Yes.** This is the row as intended |
+| A newly registered pilot, first ever sign-in on this station | **Cannot validate.** There is nothing cached to validate against | Correct behaviour, undocumented consequence |
+| Any pilot on a freshly provisioned or freshly reset station | **Cannot validate** | Same |
+
+None of these is a defect. The second and third are the irreducible cost of a cloud identity
+authority, and they are acceptable precisely because they fall outside the flight sequence. What is
+wrong is that they are **unwritten**, and two things depend on them being written:
+
+| Depends on it | How |
+| --- | --- |
+| `AERORA-AWS-REQ-006`'s all-network-blocked test | It asserts connection, parameter load, planning, upload and local recording with the network blocked. Whether it passes depends on whether the fixture pre-seeds a credential, and nothing says it must. A test that signs in offline against an empty store would fail for the right reason and read as the wrong finding |
+| `AERORA-SEC-REQ-018` | A settings-schema version change clears all settings before any subsystem starts. If the cached credential lives there, **a station update strands every pilot until each re-registers online** — and the requirement currently describes this as a key-destroying event, not a credential-destroying one |
+
+The second is the sharper one. It is the same failure `AERORA-SEC-REQ-018` already names, reaching a
+second asset nobody had counted, and it turns a routine station update into a fleet-wide grounding.
+
+## 12. The credential lifetime is the revocation latency
+
+`IF-SEC-002` records that credential validity is time-bounded and that expiry is a reported state
+rather than an inference. `IF-SEC-009` records that a failed refresh leaves the local credential in
+force until its own expiry. Put the owner's answer beside those two and a number appears that nobody
+has set:
+
+**If Aeroradynamics revokes a pilot's registration, that pilot can keep flying until the cached
+credential expires.** The validity period *is* the revocation latency. There is no other mechanism,
+because the station never calls out — `IF-SEC-010` makes that structural rather than incidental.
+
+This is not a flaw in the design. It is the price of offline-first, it is the correct price, and the
+alternative is the per-flight check that section 10 rules out. But it makes the validity period a
+**safety and security value rather than a convenience one**, and it is exactly the shape of value
+this programme does not invent:
+
+| | |
+| --- | --- |
+| What it is | A single duration, held by Product with security architecture |
+| What it trades | Revocation latency against how long a disconnected station stays usable. Short strands field crews; long leaves a revoked pilot airborne |
+| Why no number is here | It is a Contract_Value, the same class as the freshness budgets `DG-FRS` holds and the thresholds `kDefinedThresholdCount` is pinned at zero to keep the station out of |
+| What exists already | `IF-SEC-008`, credential lifetime state, which carries "validity, expiry and refresh state as distinct values" — the display contract is written, the duration is not |
+
+The honest station behaviour in the meantime is the one `IF-SEC-008` already specifies: show the
+validity, the expiry and the refresh state as three separate values, and let the operator see how
+old their authority is.
+
+## 13. Offline validation needs a trust anchor the station cannot protect
+
+The finding with the widest consequence, and it is derivable entirely from what is already recorded.
+
+To validate a cloud-issued credential **without** reaching the issuer, the station must verify it
+locally. That needs verification material on the station and a trust anchor for it. `IF-SEC-001`
+leaves the credential's form unspecified — `BASELINE-ASSERTED`, `PROPOSED` — so no mechanism is
+chosen anywhere, and none is chosen here.
+
+What is recorded is that the station has nowhere safe to keep one:
+
+| Recorded | Consequence for this |
+| --- | --- |
+| `AERORA-SEC-REQ-017`, `CONFIRMED`: a production release shall not persist signing key material without protection at rest | A trust anchor is key material in the sense that matters |
+| `AeroraPlatformKeyProtector::createForCurrentPlatform()` returns `nullptr` on **every** platform, deliberately, because `D-006` leaves an untested crypto backend worse than none | There is no protected store to put it in |
+| `F3.1-01` and `ADR-008`: key protection at rest has two candidate routes and **neither is an isolation**. Recorded against `G-RELEASE` | The gap is release-critical and already escalated |
+
+A trust anchor does not need secrecy; it needs **integrity**. An attacker who can replace the anchor
+in an unprotected settings store can mint credentials the station will accept offline, and offline is
+where every flight-time validation happens. So the integrity half of the same gap is what
+authentication now rests on.
+
+**What changes is the scope of `F3.1-01`, not its severity.** It was load-bearing for audit signing.
+The owner's answer makes it load-bearing for **authentication** as well, which means the `G-RELEASE`
+gate now holds the product's second differentiator and not only its audit trail.
+
+Nothing here proposes a mechanism. Choosing one is security architecture's with Product, it is
+blocked behind the same build host, and a credential-validation scheme written without a compiler or
+a test would be the security control that does nothing which `F3.1-03` already names once.
 
 ## Status vocabulary
 

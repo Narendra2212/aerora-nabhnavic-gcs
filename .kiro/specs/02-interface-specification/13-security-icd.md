@@ -104,6 +104,29 @@ first of the eight hidden-dependency traps enumerated in
 [cloud-architecture.md](../01-aerora-architecture/cloud-architecture.md), and
 `AERORA-TEST-REQ-005` makes it testable rather than aspirational.
 
+### The identity authority is now named, and three gaps follow
+
+The owner has stated that operators authenticate against the Aeroradynamics cloud user database and
+register with Aeroradynamics separately before flying. That names the identity and access backend
+`IF-SEC-009` was written against, and it asks the station to call nothing, so `IF-SEC-002`,
+`IF-SEC-010` and `IF-CLD-004` stand as written — **on the reading that registration is enrolment
+rather than a per-flight check.**
+
+No row above is moved, because the document carrying the answer is unsigned. Three gaps it exposes
+are recorded in
+[product-completion 15 §§ 10–13](../05-product-completion/15-operator-identity-and-the-single-role-deployment.md#10-the-two-answers-and-the-architecture-they-land-on),
+and each belongs to a row here:
+
+| Row | Gap |
+| --- | --- |
+| `IF-SEC-002` | Its `CONFIRMED` offline guarantee carries no **precondition**, and with a cloud identity it has one: a credential already cached on this station. A first-ever sign-in cannot be offline, and `AERORA-AWS-REQ-006`'s all-network-blocked test outcome depends on which case is assumed |
+| `IF-SEC-002`, `IF-SEC-009` | The **credential validity period is the revocation latency**. Because `IF-SEC-010` means the station never calls out, a revoked operator holds authority until the cached credential expires. `IF-SEC-008` already carries the display contract for validity and expiry; the duration is a Contract_Value and is unset |
+| `IF-SEC-001` | Validating a cloud-issued credential offline needs local verification material and a **trust anchor whose integrity is protected**. `AeroraPlatformKeyProtector` returns `nullptr` on every platform and `F3.1-01` records that neither candidate route is an isolation, so `G-RELEASE` now holds authentication and not only audit signing |
+
+`IF-SEC-003`'s update semantics, "on sign-in and on credential refresh", are confirmed by the same
+answer: the role takes effect when the aircraft connects and the operator signs in. The row's
+Questions column carries `Q-029`, which has since closed, so what held it open is gone.
+
 ## Interface contracts — MAVLink signing
 
 Upstream's signing implementation is retained unchanged. Phase 1 assessed it as well engineered and
