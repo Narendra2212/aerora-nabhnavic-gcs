@@ -156,7 +156,8 @@ classification and cannot write it.
 | Checkpoint branch | `aerora/phase6-integration-checkpoint` â†’ `1cc92e61e` (docs-only commit on top) |
 | Phase 7 development branch | `aerora/phase7-product-completion`, created at `1cc92e61e` |
 | `origin` | `https://github.com/mavlink/qgroundcontrol.git` â€” **upstream, fetch and push** |
-| Pushes performed | **None.** `D-005` is unresolved; no Aerora remote exists |
+| `aerora` | `https://github.com/Narendra2212/aerora-nabhnavic-gcs.git`, fetch and push. The Aerora remote |
+| Pushes performed | `aerora/phase7-product-completion` is published on the `aerora` remote, so **`D-005` is resolved**. Nothing has ever been pushed to `origin` |
 | Destructive git operations | **None.** No amend, reset, rebase or force |
 
 Returning to the frozen checkpoint is `git checkout aerora/phase6-integration-checkpoint`. The
