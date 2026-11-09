@@ -574,3 +574,76 @@ not safely displayable in either direction.
 Nothing here is settled. The set is `IF-GPU-007`'s, the mapping is firmware's to confirm, and the
 safe-or-default mode that an expired deviation falls back to is still `OPEN` in the
 command-authority ICD.
+
+## 13. Immediate-class actions run in all three modes, including manual
+
+Owner-stated: collision avoidance and the operations a human cannot usefully control are AI-driven
+in all three modes. That confirms the immediate class of section 11 and extends it — immediate means
+immediate in **manual** too, not only under autonomy.
+
+Two things follow, and the first looks like a contradiction and is not.
+
+### Manual dominance and envelope protection are different axes
+
+The firmware model's recorded claims, both `CONFIRMED`:
+
+| Claim | Where |
+| --- | --- |
+| "Manual is **structurally dominant** when selected" | Command-authority ICD |
+| "Manual \| Structurally dominant; **proposals do not override it**" | Same, autonomy-modes table |
+
+Read the second row carefully: the dominance is recorded **over proposals**. It does not say nothing
+overrides manual. That distinction is the reconciliation, and it is already in the wording:
+
+| Axis | What it decides | Manual's position |
+| --- | --- | --- |
+| **Command source** — which party the flight controller obeys | Manual input, companion setpoints, station commands | **Manual wins.** This is what "structurally dominant" records, and the autonomy-modes row says so explicitly: proposals do not override it |
+| **Envelope** — the bounds every command source is held inside | Obstacle proximity, geofence, altitude floor, attitude and rate limits | **Manual is bounded like everything else.** Protection is not a competing command source; it is a constraint on all of them |
+
+So the pilot is dominant over the autopilot's navigation and over the companion's proposals, and is
+**not** dominant over the envelope. Nothing recorded says otherwise, but nothing recorded says this
+either, and a reader could easily take "structurally dominant" to mean the pilot can fly into a
+wall. The owner has now said they cannot, so it is worth writing down.
+
+### The companion perceives; the flight controller decides
+
+"Controlled by AI only" needs splitting, and the split is not pedantic.
+
+Baseline 48 records, `CONFIRMED`, that "the companion does not become flight authority". If the
+companion computed and commanded the avoidance manoeuvre it would be flight authority for a safety
+function, and that `CONFIRMED` row would be false.
+
+The engineering reason is the same argument section 5 of
+[product-completion 14](14-ground-link-classes-and-control-authority.md) makes about the ground
+station, one wire shorter. The companion is a general-purpose computer running model inference: CUDA
+synchronisation, ROS scheduling, allocator pauses and memory pressure all put a tail on its worst
+case. Giving it the avoidance *decision* gives avoidance that tail. **The flight controller is the
+only deterministic element in the system**, and a reflex belongs in the deterministic element.
+
+| Function | Owner | Why |
+| --- | --- | --- |
+| Detecting the obstacle, classifying the surface, estimating range | **Companion.** This is what the models are for and nothing else can do it | Perception is compute-bound and tolerates a tail, because the flight controller can know how old a perception is |
+| Deciding to stop, slow or deviate, and commanding it | **Flight controller** | A reflex needs a bounded worst case, and only the flight controller has one |
+
+That is also why the clock decision of section 3.1 is load-bearing rather than bookkeeping: the
+flight controller can only treat perception responsibly if it knows the perception's age, which is
+what the companion's own timestamp is for.
+
+### Two consequences that have to be designed, not discovered
+
+**The pilot will be surprised.** If the envelope bounds manual input, there are moments when the
+pilot commands a direction and the aircraft refuses or deviates. Unannounced, that reads as the
+aircraft feeling sluggish or broken, and a pilot who cannot tell protection from malfunction fights
+it. So the station must **report that an input is being bounded, and by what** — the same reasoning
+as the unachievable-freshness-threshold check and the ruined-pass report of section 11: a protection
+whose action is invisible gets distrusted, then disabled.
+
+**Stale perception must degrade, not fail silently.** If the companion's perception ages past
+usefulness, the flight controller must neither act on it as though fresh nor quietly stop protecting.
+Both are wrong and the second is worse, because nothing announces it. That needs a third state —
+avoidance **degraded**, reported to the station and visible to the pilot — alongside active and
+inactive. It follows directly from the clock decision and is not settled here.
+
+Neither consequence introduces a Contract_Value. No proximity distance, no timeout and no envelope
+limit is authored anywhere in this document; those are the applicator and airframe limits that
+`kDefinedThresholdCount` is pinned at zero to keep the station out of.
