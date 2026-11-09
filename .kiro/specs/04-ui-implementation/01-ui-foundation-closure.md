@@ -492,6 +492,56 @@ each path to its bare filename; without it the resource lands at
 | **When** | At the first Aerora QML behaviour that needs asserting. Not now — an empty test target is a target with nothing in it |
 | **Candidates, in order of value** | 1. `AeroraStateText` rendering `UNKNOWN` as the word rather than an empty string (`P7-STATE-002`). 2. **New with `SCR-SHL-01`:** `AeroraSelfReportRow` letting `unchecked` outrank `warning`, and `AeroraOperationsHub`'s fail-safe enforcement derivation — that a resolution failure on `EnforcedAtCommandGate` renders *not enforced*. Both are pure QML logic the C++ harness cannot reach, and the second is a safety claim (`P7-AUTH-002`) currently guarded by review only |
 | **Shape** | Mirror `test/UnitTestFramework/QmlTesting/CMakeLists.txt` with `QUICK_TEST_SOURCE_DIR` pointing at `aerora/test/UI/qml`, the same `-platform offscreen` command, `LABELS "Unit;QML"`, and the same `ENVIRONMENT` block |
+| **Status** | **The shape above will configure and build, and it cannot load a single Aerora document.** See below. Not implemented, and the candidates are redirected |
+
+#### Why the specified shape cannot work
+
+A standalone Qt Quick Test executable links `Qt6::QuickTest/Qml/Gui/Quick` and nothing else. The
+blocker is not the import path, which is why `QML2_IMPORT_PATH` cannot fix it:
+
+| Fact | Where |
+| --- | --- |
+| Every QGC and Aerora QML module is declared `NO_PLUGIN` | `src/CMakeLists.txt`, `src/QmlControls/CMakeLists.txt`, `src/AnalyzeView/CMakeLists.txt`, `aerora/CMakeLists.txt` |
+| The `QGC` module — which holds `AeroraSecurity`, `AeroraTelemetryState`, `AeroraUi`, `ScreenTools` and `QGCPalette` — is declared on the **application executable** | `CMakeLists.txt`, `qt_add_qml_module(${CMAKE_PROJECT_NAME} URI QGC ...)` |
+| `AeroraControlsModule` is a static library whose documents live in the linking binary's resource | `aerora/CMakeLists.txt` |
+
+An executable-backed QML module cannot be imported by a second executable: no plugin is built,
+there is no archive to link, and the type registrations and `:/qml/...` resources sit inside the
+other binary's image. So a `tst_*.qml` under that target may import only `QtQuick`, `QtTest` and
+other pure-Qt modules — which is exactly what upstream's single `tst_Example.qml` does, and its own
+comment says so.
+
+Consequences for the three candidates, in the order they were listed:
+
+| Candidate | Outcome under a standalone target |
+| --- | --- |
+| `AeroraStateText` rendering `UNKNOWN` as the word | Fails to load: `QGCLabel is not a type` |
+| `AeroraSelfReportRow` letting `unchecked` outrank `warning` | Same |
+| `AeroraOperationsHub`'s fail-safe enforcement derivation | Fails to load: `AnalyzePage is not a type`, and every singleton read is `undefined` |
+
+A `tst_` that re-declared any of those derivations inline would assert a copy rather than production
+QML, which is the `F3.1-03` failure in a new place: a test satisfying the shape while testing
+nothing, reading as coverage.
+
+#### Where the candidates go instead
+
+| Route | For |
+| --- | --- |
+| The in-process `QmlUITestBase` harness, which boots production QML inside the application binary and therefore has every module registered | Anything needing a rendered tree or a loaded page. `AeroraSceneAttachmentUITest::_securityPosturePageIsReachableAndReportsNotEnforced()` is the working precedent, reading `_notEnforced` and `_enforced` off the real page. Costs a scene boot and is unavailable on Windows, where no headless plugin produces a usable scene |
+| Reading the document out of the compiled resource and asserting a textual invariant | Anything that is a property of how the QML is *written* rather than of how it renders. Costs nothing, runs on both platforms |
+
+The second route is now used for the safety claim that mattered.
+`AeroraUiFoundationTest::_noAeroraDocumentDerivesEnforcementFromTheUnenforcedValue()` enumerates the
+module's resource directory, reads every `.qml`, and fails if any derives an enforcement reading by
+comparing against `AeroraSecurity.NotEnforced`. Five documents carry that derivation and only one
+was asserted at runtime; the mutation that breaks the other four is one character wide and invisible
+in a UI diff. `P7-AUTH-002` is therefore mechanically guarded rather than review-guarded, and a
+document added later is covered without extending a list.
+
+What stays uncovered is genuine rendering behaviour — `AeroraStateText`'s word for `UNKNOWN`,
+`AeroraSelfReportRow`'s precedence — which needs the in-process harness and a scene, not a new
+target. `D-UI-05` should be closed as **rejected** rather than left open, because leaving it open
+directs the next engineer at a target that cannot load the thing it was created to test.
 
 ### HO-TAB7-05 — register the Operations Hub in `analyzePages()`
 

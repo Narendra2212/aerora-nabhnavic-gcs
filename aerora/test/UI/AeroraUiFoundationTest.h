@@ -86,6 +86,24 @@ private slots:
     // that otherwise looks correct. This is the only thing that would catch it.
     void _upstreamBindingsTheNewScreensDependOnResolve();
 
+    // `P7-AUTH-002` as a ratchet rather than as a review item.
+    //
+    // Five Aerora documents derive an enforcement reading, and each is written against the
+    // *enforced* enumerator and negated. That direction is a fail-safe: if
+    // `AeroraSecurity.EnforcedAtCommandGate` ever stops resolving - a renamed enumerator, a
+    // registration that did not happen, a typo - the comparison yields `undefined === value` and
+    // the screen reports *not enforced*. Written the other way round, against `NotEnforced`, the
+    // identical failure makes the screen claim enforcement that is not happening.
+    //
+    // Only one runtime test reads the rendered value, on one of the five documents, and it needs a
+    // booted scene that no Windows headless plugin produces. The other four were guarded by review
+    // only, and the mutation that breaks them is one character wide and invisible in a UI diff.
+    // So the direction is asserted here instead: by reading every document out of the compiled
+    // resource, which costs no scene, runs on both platforms, and covers a document added later
+    // without anyone remembering to extend a list.
+    void _noAeroraDocumentDerivesEnforcementFromTheUnenforcedValue();
+    void _theUnsafeComparisonDetectorFindsOneItIsGiven();
+
     // SCR-SHL-04. The provenance values come from a template configured into the build directory,
     // and a configure_file() that did not run leaves the literal placeholder behind - every screen
     // would then display "@QGC_GIT_HASH@" as a commit with nothing in the build failing. This is

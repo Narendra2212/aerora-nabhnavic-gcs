@@ -331,15 +331,28 @@ Cannot be written without inventing the thing under test. Grouped by blocker:
 
 ### Blocked on a QML test target â€” 16 tests
 
-Every `QML`-method test needs HO-TAB7-04 / `D-UI-05`: a second Qt Quick Test executable registered
-from `aerora/CMakeLists.txt`, with `QUICK_TEST_SOURCE_DIR` pointing at `aerora/test/UI/qml`, the
-same `-platform offscreen` command, `LABELS "Unit;QML"` and the same `ENVIRONMENT` block as
+**The route this section prescribed does not work, and the prescription is withdrawn.** It read: a
+second Qt Quick Test executable registered from `aerora/CMakeLists.txt`, with
+`QUICK_TEST_SOURCE_DIR` pointing at `aerora/test/UI/qml`, mirroring
 `test/UnitTestFramework/QmlTesting/CMakeLists.txt`.
 
-Recommendation stands: create it at the **first** Aerora QML behaviour that needs asserting, not
-before. An empty test target is a target with nothing in it. The first candidate is
-`AeroraStateText` rendering `UNKNOWN` as the word rather than as an empty string â€” `P7-STATE-002`,
-which the C++ harness cannot cover.
+That target configures and builds and can load no Aerora document. Every QGC and Aerora QML module
+is `NO_PLUGIN`, and the `QGC` module that holds `AeroraSecurity`, `AeroraTelemetryState`,
+`AeroraUi`, `ScreenTools` and `QGCPalette` is declared on the **application executable**, which a
+second binary cannot import. A `tst_*.qml` there may import only `QtQuick` and `QtTest`.
+[The evidence, and the two routes that do work](../04-ui-implementation/01-ui-foundation-closure.md#why-the-specified-shape-cannot-work).
+
+So the 16 split two ways rather than waiting on one target:
+
+| Route | Covers |
+| --- | --- |
+| The in-process `QmlUITestBase` harness, which boots production QML inside the application binary | Genuine rendering behaviour — `AeroraStateText`'s word for `UNKNOWN` (`P7-STATE-002`), `AeroraSelfReportRow`'s precedence. Costs a scene boot, and is unavailable on Windows where no headless plugin produces a usable scene |
+| Reading the document out of the compiled resource and asserting a textual invariant | Anything that is a property of how the QML is *written*. Costs nothing and runs on both platforms |
+
+The first one taken by the second route is the one that was a safety claim:
+`AeroraUiFoundationTest::_noAeroraDocumentDerivesEnforcementFromTheUnenforcedValue()` holds
+`P7-AUTH-002`'s fail-safe direction across all five documents that derive an enforcement reading,
+where previously one was asserted at runtime and four were guarded by review.
 
 ## 7. Verification method by requirement class
 

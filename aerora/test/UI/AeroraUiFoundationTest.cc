@@ -1,6 +1,7 @@
 #include "AeroraUiFoundationTest.h"
 
 #include <QtCore/QByteArray>
+#include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QMetaClassInfo>
 #include <QtCore/QMetaEnum>
@@ -73,6 +74,30 @@ constexpr const char* kProvenancePageFile = "AeroraProvenancePage.qml";
 /// SCR-HLP-02's page. An AnalyzePage rather than a SetupPage, but the compile check is the same
 /// question - whether the document's types and property names resolve - so it shares the slot.
 constexpr const char* kStateVocabularyPageFile = "AeroraStateVocabularyPage.qml";
+
+/// The Aerora QML module's flat resource directory. Every AERORA_UI_QML_FILES entry is aliased to
+/// its bare name, so one directory listing is the whole module.
+constexpr const char* kAeroraModuleResourceDir = ":/qml/Aerora/Controls";
+
+/// The singleton property every enforcement reading is derived from.
+constexpr const char* kEnforcementRead = "AeroraSecurity.enforcement";
+
+/// @return true when @a document compares the enforcement reading against the **unenforced**
+///         enumerator, in either operand order.
+///
+/// This is the one form that must never appear. `AeroraSecurity.enforcement` compared against
+/// `AeroraSecurity.NotEnforced` reads correctly today and inverts the moment either enumerator
+/// stops resolving, because `undefined === undefined` is true - so the screen would report
+/// enforcement with nothing enforcing. Matched on the comparison rather than on the bare token,
+/// because the word also appears in prose: the hub's basis string says "enforcement is
+/// NotEnforced", which is a description and not a derivation.
+bool comparesEnforcementAgainstNotEnforced(const QString& document)
+{
+    static const QRegularExpression unsafe(
+        QStringLiteral("AeroraSecurity\\.enforcement\\s*(?:===|!==|==|!=)\\s*AeroraSecurity\\.NotEnforced"
+                       "|AeroraSecurity\\.NotEnforced\\s*(?:===|!==|==|!=)\\s*AeroraSecurity\\.enforcement"));
+    return document.contains(unsafe);
+}
 
 /// Resolves one of the three meta-objects AeroraMissionProgressPage.qml binds to, by class name.
 ///
@@ -862,6 +887,66 @@ void AeroraUiFoundationTest::_identityPagePropertiesResolve()
         meta->indexOfProperty(propertyName.constData()) != -1,
         qPrintable(
             QStringLiteral("AeroraIdentityPage.qml reads AeroraUi.identity.%1").arg(QString::fromUtf8(propertyName))));
+}
+
+void AeroraUiFoundationTest::_noAeroraDocumentDerivesEnforcementFromTheUnenforcedValue()
+{
+    const QDir moduleDir(QString::fromUtf8(kAeroraModuleResourceDir));
+    const QStringList documents = moduleDir.entryList(QStringList{QStringLiteral("*.qml")}, QDir::Files, QDir::Name);
+
+    // Enumerated from the resource rather than from a written list, so a document added to
+    // AERORA_UI_QML_FILES is covered without anyone remembering to extend this test.
+    QVERIFY2(!documents.isEmpty(),
+             "the Aerora QML module must be compiled into the resource for this to examine anything");
+
+    QStringList derivingDocuments;
+    QStringList unsafeDocuments;
+
+    for (const QString& name : documents) {
+        QFile file(moduleDir.filePath(name));
+        QVERIFY2(file.open(QIODevice::ReadOnly | QIODevice::Text),
+                 qPrintable(QStringLiteral("could not read %1 out of the compiled resource").arg(name)));
+
+        const QString document = QString::fromUtf8(file.readAll());
+
+        if (document.contains(QString::fromUtf8(kEnforcementRead))) {
+            derivingDocuments.append(name);
+        }
+        if (comparesEnforcementAgainstNotEnforced(document)) {
+            unsafeDocuments.append(name);
+        }
+    }
+
+    // Not a vacuous pass. If no document reads the enforcement property at all then this slot
+    // proves nothing, and reporting coverage of an empty set is the failure it exists to prevent.
+    QVERIFY2(!derivingDocuments.isEmpty(),
+             "no Aerora document reads AeroraSecurity.enforcement, so this slot would pass vacuously");
+
+    QVERIFY2(unsafeDocuments.isEmpty(),
+             qPrintable(QStringLiteral("these documents derive enforcement by comparing against the unenforced "
+                                       "value, so a resolution failure would make them claim enforcement that is "
+                                       "not happening: %1")
+                            .arg(unsafeDocuments.join(QStringLiteral(", ")))));
+}
+
+void AeroraUiFoundationTest::_theUnsafeComparisonDetectorFindsOneItIsGiven()
+{
+    // Keeps the slot above from passing because the detector is broken rather than because the
+    // documents are safe, which is the discipline AeroraUiSafetyTest's writable-property detector
+    // already uses against a type known to have one.
+    QVERIFY(comparesEnforcementAgainstNotEnforced(QStringLiteral(
+        "readonly property bool _notEnforced: AeroraSecurity.enforcement === AeroraSecurity.NotEnforced")));
+    QVERIFY(comparesEnforcementAgainstNotEnforced(
+        QStringLiteral("AeroraSecurity.NotEnforced !== AeroraSecurity.enforcement")));
+
+    // And does not fire on the fail-safe form every Aerora document actually uses.
+    QVERIFY(!comparesEnforcementAgainstNotEnforced(QStringLiteral(
+        "readonly property bool _enforced: AeroraSecurity.enforcement === AeroraSecurity.EnforcedAtCommandGate")));
+
+    // Nor on prose that merely names the enumerator, which is why the rule matches a comparison
+    // rather than the token. This string is the hub's own basis text.
+    QVERIFY(!comparesEnforcementAgainstNotEnforced(
+        QStringLiteral("basis: qsTr(\"AeroraSecurity.enforcement is NotEnforced.\")")));
 }
 
 void AeroraUiFoundationTest::_aeroraPageDocumentsCompile_data()

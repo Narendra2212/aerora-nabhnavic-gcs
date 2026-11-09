@@ -837,7 +837,7 @@ Keeping this at zero is the main reason an upstream rebase stays mechanical (`P7
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Nothing structurally; needed for acceptance | `OPEN` |
 | `D-UI-03` | `AeroraStateValue::capability` must lose `WRITE` (HO-TAB7-01) | Tab 4 | — | **CLOSED** — U3, `a7b317f89`. `IMPLEMENTED-UNCOMPILED` |
 | `D-UI-04` | `AeroraControlsModule` block omits `IMPORTS QGC` and `qgc_set_qt_resource_alias` versus HO-TAB7-03 | Tab 1 | — | **CLOSED** — U2, `a73699796`. `IMPLEMENTED-UNCOMPILED` |
-| `D-UI-05` | Whether an Aerora QML Quick Test target is created now (HO-TAB7-04) | Tab 1 + Tab 7 | QML rendering tests only | `OPEN` — recommend at the first QML behaviour needing assertion |
+| `D-UI-05` | Whether an Aerora QML Quick Test target is created now (HO-TAB7-04) | Tab 1 + Tab 7 | QML rendering tests only | **RECOMMEND REJECTED.** A standalone Quick Test executable can import only pure-Qt modules — the `QGC` module holding every Aerora singleton is declared on the application executable, so a second binary cannot import it. The target would build and load nothing. [Evidence and the two routes that do work](../04-ui-implementation/01-ui-foundation-closure.md#why-the-specified-shape-cannot-work) |
 | `D-UI-06` | Multi-station authority display — which station holds authority | **Architecture** | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — raised by [benchmark §7.3](02-gcs-reference-benchmark.md#73-which-station-holds-authority-when-several-are-connected) |
 
 `D-UI-04` was the one with a concrete cost, and it was unusually well evidenced because **Tab 7's
