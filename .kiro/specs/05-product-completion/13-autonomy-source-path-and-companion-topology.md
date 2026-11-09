@@ -382,3 +382,89 @@ invented:
 The first is structurally better and the second is cheaper to reach from what is already built.
 Choosing between them is a decision with an issued document behind it, which is what the Gate is
 waiting for and what this section deliberately does not supply.
+
+## 10. Approval delay: why timeout must not approve, and what that requires instead
+
+The owner raises the case that matters: if a human is slow to approve or deny, something must act
+rather than let a delay become a crash. The concern is correct and the answer is not a timeout.
+
+### What the accepted record already forbids, by name
+
+`DG-AUT:proposal-model` is accepted and signed, and its expiry rule says this:
+
+> "Expiry never approves. An expired proposal transitions only to Absent, so no path runs from
+> Expired to Approved and the rule cannot become a timeout that acts by itself. `P7-AI-002` requires
+> an explicit operator approval event, and **a proposal that approved itself by ageing would be the
+> hardest version of that violation to notice**."
+
+The accepted transition map carries no `Expired → Approved` edge. So auto-approval on delay is
+excluded, and the reason is sound: a plan nobody reviewed would execute, and the audit trail would
+record an approval that never happened.
+
+### Why the concern is still satisfied
+
+Because an avoidance action **is not a proposal**. Conflating the two is what makes the delay look
+dangerous.
+
+| | Proposal | Flight-controller safety function |
+| --- | --- | --- |
+| What it is | A discretionary suggestion about mission execution — paint this pass next, approach from here | Obstacle avoidance, geofence, plausibility, failsafe |
+| Who decides | The operator, explicitly, under `P7-AI-002` | The flight controller, immediately |
+| Does it wait for approval | Yes, and expires unapproved | **No. It is never routed through approval at all** |
+| Already recorded | The accepted lifecycle and expiry rule | "Proposals may be **rejected**, routing to a safe or default mode", `MODEL`, `CONFIRMED`; and baseline 46 records geofence, velocity and acceleration rejection skeletons and GPS and flow plausibility checking in the model |
+
+The flight controller protecting the aircraft is not the station deciding a failsafe. The
+command-authority ICD is explicit about which of those is prohibited, and it prohibits the station's
+half: decide a failsafe action, **No**; initiate a failsafe response autonomously, **No**; infer a
+failsafe condition the vehicle has not flagged, **No**. None of those constrains the flight
+controller, which is the party that must act inside human reaction time and the only one that can.
+
+### The rule this gives
+
+**A pending proposal must never be the thing standing between the aircraft and safety.**
+
+The aircraft is always already executing a safe behaviour. A proposal is an *improvement* awaiting
+approval, not a *rescue* awaiting approval. Operator delay is then benign by construction: the
+proposal ages, expires, goes Absent, and the aircraft carries on doing the safe thing it was already
+doing.
+
+The corollary is the test to apply to every autonomy output: **if it must take effect within human
+reaction time, it cannot be a proposal.** It has to be an input to a flight-controller safety
+function instead, and it must not appear on an approval surface at all — because putting it there
+would be exactly the delay the owner is right to worry about.
+
+### The gap this exposes, and it is safety-critical
+
+The partition above has to be written down per autonomy output, and it is not.
+
+`IF-GPU-002` already records that a proposal carries a **class**, and `IF-GPU-007` carries "which
+autonomy modes and **proposal classes** exist" at `NOT-EVIDENCED` and `OPEN`. That class set is
+where the partition belongs: for each class, whether it is **approvable** — routed through the
+lifecycle, able to expire unapproved — or **immediate** — an input to a flight-controller safety
+function, never approved and never shown as pending.
+
+Getting it wrong is severe in both directions:
+
+| Misclassification | Consequence |
+| --- | --- |
+| An immediate output classed as approvable | A collision-avoidance manoeuvre waits for a human, which is the owner's concern made real |
+| A discretionary plan classed as immediate | An unreviewed AI plan executes with no operator decision, which is what `P7-AI-002` exists to prevent |
+
+This has to be settled **before** the approval surface is built, not after, because the surface is
+what makes the first failure reachable.
+
+### One premise worth naming, because it is also open
+
+The no-auto-approve rule is safe only if the behaviour the aircraft falls back to is safe. The
+command-authority ICD records "Proposals may be rejected, routing to a safe or default mode" as
+`CONFIRMED` — and on the next row, **"The safe or default mode's identity | Flagged in the baseline
+as requiring confirmation | `OPEN`"**.
+
+So the fallback exists and what it *is* does not. That is load-bearing here rather than incidental:
+expiry routes a proposal to Absent and the aircraft continues under the mode in force, and if that
+mode is ever one that holds the aircraft in an unsafe state awaiting instruction, the accepted
+expiry rule stops being conservative. Settling the safe-mode identity is what makes the rule sound,
+and it is Firmware's with the baseline owner.
+
+Nothing in this section changes the accepted record. The expiry rule and the transition map stand as
+signed.
