@@ -59,7 +59,7 @@ first Phase C design document.
 | HO-TAB1-10 — the `SCR-SHL-03` enforcement-state indicator QML | `IMPLEMENTED-UNCOMPILED` | `602b38a18` |
 | HO-TAB7-06 — register the indicator in `toolBarIndicators()` | `IMPLEMENTED-UNCOMPILED` | this pass |
 | WP1-C — local persistence architecture | `DESIGNED` | doc 09 |
-| `AeroraAuditChain` — the hash chain `DG-STO:tamper-evidence` settles | `IMPLEMENTED-UNCOMPILED` — the CI legs have not seen it yet | doc 09 |
+| `AeroraAuditChain` — the hash chain `DG-STO:tamper-evidence` settles | `VERIFIED` — compiled and run on both CI legs, `fc381412f` | doc 09 |
 | `AeroraRolePolicy` — the authorization policy over the signed role set | `VERIFIED` — compiled and run on both CI legs, `32d010753` | doc 15 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
 | U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
