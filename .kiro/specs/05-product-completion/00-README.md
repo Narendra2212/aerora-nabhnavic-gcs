@@ -62,7 +62,7 @@ first Phase C design document.
 | `AeroraAuditChain` — the hash chain `DG-STO:tamper-evidence` settles | `VERIFIED` — compiled and run on both CI legs, `fc381412f` | doc 09 |
 | `AeroraRolePolicy` — the authorization policy over the signed role set | `VERIFIED` — compiled and run on both CI legs, `32d010753` | doc 15 |
 | `AeroraAssignedRoleResolver` — the deployment's role assignment | `VERIFIED` — compiled and run on both CI legs, `de2413c09` | doc 15 |
-| `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `IMPLEMENTED-UNCOMPILED` — the CI legs have not seen it yet | doc 15 |
+| `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `VERIFIED` — compiled and run on both CI legs, `23b571652` | doc 15 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
 | U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
 
