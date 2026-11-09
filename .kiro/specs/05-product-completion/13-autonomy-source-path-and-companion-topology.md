@@ -369,19 +369,50 @@ individually.
 | The response half: the message and fields by which the flight controller reports a **proposal** to the station, and the autonomy state in modes where no proposal is pending | **Open.** This is the whole of it |
 | An issued interface control document to cite for that element | **Open**, and `DG-AUT-SOC-01` requires it |
 
-Two candidate shapes for the response half, both common-dialect and both introducing no identifier.
-Named as candidates for Firmware and the external interface authority to confirm or reject, and
-decided nowhere here, because `P7-AI-004` records that no endpoint, schema or response may be
-invented:
+Two candidate shapes for the response half, both built on the common dialect and neither adding a
+message to it. Named as candidates for Firmware and the external interface authority to confirm or
+reject, and not decided by this document, because `P7-AI-004` records that no endpoint, schema or
+response may be invented:
 
 | Candidate | Fits | Does not fit |
 | --- | --- | --- |
-| `TUNNEL`, with a vendor-defined payload type | Carries an opaque byte payload, so a `basis` of arbitrary length survives, and one message holds the whole proposal | The station must parse a payload the dialect does not describe, so the schema lives in the interface control document rather than in the message definition |
+| `TUNNEL` (385), with a vendor-defined payload type | Carries an opaque byte payload up to 128 bytes, so a `basis` of bounded length survives and one message holds the whole proposal atomically | The station parses a payload the dialect does not describe, so the schema lives in the interface control document rather than in the message definition, and its `payload_type` must be chosen — see below |
 | A set of `NAMED_VALUE_*` keys plus `STATUSTEXT` for the basis | Reuses the mechanism `DG-TLM` already settled, and the ten-byte key discipline is already recorded | A proposal is split across several messages with no atomicity, so a half-arrived proposal is representable. `STATUSTEXT` truncates a basis |
 
-The first is structurally better and the second is cheaper to reach from what is already built.
-Choosing between them is a decision with an issued document behind it, which is what the Gate is
-waiting for and what this section deliberately does not supply.
+### The owner's recommended carrier, and what it does not close
+
+The product owner has stated a preference for `TUNNEL` and, with full authority, delegated the
+engineering call. It is recorded here as an **input to the interface control document, not as a
+closure** of `DG-AUT:source-interface`: the carrier and its schema are the external interface
+authority's to issue, and `DG-AUT-SOC-01` is met only by citing that issued document, which does not
+yet exist.
+
+The recommendation rests on one point. `TUNNEL`'s only disadvantage against the split-message
+candidate is that its schema sits in the interface control document rather than in a message
+definition — and that is not a cost here, because `DG-AUT-SOC-01` requires an issued interface
+control document whichever carrier is chosen. The split-message candidate pays that same
+documentation cost and additionally makes a half-arrived proposal representable, which section 12
+shows is the dangerous direction for a proposal that carries its own class. So `TUNNEL` is better on
+the axis that matters and no worse on the one that looked like a cost.
+
+One correction to the framing above. Calling both candidates free of any new identifier is too
+strong for `TUNNEL`. It adds no *message* to the common dialect, but its `payload_type` is a value
+that must be chosen, and the choice carries a consequence
+([MAVLink TUNNEL, message 385](https://mavlink.io/en/messages/common.html#TUNNEL)): a code below
+32768 is a *registered* type that belongs in the common `MAV_TUNNEL_PAYLOAD_TYPE` enum — a new
+common-dialect identifier, which the zero-new-identifier position of `DG-MIS` and `DG-TLM` does not
+permit — while a code above 32767 is reserved by the specification for local experiments and is
+explicitly not to be checked into a widely distributed codebase. `TUNNEL` therefore stays free of a
+new common-dialect identifier **only** by using a local-experiment `payload_type`, which then lives
+in the issued interface control document beside the payload schema. The specification reserving a
+range for exactly this use is a point in `TUNNEL`'s favour; it is written down so the issued document
+chooses a local-experiment code deliberately rather than minting a registered one by habit.
+
+Two questions the carrier choice leaves for that issued document. The **basis size**: the 128-byte
+payload bounds a `basis` to roughly that, and whether a longer one is needed — which would force
+fragmentation across several `TUNNEL` messages and reintroduce the atomicity problem the
+single-message fit was chosen to avoid — is unanswered. And the **payload schema** itself, the field
+layout the station parses, which is the whole of what `DG-AUT-SOC-01` waits on.
 
 ## 10. Approval delay: why timeout must not approve, and what that requires instead
 
