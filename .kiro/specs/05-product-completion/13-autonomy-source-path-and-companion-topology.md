@@ -40,6 +40,29 @@ The workload scope does not disturb the authority boundary. Control and navigati
 arrives as a **proposal** like any other companion output, never as a command, because the companion
 is non-authoritative by topology rather than by policy.
 
+### What "terminates at the flight controller" is scoped to
+
+It is scoped to **MAVLink, and to the proposal traffic this question is about.** Stated because the
+phrase is easy to over-read into "no companion data reaches the station", which is not what `Q3-005`
+settles and not what the owner describes.
+
+| Companion output | Path to the station | Status |
+| --- | --- | --- |
+| Proposals, health, presence — MAVLink on the UART | Terminates at the flight controller, which summarises and re-emits | `Q3-005`, answered |
+| **Video from the perception cameras** | A separate companion-to-station stream on its own transport, not MAVLink and not a flight-control path | Owner-stated. Recorded here, not settled |
+
+The video path does not disturb what is already recorded, and the distinction is worth being exact
+about. `IF-GPU-008` prohibits **station to companion**, and video flows the other way, so it is
+unviolated. The authority boundary row reads "the ground station has no path **to** the companion",
+which still holds — no command, no configuration, no model deployment, and the ICD already declares
+companion software update and model deployment out of scope.
+
+What changes is only that the companion is a source of data the station receives directly, while
+remaining not a MAVLink peer of the station and not a party the station can address. A perception
+overlay needs a frame and a proposal, and they arrive by different routes: the frame directly, the
+proposal through the flight controller. The ICD already anticipated exactly that overlap when it
+declared video out of its own scope.
+
 ## 2. What the answer resolves
 
 `Q3-005` records what turns on it: which of `IF-FC-010` and `IF-GPU-002` exists, and against which

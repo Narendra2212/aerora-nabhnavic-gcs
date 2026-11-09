@@ -269,3 +269,81 @@ answer changes what a flight controller does when a ground station dies in fligh
 
 Defined programme-wide in [00-README.md](00-README.md#status-vocabulary). This document redefines
 none of them and claims `VERIFIED` for nothing.
+
+## 7. The three operating modes, and the control chain under them
+
+Owner-stated, and the useful finding is that the three modes are not new: they map exactly onto the
+three authority sentinels the firmware model already evidences, which
+[09-command-authority-icd.md](../02-interface-specification/09-command-authority-icd.md) publishes as
+`CONFIRMED as observed`.
+
+| Owner's mode | Sentinel | What the model already records about it |
+| --- | --- | --- |
+| Autonomous | **101**, automatic coverage | — |
+| Hybrid | **102**, semi-automatic supervised | "requires **explicit pilot confirmation** before following a proposal", which is the owner's approve step |
+| Manual | **100**, manual | "Manual is **structurally dominant** when selected" |
+
+So this records a mapping rather than an enumeration. The ICD deliberately does not publish the set
+as closed — whether these three are all of them is `UNKNOWN` and the safe-or-default mode's identity
+is `OPEN` — and nothing here closes either.
+
+### The control chain
+
+The companion sends instructions describing where the aircraft should be and when. The flight
+controller computes motor demand and flies there. The same split applies to the painting module.
+
+That is the standard companion-computer arrangement and it is what makes `IF-GPU-002`'s recorded
+authority of **"Proposal only"** true in operation rather than by assertion: the companion emits
+setpoints, and the flight controller is free to refuse them. The firmware model already records
+"Proposals may be **rejected**, routing to a safe or default mode" as `CONFIRMED`, and baseline 46
+records geofence, velocity and acceleration proposal-rejection skeletons in the model. The companion
+proposes; the flight controller disposes; neither claim is new.
+
+The companion reaches the flight controller over **UART/USART carrying MAVLink**, which is section 7
+of [product-completion 13](13-autonomy-source-path-and-companion-topology.md).
+
+## 8. Correcting section 5: two latency classes, not one
+
+Section 5 decided that the stick stream does not traverse the ground station. That decision is
+correct and stands, **but it was written in a way that reads wider than it should.** It is a
+statement about rate and attitude command. It is not a statement about every manual command, and
+read as one it would forbid the manual mode the owner has just described.
+
+| Class | What it commands | Tolerance | May the station carry it |
+| --- | --- | --- | --- |
+| **Rate or attitude** | Roll, pitch and yaw rate — adjacent to the inner loop | Tens of milliseconds, and the *tail* matters more than the mean | **No.** Section 5, unchanged |
+| **Position or velocity setpoint** | Where to be, and when | Hundreds of milliseconds, because the flight controller holds position between setpoints | **Yes** |
+
+The distinction is not a matter of degree, it is a matter of what the failure looks like:
+
+| Stream | What a stall does |
+| --- | --- |
+| Rate command | Attitude authority is lost while the operator holds the sticks and cannot tell. The `manual-control-latency` hazard |
+| Setpoint command | The aircraft holds its last commanded position. Benign, observable, and self-announcing — the station stops getting acknowledgements |
+
+A setpoint stream degrades into a hover. A rate stream degrades into a loss of control. That is why
+one may cross a general-purpose operating system and the other may not, and it is why the owner's
+manual mode is not in conflict with section 5.
+
+### The modes against the two classes
+
+| Mode | Command source | Class | Carriage |
+| --- | --- | --- | --- |
+| Autonomous, 101 | Companion | Setpoint | Companion to flight controller, direct over UART |
+| Hybrid, 102 | Companion, with the operator approving or overriding at the station | Setpoint | Station may carry the operator's half |
+| Manual, 100, from the station | Operator | Setpoint | Station may carry it |
+| Manual, 100, from a transmitter | Operator | **Rate** | **Direct, never the station.** Structurally dominant, and the path that remains when everything else is unavailable |
+
+The last two rows are both "manual" and they are not the same thing. One is an operator commanding
+positions from a workstation; the other is a pilot flying. Keeping them apart is what lets the
+station be the normal operating surface without the station becoming load-bearing for flight
+control — and it is why section 5's decision costs the owner nothing.
+
+### What stays true in all three modes
+
+The companion's output is visible to the station in every mode, read-only, and that is unaffected by
+which mode is in force. `IF-UIS-003` presents a proposal as subordinate and labelled; the autonomy
+fact group carries the values; `IF-GPU-008` keeps the reverse path prohibited. In manual mode the
+same signals are guidance to the pilot rather than instructions to the aircraft, which is a
+presentation difference and not an interface one — the station displays what is reported and
+originates nothing.
