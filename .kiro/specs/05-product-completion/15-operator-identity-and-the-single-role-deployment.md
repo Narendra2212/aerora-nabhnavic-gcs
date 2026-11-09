@@ -712,23 +712,58 @@ What that unblocks, and what it does not:
 | Not unblocked | `isTamperEvident()`. A lifted prohibition is permission to implement, not an implementation, and the register's guard verdict already said *permitted* rather than earned |
 | Unchanged | `AERORA-SEC-REQ-017`, `CONFIRMED`: a production release shall not persist signing key material without protection at rest. Two platforms gaining a protector does not satisfy it for the other three, so `F3.1-01` stays release-critical against `G-RELEASE` |
 
-### The one answer that raised a new question
+### Answered: the 24 hours is an offline flying window
 
-Answers 2 and the earlier 24-hour period do not compose, and the two readings differ by whether an
-aircraft flies at all without a network. This document does not choose between them.
+Answers 2 and the 24-hour period looked as though they did not compose, because two readings of
+"every time it will verify from our cloud database" differ by whether an aircraft flies at all
+without a network. The owner has chosen the second.
 
-| Reading | What it means | Consequence |
+| Reading | What it means | Chosen |
 | --- | --- | --- |
-| **(i)** Every arming contacts the cloud | The 24 hours governs how long a session lasts before a fresh login, and the cloud is reached at each arming regardless | No network, no flight, ever. `AERORA-AWS-REQ-005` falls completely and the credential's validity period governs login frequency rather than offline capability |
-| **(ii)** The cloud is contacted at login; the gate at arming checks the **cached** credential | The 24 hours is an offline flying window | A crew can fly for up to 24 hours after their last successful login. `AERORA-AWS-REQ-005` is contradicted at login rather than at every arming, which is a far smaller reversal |
+| **(i)** Every arming contacts the cloud | The 24 hours is a login-frequency setting; the cloud is reached at each arming regardless, so no network means no flight ever | — |
+| **(ii)** The cloud is contacted at **login**; the gate at arming checks the **cached** credential | The 24 hours is an offline flying window: a crew flies for up to 24 hours after their last successful login | **Yes** |
 
-Reading (i) is what "every time it will verify from our cloud database" says literally. Reading (ii)
-is what a 24-hour credential period is *for* — under reading (i) the period has no offline role to
-play, which makes it a login-frequency setting rather than a credential lifetime.
+So the shape is: a successful online login against the Aeroradynamics cloud caches a credential that
+carries its own expiry, 24 hours out by default; the arming gate reads the **cached** credential and
+contacts nothing. `AERORA-AWS-REQ-005` is still contradicted — arming consults a locally cached
+credential whose existence depended on a past cloud call — but the contradiction is at login rather
+than at every arming, which is the smaller reversal and the one that lets a disconnected crew keep
+working through a shift.
 
-**This is the last input the identity provider needs**, and it is recorded as a question rather than
-guessed, because the two readings produce different code and only one of them lets a disconnected
-crew fly.
+The 24 hours is owner-stated and is **not** authored in code. The credential carries `issuedUtcMs`
+and `expiresUtcMs`, and whatever issues it sets the gap, exactly as `AeroraManualAuthorityGrant`
+carries its own issue and expiry rather than compiling in a grant duration. A deployment that wants
+a different window changes the issuer, not the type.
+
+### What this settles, and the one thing it does not
+
+It settles the last input the **identity provider** needed, so the provider is now buildable: a
+cached-credential reporter that answers authenticated while the cached credential is valid at the
+current wall-clock time, and unauthenticated once it is not. `AeroraCachedCredentialIdentityProvider`
+is that type.
+
+It does **not** make the provider safe to install on `AeroraCommandAuthorizer` yet, and the reason is
+answer 1. The command authorizer reads `currentIdentity()` on **every** queued command and denies an
+unauthenticated one. If a cached credential expires at the 24-hour mark while the aircraft is
+airborne, a provider wired straight to that gate would begin denying every subsequent command —
+which is continuation-blocking, the exact failure answer 1 forbids. So the three installables that
+`isFullyConfigured()` reads now all exist and are verified, and installing them together is blocked
+on an operation-entry gate that distinguishes *entering* an operation from *continuing* one. That
+gate does not exist, and improvising it inside the command authorizer would be the wrong place:
+`DG-ROL` already settles the scope at `MavCommandQueue::sendWorker()`, and the entry/continuation
+distinction is a lifecycle concern above it.
+
+### The clock the window is measured on, and its limit
+
+The credential's validity is wall-clock, because "24 hours since login" is a human duration and,
+if the credential is ever persisted across a restart, a monotonic clock would reset under it. The
+cost is recorded rather than hidden: a wall clock steps on an NTP correction, a GNSS fix or an
+operator change, so a backward step extends a window and a forward step shortens it. This is the
+same exposure `IF-SEC-008` already carries for credential lifetime — "expiry is a reported state,
+not an inference" — and it is not solved here. Solving it needs a clock an attacker cannot move,
+which is the trust-anchor concern of section 13 and `F3.1-01`, not a property this type can assert
+on its own. Whether the cached credential is held in memory only or persisted is left open and is a
+`P7-DAT-002` question; the type is correct either way.
 
 ## Status vocabulary
 
