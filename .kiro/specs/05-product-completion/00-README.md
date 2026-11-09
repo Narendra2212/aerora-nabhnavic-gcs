@@ -61,6 +61,7 @@ first Phase C design document.
 | WP1-C — local persistence architecture | `DESIGNED` | doc 09 |
 | `AeroraAuditChain` — the hash chain `DG-STO:tamper-evidence` settles | `VERIFIED` — compiled and run on both CI legs, `fc381412f` | doc 09 |
 | `AeroraRolePolicy` — the authorization policy over the signed role set | `VERIFIED` — compiled and run on both CI legs, `32d010753` | doc 15 |
+| `AeroraAssignedRoleResolver` — the deployment's role assignment | `VERIFIED` — compiled and run on both CI legs, `de2413c09` | doc 15 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
 | U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
 
