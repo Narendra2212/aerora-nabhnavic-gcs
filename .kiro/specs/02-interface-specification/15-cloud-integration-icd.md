@@ -51,7 +51,7 @@ routes would fill.
 
 | Trap | How it would arrive | Refusal |
 | --- | --- | --- |
-| Authentication | "Operators sign in, so check the token before arming" | Validated offline — `IF-SEC-002` |
+| Authentication | "Operators sign in, so check the token before arming" | Validated offline — `IF-SEC-002`. **This refusal is contested.** See below |
 | Configuration | "Fetch the vehicle's configuration from the registry at connect" | Cached locally and usable offline — `IF-CLD-007` |
 | Fleet identity | "Resolve the identifier against the registry before trusting it" | Local identifier; the registry reconciles later — `IF-VID-007` |
 | Logging | "Stream telemetry to the cloud so we have the record" | Local first; upload is a second step — `IF-LOG-016` |
@@ -62,6 +62,34 @@ routes would fill.
 
 Each of the eight is reasonable in a different product. The last one earns its emphasis: an
 entitlement check on a flight path turns a commercial system into a safety system.
+
+#### Trap one has arrived as product policy
+
+The owner states that an operator is verified against the Aeroradynamics cloud database before every
+operation, that a login is required after every aircraft-station disconnection, that a credential
+otherwise lasts 24 hours, and that verification may only happen while the aircraft is landed. That is
+row one as written, and it arrives as a deliberate licensing control rather than as a convenience,
+with a legitimate reason: a pilot not currently registered must not fly, and no offline mechanism
+delivers that, because an offline credential is a statement about the past.
+
+It is also close to row eight. An entitlement check and a per-flight registration check differ in
+who is being verified and not in what gates the flight, which is the comparison row eight's emphasis
+is about.
+
+**No row above is moved and `IF-CLD-004` keeps its `CONFIRMED` status**, because the document
+carrying the owner's statement is unsigned and narrowing a `CONFIRMED` empty interface is the
+interface owner's act. The reversal is recorded as the `cloud-gated-flight-authorisation` hazard in
+the Gate_Register and analysed in
+[product-completion 15 § 14](../05-product-completion/15-operator-identity-and-the-single-role-deployment.md#14-the-verification-is-per-flight-which-is-the-reading-that-breaks-four-confirmed-positions),
+with the eight actions it needs and an owner against each.
+
+Three things from this document survive the change and bound it:
+
+| Survives | Why it matters here |
+| --- | --- |
+| `AERORA-AWS-REQ-006` | Its five capabilities — connection, parameter load, mission planning, mission upload, local flight recording — are none of them flight authorisation, so all five stay offline-capable. A pilot with no signal can still plan and upload; they cannot start |
+| `AERORA-AWS-REQ-007` and `IF-CLD-013` | They require a defined local behaviour per feature rather than a global offline mode. "Refuse to start an operation" is a defined local behaviour, so this is the one position the policy satisfies rather than breaks |
+| `IF-CLD-002` | No synchronous network call originates on the main thread. A verification that blocks until the cloud answers breaks it and freezes the interface on a slow name resolution. The policy is implementable without breaking it, and only if that is known before it is built |
 
 ### The HTTP server finding, carried forward unchanged
 

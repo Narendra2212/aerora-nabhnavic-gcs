@@ -14,10 +14,13 @@ answer is not the question that is open.
 | The owner's "one role, Pilot" | **Read as a deployment, not as a role set.** Section 3. On that reading it contradicts nothing signed |
 | The owner's login statement | **New, and the input that was actually missing.** Section 5 |
 | When the role takes effect | **Answered: at connection and sign-in.** That is `IF-SEC-003` as already written. Section 10 |
-| What authenticates an operator | **Answered: the Aeroradynamics cloud user database**, with registration as a separate prior act. Compatible with three `CONFIRMED` rows on the enrolment reading, and with none of them on a per-flight reading. Section 10 |
-| New Contract_Values introduced | **None.** No role name is invented here, no credential format or lifetime is authored, and no permission is added to a signed role |
+| What authenticates an operator | **Answered: the Aeroradynamics cloud user database.** Section 10 |
+| Whether that check is per-flight or enrolment only | **Answered: per-flight.** Section 10's compatibility conclusion is superseded by section 14 and kept for its reasoning |
+| What that reversal costs | **Four `CONFIRMED` positions**, three of them baseline-sourced, plus one architectural-property test. Section 14, and the `cloud-gated-flight-authorisation` hazard |
+| The sharpest consequence | A link drop or a 24-hour expiry **in flight** demands a login the landed-only rule makes impossible. The repair is document 14 § 6's, applied to the credential: it gates entry, not continuation. Section 14 |
+| Contract_Values | **None authored here.** The 24-hour period is **owner-stated** and recorded in section 14; no credential format, key mechanism or landed-state source is authored |
 | What this unblocks | The identity provider, which is one of the three installables `isFullyConfigured()` requires. Section 7 |
-| What it newly blocks on | `F3.1-01`, key protection at rest. Offline credential validation needs a trust anchor and the station has nowhere to protect one, so `G-RELEASE` now holds authentication too. Section 13 |
+| What it newly blocks on | `F3.1-01`, key protection at rest. Section 13. Note that per-flight verification reduces the reliance on a local trust anchor without removing it, because the 24-hour window is still validated locally |
 | Document number | 15, allocated here rather than by Tab 1, the same irregularity [13](13-autonomy-source-path-and-companion-topology.md) records about its own number |
 
 ## 1. Three things, conflated into one question
@@ -239,8 +242,11 @@ rewritten rather than appended to, so it reads as the current open set.
 | --- | --- | --- |
 | Whether "one role, Pilot" means a **deployment** or a **retraction** of three signed roles | Product, with the process owner if it is the second | Section 3 reads it as the first because that reading is free and reversible. The second needs a retraction path the process does not have, and would reopen the Gate under criterion 11 |
 | ~~What authenticates the pilot~~ | — | **Answered.** The Aeroradynamics cloud user database, with registration as a separate prior act. Section 10 |
-| Whether registration is ever checked **at flight time** rather than only at enrolment | Product | Section 10. On the enrolment reading the answer satisfies `AERORA-SEC-REQ-011`, `IF-SEC-002` and `IF-CLD-004`; on a per-flight reading it breaks all three and grounds an aircraft that has no signal |
-| The **credential validity period**, which is the revocation latency | Product, with security architecture | Section 12. A revoked pilot flies until the cached credential expires, because `IF-SEC-010` means the station never calls out. It is a Contract_Value and no number is authored here |
+| ~~Whether registration is checked at flight time~~ | — | **Answered: yes, every operation.** Section 14, and it is the reading that reverses four `CONFIRMED` positions |
+| ~~The credential validity period~~ | — | **Answered: 24 hours**, owner-stated. Section 14. Revocation latency is now bounded where it was unbounded |
+| Whether the credential gates **entry to an operation only**, or continuation as well | Product with security architecture | Section 14, and it carries the safety case. Continuation leaves an airborne aircraft whose operator cannot re-authenticate until it lands, and landing is what the state forbids |
+| Whether "landed" means **disarmed** or a landed-state report, and what an `UNKNOWN` state does | Product with Firmware | Section 14. The first is reported in the heartbeat today; the second needs a message the relayed set does not include |
+| Whether the gate sits at **station sign-in** or at **arming** | Architecture | Section 14. It decides whether `AERORA-AWS-REQ-005` survives the change or joins the four |
 | Where the cached credential and its trust anchor are **stored**, given that no protected store exists | Security architecture, with Product | Section 13. `AeroraPlatformKeyProtector` returns `nullptr` on every platform and `F3.1-01` records that neither candidate route is an isolation. `AERORA-SEC-REQ-018` additionally clears the settings store on a schema bump |
 | Whether `IF-SEC-002`'s `CONFIRMED` offline guarantee should carry its **precondition** explicitly | The interface owner | Section 11. The guarantee holds for a previously cached operator and cannot hold for a first sign-in, and `AERORA-AWS-REQ-006`'s test outcome depends on which is assumed |
 | Whether the deployment provisions `Maintenance Technician` to anyone | Product | Section 4. If not, the station cannot write a vehicle parameter, which is a defensible posture and must be a chosen one |
@@ -431,6 +437,172 @@ gate now holds the product's second differentiator and not only its audit trail.
 Nothing here proposes a mechanism. Choosing one is security architecture's with Product, it is
 blocked behind the same build host, and a credential-validation scheme written without a compiler or
 a test would be the security control that does nothing which `F3.1-03` already names once.
+
+## 14. The verification is per-flight, which is the reading that breaks four `CONFIRMED` positions
+
+Section 10 said the cloud answer was compatible on the enrolment reading and incompatible on the
+per-flight reading, and that the difference between them was whether an aircraft flies without a
+network. The owner has now stated the per-flight reading.
+
+| Owner-stated | |
+| --- | --- |
+| A login is required after **every disconnection** between aircraft and station | |
+| With no disconnection, the credential period is **24 hours** | |
+| Verification can only happen while the aircraft is **landed** | |
+| **Every time**, the operator is verified against the Aeroradynamics cloud database, and the operation starts only on a match | |
+
+Section 10 is therefore superseded in its conclusion and kept for its reasoning, which is the
+convention [13](13-autonomy-source-path-and-companion-topology.md) § 7 uses for the same situation.
+The register carries this as the `cloud-gated-flight-authorisation` hazard.
+
+### What it contradicts, stated plainly
+
+Four positions, and three of the four are sourced to the baseline:
+
+| Position | Status | What the rule does to it |
+| --- | --- | --- |
+| `AERORA-SEC-REQ-011`: credential validation shall succeed without network access **as the primary path** | `CONFIRMED`, `B-51` | **Inverted.** Online becomes the primary path and offline becomes nothing |
+| `IF-SEC-002`: "validation must succeed with all network access blocked. **A network error is not an authorisation outcome**" | `CONFIRMED` | **Broken.** Under the rule a network error is precisely an authorisation outcome: the operation does not start |
+| `IF-CLD-004`: "no command, **authorisation**, arming check, **identity resolution**, **entitlement check** or configuration fetch blocks on a network service" | `CONFIRMED`, `GCS-DECIDED` | **Broken three times by name.** This row was written to close every door this request could come through |
+| `IF-SEC-010`: "no call from the Security module into the Cloud module exists" | `GCS-DECIDED` | **Broken structurally**, and `AERORA-TEST-REQ-005` asserts it as an architectural property, so a test has to be inverted rather than a comment changed |
+
+And the cloud interface control document's first named trap is the request verbatim:
+
+> Authentication — "Operators sign in, so check the token before arming" — **Refusal: validated
+> offline, `IF-SEC-002`.**
+
+Eight hidden-dependency routes are enumerated there, each introduced "one convenience at a time,
+each step individually defensible". This is route one, arriving as a deliberate product policy
+rather than as a convenience. That is a better way for it to arrive, and it is still route one.
+
+### What survives, which is more than it looks
+
+Three things, and they matter because they bound the change:
+
+| Survives | Why |
+| --- | --- |
+| `AERORA-AWS-REQ-006`, `CONFIRMED` | It names five capabilities that must work with all network access blocked: connection, parameter load, mission planning, mission upload and local flight recording. **None of them is flight authorisation.** A pilot with no signal can still connect, read parameters, plan, upload and record. They cannot start an operation |
+| `AERORA-AWS-REQ-007` and `IF-CLD-013` | They require each cloud-backed feature to have a **defined local behaviour** and record that the absence of a global offline mode is the contract. The rule gives flight authorisation a defined local behaviour, which is to refuse. That is the one cloud position the answer satisfies rather than breaks |
+| `IF-CLD-002`, `GCS-DECIDED` | No synchronous network call originates on the main thread. A verification written the obvious way — block until the cloud answers, then start — breaks it and freezes the interface on a slow name resolution. The rule is implementable without breaking it, and only if that is known in advance |
+
+`AERORA-AWS-REQ-005`, no operator command to a vehicle depending on cloud availability, depends on
+**where the gate sits**. At station sign-in it survives, because a sign-in is not a command to a
+vehicle. At arming it does not. The rule as stated does not say which, and that is section 14's
+second question.
+
+### The rule contradicts itself in flight, and the repair is already in this tree
+
+This is the finding to act on, and it follows from the owner's two rules alone without reference to
+any requirement.
+
+A link drop between station and aircraft is **normal**. The whole link architecture is built around
+it: `IF-RAD-009` covers reconnection, `IF-RAD-008` covers vehicle-reported link state, and
+[14](14-ground-link-classes-and-control-authority.md) § 6 is a finding about what link loss does to
+authority. Chain the rules against that:
+
+| Step | |
+| --- | --- |
+| The link drops while the aircraft is airborne | Routine |
+| Rule 2: a login is now required | |
+| Rule 2's own constraint: verification can only happen while landed | |
+| The aircraft is airborne, so verification **cannot happen** | |
+| Result | The station reconnects to an airborne aircraft and the operator holds no valid credential |
+
+A 24-hour expiry reached in flight produces the identical state by a different trigger. So both
+triggers converge on one question, and it is the question to answer: **what authority does the
+station have over an airborne aircraft whose operator credential is no longer valid?**
+
+Both obvious answers are wrong in the same way they were wrong in document 14:
+
+| Answer | Where it fails |
+| --- | --- |
+| None. Commands are refused until the operator re-authenticates | The operator cannot tell an airborne aircraft to land, return or abort — and landing is the precondition for re-authenticating, so the only way out of the state is the one thing the state forbids. It is a deadlock with an aircraft in it |
+| Full. The credential gates nothing once flying | Then "every time, verified before the operation starts" is satisfied by a login at dawn, and a 24-hour expiry means nothing |
+
+**This is the second instance of one defect class.** Document 14 § 6 found it on the
+Manual_Authority_Grant axis and stated the resolution: *may manual control begin* and *may manual
+control continue* are different questions with different answers, so a grant is required to **enter**
+manual authority and expiry does not **end** it. The credential axis reproduces it exactly, and the
+same resolution applies:
+
+> **A valid credential is required to *enter* an operation. Its loss or expiry does not *end* one.**
+
+| Case | Behaviour |
+| --- | --- |
+| No valid credential, operator tries to start an operation | Refused. This is the owner's intent — an unregistered pilot does not fly — and it holds |
+| Credential valid, operation starts, link then drops in flight | The credential is marked requiring re-verification and recorded as such. The operator keeps command of the airborne aircraft, including the command to land |
+| Credential expires at 24 hours while airborne | Same. Recorded, displayed, and not enforced until the aircraft is down |
+| Aircraft lands, operator wants to start another operation | Re-verification required, which needs the cloud. The gate is real |
+
+The owner's own landed-only constraint is what makes this the reading rather than a compromise. **A
+check that can only be performed when the aircraft is landed cannot be a continuation gate**, because
+continuation is the state where it cannot run. The rule already says entry; writing it down as entry
+only makes it say what it means.
+
+### The landed state has no reported value behind it
+
+The rule's precondition depends on the station knowing the aircraft is landed, and the station may
+not infer it — `AERORA-GCS-REQ-029` and `IF-UIS-005` keep the station to what the vehicle reports,
+and `kRemainingEnergyEstimationImplemented` is the standing precedent for not computing what was not
+reported.
+
+If the relayed message set of [13](13-autonomy-source-path-and-companion-topology.md) § 14 is
+confirmed, the flight controller sends heartbeat, system status, attitude, global position, GPS,
+battery, head-up values and status text. **No extended system state, so no landed state.** What *is*
+reported is the armed flag, which the heartbeat carries.
+
+| Reading of "landed" | Reported today |
+| --- | --- |
+| Disarmed | **Yes**, in the heartbeat. Usable now |
+| A landed-state report distinct from disarmed | **No.** It needs a message the relayed set does not include |
+
+Those are not the same condition: an armed aircraft sitting on the ground is disarmed-false and
+landed-true. Which one the rule means is a one-sentence answer from the owner, and on the first
+reading the rule is implementable against what the aircraft already sends.
+
+An `UNKNOWN` landed state also needs a defined behaviour, and neither default is free. Fail closed
+and an aircraft that has not reported the state cannot be authorised. Fail open and the landed-only
+constraint is advisory. The State_Vocabulary has the right answer available — report `UNKNOWN` and
+say so — but what the gate then does is a decision.
+
+### The 24-hour period, recorded
+
+The owner has set the value section 12 asked for. It is recorded as owner-stated and it is not
+authored here.
+
+| | |
+| --- | --- |
+| What it bounds | Section 12 asked for the credential validity period because it is the revocation latency. At 24 hours the revocation latency is **bounded at 24 hours**, down from unbounded. That is a strict improvement on the previous state |
+| What else it is | A hard cap on how long a station stays usable without a cloud round trip, and under the entry-not-continuation reading, a cap on when the next operation may start rather than on the current one |
+| What it does not settle | The in-flight expiry case above, which is behaviour rather than duration |
+
+### What this needs, and from whom
+
+Nothing below is done here. Each is a named owner's act, and three of them move `CONFIRMED` content.
+
+| Action | Owner |
+| --- | --- |
+| Decide whether the credential gates **entry only**, as recommended above, or continuation as well | Product with security architecture, and it carries the safety case for the airborne aircraft |
+| Amend or withdraw `AERORA-SEC-REQ-011`, which the rule inverts | The requirement owner. A `CONFIRMED` baseline-sourced requirement, and changing one is the owner's act rather than this document's |
+| Move `IF-SEC-002`'s status and rewrite its failure row, and add the named member to `IF-CLD-004`'s empty set | The interface owner |
+| Withdraw or narrow `IF-SEC-010`, and invert the `AERORA-TEST-REQ-005` architectural-property test that asserts it | Architecture with Tab 2 |
+| Withdraw the cloud document's trap-one refusal, or record the exception against it | Architecture |
+| State whether "landed" means disarmed or a landed-state report, and what an `UNKNOWN` state does | Product with Firmware |
+| State whether the gate sits at station sign-in or at arming, which decides whether `AERORA-AWS-REQ-005` survives | Architecture |
+| Author the product requirement for registration as a prerequisite to flight, which still does not exist | Product |
+
+### Why this is recorded rather than resisted
+
+The owner's goal is clear and legitimate: a pilot not currently registered with Aeroradynamics must
+not fly. That is a licensing control, it is the kind of control an operating organisation is
+accountable for, and no offline mechanism delivers it — an offline credential is by construction a
+statement about the past.
+
+So this is not a convenience that slipped onto the flight path. It is a deliberate reversal with a
+real reason, and the correct response is an impact statement rather than a refusal. What the record
+owes it is that the reversal is **visible**: four positions move, one architectural-property test
+inverts, and the in-flight case gets an answer before any of it is built. All of that is cheap now
+and expensive once a login screen exists.
 
 ## Status vocabulary
 

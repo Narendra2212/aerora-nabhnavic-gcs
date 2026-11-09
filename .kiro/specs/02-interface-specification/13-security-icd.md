@@ -108,12 +108,23 @@ first of the eight hidden-dependency traps enumerated in
 
 The owner has stated that operators authenticate against the Aeroradynamics cloud user database and
 register with Aeroradynamics separately before flying. That names the identity and access backend
-`IF-SEC-009` was written against, and it asks the station to call nothing, so `IF-SEC-002`,
-`IF-SEC-010` and `IF-CLD-004` stand as written — **on the reading that registration is enrolment
-rather than a per-flight check.**
+`IF-SEC-009` was written against.
 
-No row above is moved, because the document carrying the answer is unsigned. Three gaps it exposes
-are recorded in
+**And the owner has since stated that the check is per-flight, not enrolment only**: an operator is
+verified against the cloud before every operation, a login is required after every aircraft-station
+disconnection, a credential otherwise lasts 24 hours, and verification may only happen while the
+aircraft is landed. That reverses `IF-SEC-002`'s failure row, adds three named members to
+`IF-CLD-004`'s empty set, and breaks `IF-SEC-010` structurally together with the
+`AERORA-TEST-REQ-005` architectural-property test that asserts it.
+
+**No row above is moved, because the document carrying the answer is unsigned, and moving a
+`CONFIRMED` row is the interface owner's act.** The reversal is recorded as the
+`cloud-gated-flight-authorisation` hazard in the Gate_Register, and analysed in
+[product-completion 15 § 14](../05-product-completion/15-operator-identity-and-the-single-role-deployment.md#14-the-verification-is-per-flight-which-is-the-reading-that-breaks-four-confirmed-positions),
+which lists the eight actions the change needs and names an owner for each. `AERORA-AWS-REQ-006`
+survives it: none of its five named capabilities is flight authorisation.
+
+Three gaps the answer exposes independently of the reversal are recorded in
 [product-completion 15 §§ 10–13](../05-product-completion/15-operator-identity-and-the-single-role-deployment.md#10-the-two-answers-and-the-architecture-they-land-on),
 and each belongs to a row here:
 
