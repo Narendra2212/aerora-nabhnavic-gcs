@@ -468,3 +468,72 @@ and it is Firmware's with the baseline owner.
 
 Nothing in this section changes the accepted record. The expiry rule and the transition map stand as
 signed.
+
+## 11. Paint failure breaks the previous section's premise, and fixes it
+
+The owner adds paint failure to what approval delay must not cause. That is not a safety matter, and
+adding it exposes an error in section 10.
+
+### What section 10 got wrong
+
+Section 10 concluded that operator delay is "benign by construction: the proposal ages, expires,
+goes Absent, and the aircraft carries on doing the safe thing it was already doing."
+
+That reasons on the safety axis only, and it is **false on the quality axis**. Hovering is safe and
+ruins the coating. A sprayed surface has a window in which the adjacent pass must be applied while
+the previous edge is still wet; hold position past it and the result is a visible lap mark. So a
+pause is not benign merely because it is safe, and "carry on hovering" is not a neutral fallback for
+a painting aircraft.
+
+### The resolution: approve the plan, not the step
+
+A proposal in hybrid mode is a **deviation request**, not a step instruction. With that one change
+the owner's requirement is met and nothing signed has to move.
+
+| | Who approves, and when | What happens on delay |
+| --- | --- | --- |
+| **Immediate safety** — obstacle, geofence, plausibility, failsafe | Nobody. It is not a proposal and never reaches an approval surface | The flight controller acts. Section 10 |
+| **In-plan execution** — the next pass of an approved coverage plan | Pre-approved **once**, with the plan, at mission upload and start. This is `P7-AI-002`'s explicit operator approval event | **Nothing to delay.** No proposal exists, so no approval sits in the painting loop and latency cannot reach the wet edge |
+| **Deviation from the plan** — the autonomy wants to go outside what was approved | Explicitly, per deviation | It expires and goes Absent, and the aircraft **continues the approved plan** rather than hovering |
+
+The third row is what repairs section 10. The fallback for an unapproved deviation is the approved
+plan, not a hover — so delay is benign on both axes at once: the flight controller still handles
+hazards, and the aircraft keeps painting the pattern it was already authorised to paint.
+
+The mechanism is already built and signed. `DG-MIS` is closed over the mission command set, the
+Aerora complex-item type, its parameter set, the asset and obstruction geometry, and the plan-file
+representation. A coverage plan is a real, reviewable, pre-approvable artifact, and approving it is
+an explicit operator event with an audit record. Nothing here needs a timeout that approves, and the
+accepted expiry rule stands exactly as signed: expiry never approves, it drops a deviation.
+
+### What this sharpens about the class partition
+
+The `unpartitioned-proposal-classes` hazard asked for each class to be marked approvable or
+immediate. The answer is three-way rather than two-way, and the middle row is the one that was
+missing: content that is **neither** immediate **nor** individually approvable, because it was
+approved in advance as part of a plan. Most of what the autonomy does in a painting run is that
+middle row, which is why per-step approval was never the right shape.
+
+### The new gap: the coating window is recorded nowhere
+
+Searched: no document in this tree records a wet-edge window, a recoat interval, a lap-mark
+constraint or any coating timing at all. The overlap parameters that exist are upstream
+camera-survey ones, `frontalOverlap` and `sideOverlap` for photo coverage, which are geometric and
+not temporal.
+
+So the constraint that makes "paint failure" real is unrecorded, and two things follow from it:
+
+| Consequence | Owner |
+| --- | --- |
+| A coverage plan must be **flyable within the coating window**, which makes the window a planning constraint on the Aerora complex item rather than a display value | Product, with the applicator ICD |
+| **A safety pause can cause a paint failure.** The flight controller stopping to avoid an obstacle may hold the aircraft past the wet edge and ruin the pass | Recorded consequence, not a conflict to resolve |
+
+The second deserves saying plainly rather than discovering: safety wins, every time, and the pass is
+lost. What the station owes the operator is that the cost is **reported** rather than hidden — an
+avoidance action that ruined a pass should say so, because an operator who finds the lap mark later
+and cannot explain it will start distrusting the avoidance that caused it. That is the same
+reasoning as the unachievable-freshness-threshold check: a protection whose cost is invisible gets
+switched off.
+
+Neither consequence is settled here. The window is a Contract_Value with an applicator ICD behind
+it, and no number is authored anywhere in this document.
