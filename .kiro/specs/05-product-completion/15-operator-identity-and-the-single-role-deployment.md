@@ -604,6 +604,132 @@ owes it is that the reversal is **visible**: four positions move, one architectu
 inverts, and the in-flight case gets an answer before any of it is built. All of that is cheap now
 and expensive once a login screen exists.
 
+## 15. The owner's answers, and what each one costs
+
+`PROPOSED`, owner-stated, unsigned. Six questions this document raised are answered. Four are the
+reading it recommended; one is not, and that one is the expensive answer, so it is stated first
+rather than buried in a table.
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | What authority survives a credential lost or expired in flight | **Entry only.** A valid credential is required to *enter* an operation and its loss or expiry does not *end* one |
+| 2 | Where the cloud check sits | **At arming**, not at station sign-in |
+| 3 | What "landed" means | **Disarmed**, owner-glossed as "flight positioned at ground" |
+| 4 | Whether "one role, Pilot" was a deployment or a retraction | **A deployment.** The signed four-role set stands |
+| 5 | Whether `Maintenance Technician` is provisioned | **Yes**, to a maintainer |
+| 6 | Whether `WP2-C`'s key-protector prohibition lifts | **Yes, for Linux and Windows only** — the two platforms CI can test |
+
+### Answer 2 costs a fifth `CONFIRMED` position, and it is the one that grounds an aircraft
+
+Section 14 recorded four reversals and said a fifth depended on where the gate sits. It sits at
+arming, so the fifth falls:
+
+> `AERORA-AWS-REQ-005`, `CONFIRMED`, source `B-51`: **No operator command to a vehicle shall depend
+> on cloud availability.** Rationale as recorded: "the manual flight command path must remain
+> operational without AWS."
+
+Arming is an operator command to a vehicle. Under answer 2 it depends on cloud availability, so the
+requirement is contradicted in its own terms. That is **three baseline-sourced `CONFIRMED`
+requirements** now reversed by this policy, plus two `GCS-DECIDED` interface rows and an
+architectural-property test.
+
+The operational consequence, stated without softening: **an aircraft cannot be armed where there is
+no network.** Not "degrades", not "falls back" — cannot arm. For a painting aircraft working a
+facade in an industrial area, inside a structure, or in a basement car park, that is the common case
+rather than the edge case.
+
+`AERORA-AWS-REQ-006` still survives, and the gap between the two is now the whole operational story:
+a crew with no signal can connect, load parameters, plan a mission and upload it. They cannot start
+it.
+
+### Answers 2 and 3 compose better than either does alone
+
+This is the good news in the set, and it was not obvious when the questions were asked separately.
+
+Section 14 recorded that the landed precondition had no reported value behind it: the relayed
+firmware message set carries no extended system state, so no landed state is reported, and an
+`UNKNOWN` landed state needed a defined behaviour that neither default made free.
+
+**Answer 2 dissolves that question entirely.** A gate at arming is reachable only while the aircraft
+is disarmed, because an armed aircraft is not arming. So "verification only happens while landed" is
+structural rather than something the station must check:
+
+| What section 14 asked for | What answer 2 does to it |
+| --- | --- |
+| A reported landed state | **Not needed.** The gate's own position establishes it |
+| `EXTENDED_SYS_STATE` from firmware | **Not needed.** No firmware change is required for this |
+| A defined behaviour for an `UNKNOWN` landed state | **Does not arise.** There is no landed state to read |
+
+It also makes answer 3's proxy exact where it is used. Disarmed and on-the-ground are not the same
+condition in general — an aircraft can be armed on the ground before takeoff, and disarmed in the
+air after a kill — so "disarmed" would be a lossy stand-in for the owner's "positioned at ground"
+anywhere else. At a pre-arm gate the two coincide, because the aircraft has not left the ground yet.
+The gloss and the mechanism agree, and they agree only because of answer 2.
+
+### Answer 1 makes the recommended repair the chosen one
+
+The `cloud-gated-flight-authorisation` hazard recorded the entry-not-continuation rule as a
+*proposed* repair, unsigned. It is now the owner's answer, so the in-flight deadlock is closed by
+decision rather than by recommendation:
+
+| Case | Behaviour |
+| --- | --- |
+| No valid credential, operator tries to start an operation | Refused. This is the owner's intent and it holds |
+| Credential valid, armed, link then drops in flight | Recorded as requiring re-verification. The operator keeps command of the airborne aircraft, including the command to land |
+| Credential expires at 24 hours while airborne | Same. Recorded and displayed, enforced only at the next arming |
+| Aircraft lands and disarms, operator wants another operation | Re-verification required, which needs the cloud. The gate is real |
+
+### Answers 4 and 5 cost nothing and settle the role layer
+
+Nothing reopens. The signed four-role set stands, criterion 11 is not engaged, the three released
+screens stay released, and no settled key is rewritten. `parameter` is authorised by the role the
+signed set gives it to, so the station can write a vehicle parameter and the separation of duties
+the signed `DG-ROL-SOC-02` verdict deliberately encoded is preserved.
+
+The consequence for implementation is that **the role resolver is now fully specified**: an identity
+maps to configured role identifiers, drawn from a set that is signed and a deployment that is
+stated. `AeroraRolePolicy` already evaluates against exactly that shape, so the two meet without
+either being redesigned.
+
+### Answer 6 lifts a prohibition, and lifts it for a reason that changed
+
+`WP2-C` prohibited an `AeroraPlatformKeyProtector` backend on the ground that "an untested crypto
+backend is worse than none". That reason rested on `D-006`, which has narrowed to this host: the CI
+legs build and test the overlay on Linux and Windows. The signed `DG-STO:tamper-evidence` record
+additionally **names a backend per platform**, so the choice is settled rather than open.
+
+| Platform | Backend, per the signed record | Prohibition |
+| --- | --- | --- |
+| Linux | libsecret, through the Secret Service | **Lifted.** CI tests it |
+| Windows | DPAPI | **Lifted.** CI tests it |
+| macOS, Android, iOS | Keychain, Android Keystore, Keychain | **Stays.** No CI leg exercises them, so the original reason survives unchanged |
+
+What that unblocks, and what it does not:
+
+| | |
+| --- | --- |
+| Unblocked | The protected chain anchor of `D-DAT-05`, which is the other half of the audit construction whose keyless half is now built as `AeroraAuditChain`. And the trust anchor that offline validation of a cloud-issued credential needs, which section 13 records as the widest consequence of the cloud answer |
+| Not unblocked | `isTamperEvident()`. A lifted prohibition is permission to implement, not an implementation, and the register's guard verdict already said *permitted* rather than earned |
+| Unchanged | `AERORA-SEC-REQ-017`, `CONFIRMED`: a production release shall not persist signing key material without protection at rest. Two platforms gaining a protector does not satisfy it for the other three, so `F3.1-01` stays release-critical against `G-RELEASE` |
+
+### The one answer that raised a new question
+
+Answers 2 and the earlier 24-hour period do not compose, and the two readings differ by whether an
+aircraft flies at all without a network. This document does not choose between them.
+
+| Reading | What it means | Consequence |
+| --- | --- | --- |
+| **(i)** Every arming contacts the cloud | The 24 hours governs how long a session lasts before a fresh login, and the cloud is reached at each arming regardless | No network, no flight, ever. `AERORA-AWS-REQ-005` falls completely and the credential's validity period governs login frequency rather than offline capability |
+| **(ii)** The cloud is contacted at login; the gate at arming checks the **cached** credential | The 24 hours is an offline flying window | A crew can fly for up to 24 hours after their last successful login. `AERORA-AWS-REQ-005` is contradicted at login rather than at every arming, which is a far smaller reversal |
+
+Reading (i) is what "every time it will verify from our cloud database" says literally. Reading (ii)
+is what a 24-hour credential period is *for* — under reading (i) the period has no offline role to
+play, which makes it a login-frequency setting rather than a credential lifetime.
+
+**This is the last input the identity provider needs**, and it is recorded as a question rather than
+guessed, because the two readings produce different code and only one of them lets a disconnected
+crew fly.
+
 ## Status vocabulary
 
 Defined programme-wide in [00-README.md](00-README.md#status-vocabulary). This document redefines
