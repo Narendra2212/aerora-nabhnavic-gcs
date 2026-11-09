@@ -7,10 +7,17 @@ programme. It continues beyond the Phase 6 foundation and covers the full produc
 vehicle and mission management, AI supervision, telemetry, security, diagnostics, data management
 and future product profiles.
 
-**Nothing in this directory has been built, linted, loaded or executed.** No compiler, CMake, Qt,
-`qmllint`, `ctest` or `pre-commit` exists on this host â€” re-confirmed this pass, see
-[Host tooling](#host-tooling). Every status claim uses the vocabulary below, and `VERIFIED` is not
-claimed anywhere.
+**Nothing is built, linted, loaded or executed on this host.** No compiler, CMake, Qt, `qmllint`,
+`ctest` or `pre-commit` exists here, so every claim made from this host is source-level. See
+[Host tooling](#host-tooling).
+
+**That is no longer the same as nothing being built.** The overlay has its own CI legs, and
+`Aerora Lint`, `Aerora Linux` and `Aerora Windows` all pass: configure, build, an assertion that
+`QGC_CUSTOM_BUILD` actually attached the overlay, and `ctest -R '^Aerora'` over the `Unit` and
+`Integration` labels with `--no-tests=error` so a vacuous pass fails the job. The Linux leg boots a
+real QML window under `xvfb`. `VERIFIED` is therefore claimed, and earned, for the screens
+[03](03-gui-information-architecture-and-screens.md#inventory-totals) records under it. `D-006` is a
+statement about this host, not about the programme.
 
 ## Document set
 
@@ -57,22 +64,25 @@ first Phase C design document.
 
 ### Screen inventory, stated precisely
 
-52 screens. The headline is that **two exist**, and the three statuses below it are not
-interchangeable.
+52 screens. **The counts are not restated here.**
+[03 § Inventory totals](03-gui-information-architecture-and-screens.md#inventory-totals) holds them
+and `tools/validate_gate_register.py` checks that table against the register's screen records, so
+repeating a figure here would make this the second place it can be wrong — which is the mistake that
+table's own derivation was written to stop.
 
-| Count | State | Means |
-| --- | --- | --- |
-| **2** | `IMPLEMENTED-UNCOMPILED` | `SCR-SHL-01` (`analyzePages()`) and `SCR-SHL-03` (`toolBarIndicators()`). QML exists, is in the resource, and is registered. Never compiled, loaded or rendered |
-| 4 | Split status | `SCR-SHL-02`, `SCR-MIS-09`, `SCR-VEH-05`, `SCR-SEC-04`. One half — **service, gate, store, or one of two registries** — is `IMPLEMENTED-UNCOMPILED`; the rest is still `DESIGNED`. These are not implemented screens and must not be counted as such |
-| 26 | `DESIGNED` | Implementable; no code |
-| 20 | `SPECIFIED-NOT-DESIGNED` | Requirement captured, mechanism not chosen |
+What is worth stating is where the remaining work sits, because it has moved:
 
-The 50 screens that do not exist are overwhelmingly **not** blocked on UI work. They are blocked on
-absent data contracts: no Aerora MAVLink dialect, so all six fact groups stay `CONTRACT-ONLY`
-(`SCR-TEL-01`); no freshness budget values, `Q-036` (`SCR-TEL-03`); no durable store
-(`SCR-TEL-02`, `SCR-LOG-01`, `SCR-SEC-03`); no operator role set, `Q-029` (`SCR-SEC-02`); no
-autonomy interface, `P7-AI-004` (`SCR-AIS-*`); no fleet identity format (`SCR-FLT-01/02`).
-Building them now would mean inventing the data behind them, which `P7-NOINV-001` prohibits.
+| | |
+| --- | --- |
+| Blocked by a Gate still open | **4 screens.** `SCR-AIS-01`, `SCR-AIS-02`, `SCR-AIS-03` and the proposal half of `SCR-LIV-05`, all on `DG-AUT:source-interface` |
+| Gate-released and not yet built | **33 screens.** Nine of the ten Gates have closed, so these wait on implementation rather than on a decision |
+| Delivered | The rows 03's totals table records `VERIFIED`, each resolving to a suite and slot the register names and CI runs |
+
+That is a reversal worth noticing. This section previously recorded the undelivered screens as
+"overwhelmingly **not** blocked on UI work" but on absent data contracts — no dialect, no freshness
+budgets, no durable store, no role set, no fleet identity format. That was true when written.
+`DG-TLM`, `DG-FRS`, `DG-STO`, `DG-ROL` and `DG-FLT` have since closed, so for 33 of the 37 the
+constraint `P7-NOINV-001` imposed is lifted and what remains is building them.
 
 ### Next integration blockers
 
@@ -80,7 +90,7 @@ In the order they gate the most work. None is a UI screen.
 
 | # | Blocker | Owner | What it gates |
 | --- | --- | --- | --- |
-| 1 | **`D-006` build host.** Nothing in this programme has been compiled, linted or executed. 21 commits of overlay source are `IMPLEMENTED-UNCOMPILED` | User / Tab 8 | Every `VERIFIED` claim, and the first real measurement of ~130 overlay sources |
+| 1 | **`D-006` build host, narrowed.** No local build, so nothing can be compiled or tested *here* and every claim made from this host stays source-level. The overlay's three CI legs do build and test it, on Linux and Windows, so this no longer gates a `VERIFIED` claim | User / Tab 8 | Local iteration speed. A CI round trip is the only way to see a compile error, which is minutes rather than seconds per attempt |
 | 2 | **HO-TAB7-04** Qt Quick Test target | Tab 1 + Tab 7 | `SCR-SHL-01`'s two safety-relevant QML behaviours are guarded by review only — the fail-safe enforcement derivation is a `P7-AUTH-002` claim with no test that can reach it |
 | 3 | **`Q4-002` core edit** — one `friend` line in `src/Vehicle/Vehicle.h` plus a define | Tab 1 authorises | Aerora telemetry reaching the value picker and the CSV record; `SCR-TEL-01` |
 | 4 | ~~**`Q-029` / ADR-014** authorization policy~~ | Tab 2 | **DECIDED.** `DG-ROL` is `CLOSED`: the role set is signed and ADR-014 is selected as Option C. What is left is the identity provider, the role resolver and a configured policy, which is implementation. Doc 15 |
