@@ -14,8 +14,10 @@
 #include "AeroraAuthorization.h"
 #include "AeroraCachedCredentialIdentityProvider.h"
 #include "AeroraCommandAuthorizer.h"
+#include "AeroraCorePlugin.h"
 #include "AeroraRolePolicy.h"
 #include "AeroraSecurityTestDoubles.h"
+#include "MAVLinkLib.h"
 
 using AeroraSecurityTestDoubles::RecordingSink;
 
@@ -218,6 +220,64 @@ void AeroraOperationGateEnforcementTest::_aRoleRefusedArmDoesNotEnterTheOperatio
     _provider->setCredential(staleCredential());
     QVERIFY2(!authorizer->authorizeThroughOperationGate(operationFor(1), kEnters, !kExits),
              "a role-refused arm must not enter the operation, so the next arm is still freshness-gated");
+}
+
+void AeroraOperationGateEnforcementTest::_armClassifiesAsEnteringAnOperation()
+{
+    bool enters = false;
+    bool exits = false;
+    AeroraCorePlugin::classifyOperationBoundary(MAV_CMD_COMPONENT_ARM_DISARM, 1.0f, enters, exits);
+
+    QVERIFY(enters);
+    QVERIFY(!exits);
+}
+
+void AeroraOperationGateEnforcementTest::_disarmClassifiesAsExitingAnOperation()
+{
+    bool enters = false;
+    bool exits = false;
+    AeroraCorePlugin::classifyOperationBoundary(MAV_CMD_COMPONENT_ARM_DISARM, 0.0f, enters, exits);
+
+    QVERIFY(!enters);
+    QVERIFY(exits);
+}
+
+void AeroraOperationGateEnforcementTest::_aForceArmStillEntersAnOperation()
+{
+    // A force-arm carries its magic number in param2; param1 is still 1, so it is still an arm and
+    // still an entry. classifyOperationBoundary reads param1 only, so this holds by construction -
+    // asserted so a later change that started reading param2 cannot silently reclassify a force-arm.
+    bool enters = false;
+    bool exits = false;
+    AeroraCorePlugin::classifyOperationBoundary(MAV_CMD_COMPONENT_ARM_DISARM, 1.0f, enters, exits);
+
+    QVERIFY(enters);
+    QVERIFY(!exits);
+}
+
+void AeroraOperationGateEnforcementTest::_anArmDisarmWithAnUnexpectedParamIsNeither()
+{
+    // Only an exact 1 arms and an exact 0 disarms. A param1 that is neither is not a boundary this
+    // gate recognises, so it is treated as neither entry nor exit - it will be role-gated like any
+    // other command, never credential-gated, and never mistaken for an arm.
+    bool enters = true;
+    bool exits = true;
+    AeroraCorePlugin::classifyOperationBoundary(MAV_CMD_COMPONENT_ARM_DISARM, 0.5f, enters, exits);
+
+    QVERIFY(!enters);
+    QVERIFY(!exits);
+}
+
+void AeroraOperationGateEnforcementTest::_aNonArmCommandIsNeitherEntryNorExit()
+{
+    // A different command, even with param1 == 1, is not an arm and so is neither an entry nor an
+    // exit. The classification keys on the command id, not on the parameter alone.
+    bool enters = true;
+    bool exits = true;
+    AeroraCorePlugin::classifyOperationBoundary(MAV_CMD_NAV_TAKEOFF, 1.0f, enters, exits);
+
+    QVERIFY(!enters);
+    QVERIFY(!exits);
 }
 
 UT_REGISTER_TEST(AeroraOperationGateEnforcementTest, TestLabel::Unit)

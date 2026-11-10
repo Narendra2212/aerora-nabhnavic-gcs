@@ -119,6 +119,13 @@ public:
     /// installed and no authorization decisions are being made.
     [[nodiscard]] static bool isAuthorizationEnforced();
 
+    /// Classify a queued command against the operation boundary the credential gate needs. \a
+    /// entersOperation is set for an arm, \a exitsOperation for a disarm, and both are cleared for
+    /// any other command. Pure and static so it is unit-testable without a plugin instance; the
+    /// one place the overlay reads a MAVLink command id, kept at this call-site boundary rather
+    /// than in the authorization types, which carry \c mavCommand as an opaque int.
+    static void classifyOperationBoundary(int command, float param1, bool& entersOperation, bool& exitsOperation);
+
 private:
     void _installSigningKeyStore();
 

@@ -49,6 +49,15 @@ private slots:
     void _theOperationPhaseIsIndependentPerVehicle();
     void _aRoleRefusedArmDoesNotEnterTheOperation();
 
+    // The call-site classification that feeds the gate on the live command path. These assert
+    // AeroraCorePlugin::classifyOperationBoundary, the one place a MAVLink command id is read, so a
+    // transposed arm/disarm or a mis-typed comparison fails here rather than on an aircraft.
+    void _armClassifiesAsEnteringAnOperation();
+    void _disarmClassifiesAsExitingAnOperation();
+    void _aForceArmStillEntersAnOperation();
+    void _anArmDisarmWithAnUnexpectedParamIsNeither();
+    void _aNonArmCommandIsNeitherEntryNorExit();
+
 private:
     // Non-owning; the authorizer owns the installed provider, valid while the chain is installed.
     AeroraCachedCredentialIdentityProvider* _provider = nullptr;

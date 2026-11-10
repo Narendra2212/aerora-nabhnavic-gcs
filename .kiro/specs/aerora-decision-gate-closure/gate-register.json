@@ -2178,6 +2178,14 @@
     "gate": "DG-MIS",
     "allowList": [
       {
+        "path": "aerora/src/AeroraCorePlugin.cc",
+        "reason": "classifies a queued command by the standard arm-disarm command id to mark an operation entry for the credential gate; reads the identifier, authors none, and the authorization types still carry mavCommand as an opaque int"
+      },
+      {
+        "path": "aerora/test/Security/AeroraOperationGateEnforcementTest.cc",
+        "reason": "drives classifyOperationBoundary with the standard arm-disarm command id and a non-arm command id to assert the classification; reads the identifiers, authors none"
+      },
+      {
         "path": "aerora/src/Mission/AeroraMissionResumeBoundary.cc",
         "reason": "reads upstream's own command and frame values, which it does not author: the plan it validates, snapshots and bounds is upstream's and the identifiers come with it"
       },

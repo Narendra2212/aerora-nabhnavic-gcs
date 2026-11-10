@@ -11,6 +11,7 @@
 #include "AeroraPlatformKeyProtector.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
+#include "MAVLinkLib.h"
 #include "MAVLinkSigningKeys.h"
 #include "QGCLoggingCategory.h"
 #include "QmlComponentInfo.h"
@@ -310,5 +311,22 @@ bool AeroraCorePlugin::authorizeMavCommand(Vehicle *vehicle, int targetCompId, i
         operation.address.vehicles.append(addressed);
     }
 
-    return authorizer->isAuthorized(operation);
+    // Layer the operation-entry credential gate over role authorization. The classification is the
+    // only thing read from the command id here; the gate and the role chain take it from there.
+    bool entersOperation = false;
+    bool exitsOperation = false;
+    classifyOperationBoundary(command, param1, entersOperation, exitsOperation);
+
+    return authorizer->authorizeThroughOperationGate(operation, entersOperation, exitsOperation);
+}
+
+void AeroraCorePlugin::classifyOperationBoundary(int command, float param1, bool& entersOperation, bool& exitsOperation)
+{
+    // Arming is the entry to an operation and disarming is the exit, per the owner's answers
+    // A1 and A3 (product-completion 15). Both are MAV_CMD_COMPONENT_ARM_DISARM, distinguished by
+    // param1: 1 arms, 0 disarms. A force-arm carries its magic in param2, so param1 still decides
+    // here. Any other command is neither, so it is never credential-gated - only role-gated.
+    const bool isArmDisarm = (command == MAV_CMD_COMPONENT_ARM_DISARM);
+    entersOperation = isArmDisarm && (param1 == 1.0f);
+    exitsOperation = isArmDisarm && (param1 == 0.0f);
 }
