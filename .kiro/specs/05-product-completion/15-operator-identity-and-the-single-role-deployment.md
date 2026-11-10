@@ -748,10 +748,40 @@ unauthenticated one. If a cached credential expires at the 24-hour mark while th
 airborne, a provider wired straight to that gate would begin denying every subsequent command —
 which is continuation-blocking, the exact failure answer 1 forbids. So the three installables that
 `isFullyConfigured()` reads now all exist and are verified, and installing them together is blocked
-on an operation-entry gate that distinguishes *entering* an operation from *continuing* one. That
-gate does not exist, and improvising it inside the command authorizer would be the wrong place:
-`DG-ROL` already settles the scope at `MavCommandQueue::sendWorker()`, and the entry/continuation
-distinction is a lifecycle concern above it.
+on an operation-entry gate that distinguishes *entering* an operation from *continuing* one.
+
+### The operation-entry gate, as decided
+
+The owner's answers A1–A3 settle that gate's behaviour, and `AeroraOperationGate` now implements it
+as a pure state machine. Freshness is consulted on **exactly one transition** — entering an
+operation from outside one — and every other command is never freshness-blocked:
+
+| Phase | Command | Credential | Gate |
+| --- | --- | --- | --- |
+| Not in operation | arm (entry) | fresh | Allowed, enters |
+| Not in operation | arm (entry) | stale | **Blocked**, stays out |
+| Not in operation | a ground command | stale | Allowed — freshness is checked only at entry, so an operator whose credential just lapsed can still configure and upload, and is refused only at the arm |
+| **In operation** | **anything, incl. land/RTL/disarm** | **stale** | **Allowed** — this is A2: expiry does not end an operation |
+| In operation | disarm (exit) | either | Allowed, ends the operation (A3) |
+| Not in operation | re-arm after disarm | stale | Blocked — a new entry re-checks (A1) |
+
+The gate only ever *adds* a refusal; it never authorizes. A command it does not block still faces
+role authorization in `AeroraCommandAuthorizer`, which is the one thing that may permit a command.
+And nothing is installed: the shipped build still enforces nothing, because
+`isAuthorizationEnforced()` stays false until a deployment installs the chain.
+
+What remains is the **live wiring** — the one change that touches the real command path and so is
+staged on its own rather than folded in with the state machine:
+
+| Wiring step | Why it is its own step |
+| --- | --- |
+| Split freshness out of `AeroraCachedCredentialIdentityProvider` so `currentIdentity()` reports the operator while *logged in* and freshness is a separate read | The authorizer must keep identifying the operator through a continuation; today the provider reports unauthenticated once stale, which is correct for an identity contract and wrong for the per-command path |
+| Classify arm/disarm at `AeroraCorePlugin::authorizeMavCommand`, where the raw `mavCommand` and `param1` already are, and consult the gate around `isAuthorized()` | Recognising `MAV_CMD_COMPONENT_ARM_DISARM` is reading the standard dialect, which the overlay keeps at the call site rather than in the authorization types |
+| An end-to-end test that installs the full chain plus the gate and asserts a stale arm is refused while a post-expiry land is not | This is the only point at which `isAuthorizationEnforced()` is true, and it proves the safety case on a built binary rather than on the state machine alone |
+
+That rewire changes behaviour on the drone's command path, interacts with the shipped fail-closed
+default and the `AeroraVehicleIntegrationTest` assertion that enforcement is off, and is code this
+host cannot run. So it is landed deliberately and on its own, with the state machine proven first.
 
 ### The clock the window is measured on, and its limit
 

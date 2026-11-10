@@ -87,6 +87,8 @@ set(AERORA_SECURITY_SOURCES
     ${AERORA_SECURITY_DIR}/AeroraCalibrationAuthorization.h
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.cc
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.h
+    ${AERORA_SECURITY_DIR}/AeroraOperationGate.cc
+    ${AERORA_SECURITY_DIR}/AeroraOperationGate.h
     ${AERORA_SECURITY_DIR}/AeroraPlatformKeyProtector.h
     ${AERORA_SECURITY_DIR}/AeroraRolePolicy.cc
     ${AERORA_SECURITY_DIR}/AeroraRolePolicy.h
@@ -142,6 +144,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraRolePolicyTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraRolePolicyTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityStatusTest.cc
@@ -181,6 +185,7 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraCalibrationEnforcementTest
     AeroraFleetAuthorizationTest
     AeroraManualAuthorityTest
+    AeroraOperationGateTest
     AeroraRolePolicyTest
     AeroraSecurityStatusTest
     AeroraSigningKeyStoreTest
