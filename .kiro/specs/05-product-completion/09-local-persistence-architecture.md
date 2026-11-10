@@ -2,7 +2,7 @@
 
 Owner: **Tab 1**. Design for `P7-DAT-002`, `P7-DAT-005`, and the Q-037 assessment.
 
-Status: `DESIGNED`, with **one mechanism now built**. `AeroraAuditChain` implements the per-record
+Status: `DESIGNED`, with **two mechanisms now built**. `AeroraAuditChain` implements the per-record
 hash chain of [§7](#7-q-037-assessment-can-this-carry-audit) and `DG-STO:tamper-evidence`, as a pure
 function over a record and its predecessor's digest: no store, no key, no thread, no I/O. It is the
 one piece of this design that needed none of the rest, because the accepted Closure_Record settles a
@@ -11,10 +11,25 @@ silently degrade on one of them". `AeroraAuditChainTest` covers it, including on
 field, so a field added to `AeroraAuditEvent` and forgotten in the encoding fails rather than
 quietly stops being covered.
 
+A second mechanism is now built: `AeroraAuditQueue`, the bounded writer buffer of `IF-LOG-014`. It
+is the queue the sink contract names — the part that decides `Accepted` versus `DroppedQueueFull`,
+which is where `AERORA-GCS-REQ-025` / `IF-LOG-015` loss accounting lives — as a pure, synchronous
+FIFO with no thread and no I/O. `AeroraAuditQueueTest` covers the taken-or-refused verdict, strict
+order including across interleaved drain, and round-trip fidelity of the whole record.
+
+`IF-LOG-014`'s other half, *its thread*, is deliberately not built here. The overlay has no threaded
+component, so introducing its first one is a concurrency-model decision that should match how
+QGroundControl already runs work rather than be improvised as a bare worker; and the drain target,
+`AeroraAuditStore`, does not exist for a thread to feed. The queue is thread-agnostic so that choice
+is unconstrained: it holds no lock, and whatever owns it provides the mutex across producer and
+drain threads. This is the same split the hash chain used — the deterministic half now, the half
+that needs infrastructure later.
+
 **No honesty flag moved, and none may yet.** `isDurable()` stays false because no store exists, and
 `isTamperEvident()` stays false because the chain is the keyless half — [§7](#7-q-037-assessment-can-this-carry-audit)
 below is unchanged and is why. The register records both guards as *permitted* to become true by
-`DG-STO:tamper-evidence`, which is not the same as earned.
+`DG-STO:tamper-evidence`, which is not the same as earned. A bounded queue does not move them
+either: a buffer in front of a store that does not exist is not durability.
 
 Everything else here is still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.
