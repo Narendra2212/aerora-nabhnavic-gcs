@@ -4,14 +4,13 @@
 
 #include "AeroraAuthorization.h"
 
-/// \brief A credential the station cached from a successful cloud login, with its own validity
-///        window.
+/// \brief A credential the station cached from a successful cloud login, with its own window.
 ///
 /// The owner's model, recorded in
 /// [product-completion
 /// 15](../../../.kiro/specs/05-product-completion/15-operator-identity-and-the-single-role-deployment.md): an operator
 /// authenticates against the Aeroradynamics cloud at **login**, which caches this credential; the arming gate then
-/// reads the **cached** credential and contacts nothing. The credential is valid for an offline flying window, 24 hours
+/// reads the **cached** credential and contacts nothing. The credential is fresh for an offline flying window, 24 hours
 /// by default.
 ///
 /// \section noduration Why the 24 hours is not here
@@ -23,7 +22,7 @@
 ///
 /// \section clock Why wall-clock
 ///
-/// Validity is measured on the wall clock, not the monotonic clock `AeroraManualAuthorityGrant`
+/// Freshness is measured on the wall clock, not the monotonic clock `AeroraManualAuthorityGrant`
 /// uses. Two reasons: "24 hours since login" is a human duration, and a credential that is ever
 /// persisted across a restart cannot use a monotonic clock, which resets. The cost is a wall clock
 /// that steps on an NTP correction, a GNSS fix or an operator change, so a backward step extends a
@@ -43,18 +42,18 @@ struct AeroraOperatorCredential
     /// Wall-clock milliseconds at which the window closes.
     qint64 expiresUtcMs = 0;
 
-    /// Whether a credential is cached at all, valid or not. A present-but-expired credential is
-    /// still present: a status surface distinguishes "logged in, expired" from "never logged in",
-    /// and the two have different remedies.
+    /// Whether a credential is cached at all, fresh or not. A present-but-expired credential is
+    /// still present, which is what keeps an operator identified - and therefore able to keep
+    /// commanding an operation in force - after their window has closed.
     [[nodiscard]] bool isPresent() const { return issuedUtcMs != 0 && !operatorId.isEmpty(); }
 
     /// Whether the credential is present and within its window at \a nowUtcMs.
     ///
     /// Read from the clock on every call rather than latched, for the reason
     /// `AeroraManualAuthorityGrant::inForce()` gives: a latched flag needs something to clear it,
-    /// and the window closing is exactly when nothing is guaranteed to run. Valid *until* expiry,
+    /// and the window closing is exactly when nothing is guaranteed to run. Fresh *until* expiry,
     /// not through the expiry instant, which matches the grant's boundary.
-    [[nodiscard]] bool isValidAt(qint64 nowUtcMs) const
+    [[nodiscard]] bool isFreshAt(qint64 nowUtcMs) const
     {
         if (!isPresent()) {
             return false;
@@ -63,29 +62,32 @@ struct AeroraOperatorCredential
     }
 };
 
-/// \brief An `AeroraIdentityProvider` that reports identity from a cached credential.
+/// \brief An `AeroraIdentityProvider` that reports identity and freshness from a cached credential.
 ///
-/// \section what What it is, and what it is not
+/// \section split Identity and freshness are two answers, not one
 ///
-/// It is the station-side **reader** of the cached credential: given a credential, it answers
-/// authenticated while that credential is valid and unauthenticated once it is not. It is the third
-/// of the three installables `AeroraCommandAuthorizer::isFullyConfigured()` reads, alongside
-/// `AeroraAssignedRoleResolver` and `AeroraRolePolicy`.
+/// This is the change the owner's entry-not-continuation rule forces, and it is the whole point of
+/// the type's shape:
 ///
-/// It is **not** the login. The cloud call that authenticates an operator and produces a credential
-/// is a separate seam that needs the network, which `IF-CLD-002` forbids running synchronously on
-/// the main thread and which does not exist. Something else performs that call and hands the result
-/// to `setCredential()`; this type never reaches a network.
+/// \li **Identity** - `currentIdentity()` - answers *who is logged in*. It reports the operator as
+///     authenticated whenever a credential is **present**, fresh or not. A credential that lapses
+///     at the 24-hour mark does not strip the identity, so an operator stays identified and the
+///     command path keeps resolving their role while an operation is in force.
+/// \li **Freshness** - `isAuthenticationFresh()` - answers *is the login recent enough to enter a
+///     new operation*. The operation gate consults it at an arm and nowhere else. A lapsed window
+///     makes this false while identity stays true, which is exactly what blocks a new arm while
+///     leaving a command in flight untouched.
 ///
-/// \section notinstalled Why installing this does not simply switch enforcement on
+/// Folding the two together - reporting unauthenticated once stale - is what would deny every
+/// command after a mid-flight expiry, the continuation-blocking failure the owner's answer forbids.
+/// Keeping them apart is what makes that failure unreachable.
 ///
-/// Wiring this provider into `AeroraCommandAuthorizer` and flipping `isFullyConfigured()` true would
-/// make the per-command gate deny an unauthenticated identity on **every** command. If a cached
-/// credential expires at the 24-hour mark while the aircraft is airborne, that gate would then deny
-/// every subsequent command - continuation-blocking, which the owner's entry-not-continuation
-/// answer forbids (product-completion 15). So the entry/continuation distinction has to sit in an
-/// operation-entry gate above the command authorizer, and that gate does not exist yet. This type
-/// is correct and verified; installing the three together waits on it.
+/// \section notlogin Not the login
+///
+/// The cloud call that authenticates an operator and produces a credential is a separate seam that
+/// needs the network, which `IF-CLD-002` forbids running synchronously on the main thread and which
+/// does not exist. Something else performs that call and hands the result to `setCredential()`;
+/// this type never reaches a network.
 ///
 /// \section replace Why a new credential replaces the old one wholly
 ///
@@ -101,25 +103,30 @@ public:
     /// Caches \a credential, replacing any held credential wholly.
     void setCredential(const AeroraOperatorCredential& credential);
 
-    /// Drops the cached credential. The explicit sign-out, after which identity is unauthenticated
-    /// regardless of the clock.
+    /// Drops the cached credential. The explicit sign-out, after which the operator is neither
+    /// identified nor fresh.
     void clearCredential();
 
-    /// The identity at \a nowUtcMs. The tested core: an invalid or absent credential yields an
-    /// unauthenticated identity, which `AeroraOperatorIdentity::isValid()` then rejects and the
-    /// resolver renders as unresolved.
-    [[nodiscard]] AeroraOperatorIdentity currentIdentityAt(qint64 nowUtcMs) const;
-
-    /// The identity now, on the wall clock. Thin wrapper over `currentIdentityAt()`.
+    /// Who is logged in. Authenticated whenever a credential is present, independent of freshness -
+    /// see the split above. An absent credential yields an unauthenticated identity, which
+    /// `AeroraOperatorIdentity::isValid()` rejects and the resolver renders as unresolved.
     [[nodiscard]] AeroraOperatorIdentity currentIdentity() const override;
 
-    /// Whether a credential is cached, valid or not. For a status surface that distinguishes
+    /// Whether the cached credential is within its window at \a nowUtcMs. The tested core of the
+    /// freshness answer.
+    [[nodiscard]] bool isCredentialFreshAt(qint64 nowUtcMs) const;
+
+    /// Whether the cached credential is fresh now, on the wall clock. The operation gate reads this
+    /// at an entry; a thin wrapper over `isCredentialFreshAt()`.
+    [[nodiscard]] bool isAuthenticationFresh() const override;
+
+    /// Whether a credential is cached, fresh or not. For a status surface that distinguishes
     /// "logged in, expired" from "never logged in".
     [[nodiscard]] bool hasCredential() const { return _credential.isPresent(); }
 
     /// The cached credential's expiry, or zero when none is cached. For a status surface, never for
-    /// a decision - a consumer deciding authentication must call `currentIdentityAt()` so the clock
-    /// is read in one place.
+    /// a decision - a consumer deciding freshness calls `isCredentialFreshAt()` so the clock is
+    /// read in one place.
     [[nodiscard]] qint64 credentialExpiresAtUtcMs() const { return _credential.expiresUtcMs; }
 
 private:

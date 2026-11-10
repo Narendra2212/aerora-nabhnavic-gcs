@@ -737,10 +737,13 @@ a different window changes the issuer, not the type.
 
 ### What this settles, and the one thing it does not
 
-It settles the last input the **identity provider** needed, so the provider is now buildable: a
-cached-credential reporter that answers authenticated while the cached credential is valid at the
-current wall-clock time, and unauthenticated once it is not. `AeroraCachedCredentialIdentityProvider`
-is that type.
+It settles the last input the **identity provider** needed. `AeroraCachedCredentialIdentityProvider`
+is that type, and it answers two separate questions rather than one: `currentIdentity()` reports the
+operator as authenticated whenever a credential is **present** — logged in, fresh or not — and
+`isAuthenticationFresh()` reports whether the window is still open. Keeping them apart is what lets
+an expired-but-logged-in operator keep commanding an operation in force while a new entry is still
+refused, which is the owner's entry-not-continuation rule. Folding them — reporting unauthenticated
+once stale — would deny every command after a mid-flight expiry, the failure that rule forbids.
 
 It does **not** make the provider safe to install on `AeroraCommandAuthorizer` yet, and the reason is
 answer 1. The command authorizer reads `currentIdentity()` on **every** queued command and denies an
@@ -773,11 +776,11 @@ And nothing is installed: the shipped build still enforces nothing, because
 What remains is the **live wiring** — the one change that touches the real command path and so is
 staged on its own rather than folded in with the state machine:
 
-| Wiring step | Why it is its own step |
+| Wiring step | State |
 | --- | --- |
-| Split freshness out of `AeroraCachedCredentialIdentityProvider` so `currentIdentity()` reports the operator while *logged in* and freshness is a separate read | The authorizer must keep identifying the operator through a continuation; today the provider reports unauthenticated once stale, which is correct for an identity contract and wrong for the per-command path |
-| Classify arm/disarm at `AeroraCorePlugin::authorizeMavCommand`, where the raw `mavCommand` and `param1` already are, and consult the gate around `isAuthorized()` | Recognising `MAV_CMD_COMPONENT_ARM_DISARM` is reading the standard dialect, which the overlay keeps at the call site rather than in the authorization types |
-| An end-to-end test that installs the full chain plus the gate and asserts a stale arm is refused while a post-expiry land is not | This is the only point at which `isAuthorizationEnforced()` is true, and it proves the safety case on a built binary rather than on the state machine alone |
+| Split freshness out of `AeroraCachedCredentialIdentityProvider` so `currentIdentity()` reports the operator while *logged in* and freshness is a separate read | **Done.** `currentIdentity()` now follows presence and `isAuthenticationFresh()` follows the window, added to the `AeroraIdentityProvider` base with a default of true so a provider that never expires never blocks an entry |
+| Classify arm/disarm at `AeroraCorePlugin::authorizeMavCommand`, where the raw `mavCommand` and `param1` already are, and consult the gate around `isAuthorized()` | **Next.** Recognising the standard arm-disarm command is reading the dialect, which the overlay keeps at the call site rather than in the authorization types |
+| An end-to-end test that installs the full chain plus the gate and asserts a stale arm is refused while a post-expiry land is not | **Next.** This is the only point at which `isAuthorizationEnforced()` is true, and it proves the safety case on a built binary rather than on the state machine alone |
 
 That rewire changes behaviour on the drone's command path, interacts with the shipped fail-closed
 default and the `AeroraVehicleIntegrationTest` assertion that enforcement is off, and is code this

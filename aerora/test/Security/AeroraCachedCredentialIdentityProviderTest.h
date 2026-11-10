@@ -2,58 +2,56 @@
 
 #include "UnitTest.h"
 
-/// \brief Asserts `AeroraCachedCredentialIdentityProvider`: that identity tracks the cached
-/// credential's window exactly, and that the mid-flight-expiry case is reported rather than hidden.
+/// \brief Asserts `AeroraCachedCredentialIdentityProvider`: that identity follows presence and
+/// freshness follows the window, and that the two are not the same answer.
 ///
-/// \section why What is worth testing
+/// \section why The split is the point
 ///
-/// The lookup is trivial; three things are not.
+/// The owner's entry-not-continuation rule turns on identity and freshness being distinct. If a
+/// lapsed credential stripped the identity, every command after a mid-flight expiry would be denied
+/// for want of an operator - the continuation-blocking failure the rule forbids. So the case that
+/// carries the weight is the one where a present-but-expired credential still reports an
+/// authenticated operator while reporting not fresh. The rest pins the two axes independently:
 ///
-/// \li **The window boundary.** A credential is valid until its expiry, not through the expiry
-///     instant, and an off-by-one there is the difference between a window that closes on time and
-///     one that never does. Asserted on both edges through the now-taking core.
-/// \li **Present-but-expired versus never-cached.** Both report unauthenticated, so a defect that
-///     collapsed them would change no verdict and would change what a status surface can say -
-///     "logged in, expired" and "never logged in" have different remedies. `hasCredential()` keeps
-///     them apart and is asserted doing so.
-/// \li **That it reports the expiry rather than acting on it.** When a credential expires mid-flight
-///     the provider reports unauthenticated; it does not and must not decide what happens to an
-///     airborne aircraft. That decision is the owner's entry-not-continuation rule, enforced above
-///     this type, and the test says so in a comment so no one wires the continuation block in here.
+/// \li **Identity follows presence.** Logged in - a credential cached with a non-empty id - is
+///     authenticated, fresh or not. Absent, empty-id, or signed-out is unauthenticated.
+/// \li **Freshness follows the window.** Fresh from the issue instant up to but not through expiry,
+///     and never without a present credential.
 ///
-/// \section clock Why a now is passed in
+/// \section clock Why freshness takes a now
 ///
-/// `currentIdentityAt(nowUtcMs)` is the tested core, mirroring `AeroraManualAuthorityGrant::inForce`.
-/// The parameterless `currentIdentity()` reads the wall clock and is exercised only where the
-/// answer is clock-independent - no credential, and a credential whose window spans any plausible
-/// present - so the suite never depends on what time it runs.
+/// `isCredentialFreshAt(nowUtcMs)` is the tested core, mirroring `AeroraManualAuthorityGrant::inForce`.
+/// `isAuthenticationFresh()` reads the wall clock and is exercised only where the answer is
+/// clock-independent - no credential, and a window spanning any plausible present - so the suite
+/// never depends on what time it runs. Identity needs no clock at all.
 class AeroraCachedCredentialIdentityProviderTest : public UnitTest
 {
     Q_OBJECT
 
 private slots:
-    // No credential.
-    void _withNoCredentialTheIdentityIsUnauthenticatedAtAnyTime();
-    void _withNoCredentialThereIsNoCredentialHeld();
-
-    // A valid credential.
-    void _aCredentialInsideItsWindowAuthenticatesAndCarriesTheOperatorId();
-    void _theWindowIsHalfOpenAtBothEnds();
-
-    // Expiry, including the case that matters.
-    void _anExpiredCredentialIsUnauthenticatedButStillHeld();
-    void _aCredentialBeforeItsIssueInstantIsUnauthenticated();
-
-    // Malformed input.
-    void _aCredentialWithNoOperatorIdIsNeverValid();
+    // Identity follows presence, not freshness.
+    void _withNoCredentialTheOperatorIsNotIdentified();
+    void _aPresentCredentialIdentifiesItsOperator();
+    void _anExpiredButPresentCredentialStillIdentifiesItsOperator();
+    void _aCredentialWithNoOperatorIdIsNotPresent();
     void _anIdentityIsNeverAuthenticatedWithAnEmptyId();
 
-    // Lifecycle.
-    void _clearingRevokesTheCredential();
-    void _settingACredentialReplacesThePreviousOneWholly();
-    void _aShorterReloginDoesNotInheritTheOlderExpiry();
+    // Freshness follows the window.
+    void _withNoCredentialNothingIsFresh();
+    void _aCredentialInsideItsWindowIsFresh();
+    void _theFreshnessWindowIsHalfOpenAtBothEnds();
+    void _aCredentialBeforeItsIssueInstantIsNotFresh();
 
-    // The wall-clock wrapper, exercised where the answer does not depend on the clock.
-    void _theWallClockWrapperIsUnauthenticatedWithNoCredential();
-    void _theWallClockWrapperAuthenticatesAGenerouslyValidCredential();
+    // The split case that the rule turns on.
+    void _anExpiredCredentialIsIdentifiedYetNotFresh();
+
+    // Lifecycle.
+    void _clearingDropsBothIdentityAndFreshness();
+    void _settingACredentialReplacesThePreviousOneWholly();
+    void _aShorterReloginDoesNotInheritTheOlderWindow();
+    void _aPresentButExpiredCredentialIsStillHeldAndDistinctFromNeverLoggedIn();
+
+    // The wall-clock wrapper, where the answer does not depend on the clock.
+    void _theWallClockFreshnessIsFalseWithNoCredential();
+    void _theWallClockFreshnessIsTrueForAGenerouslyValidCredential();
 };

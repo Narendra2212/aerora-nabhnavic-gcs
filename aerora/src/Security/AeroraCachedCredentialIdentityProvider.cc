@@ -19,13 +19,14 @@ void AeroraCachedCredentialIdentityProvider::clearCredential()
     _credential = AeroraOperatorCredential{};
 }
 
-AeroraOperatorIdentity AeroraCachedCredentialIdentityProvider::currentIdentityAt(qint64 nowUtcMs) const
+AeroraOperatorIdentity AeroraCachedCredentialIdentityProvider::currentIdentity() const
 {
     AeroraOperatorIdentity identity;
 
-    // Default is unauthenticated with an empty id, which AeroraOperatorIdentity::isValid() rejects
-    // and the resolver renders as unresolved. Only a present, in-window credential populates it.
-    if (_credential.isValidAt(nowUtcMs)) {
+    // Logged in means identified. Presence, not freshness: a lapsed credential still names its
+    // operator, so the command path keeps resolving their role while an operation is in force. The
+    // default unauthenticated identity is what an absent credential yields.
+    if (_credential.isPresent()) {
         identity.opaqueId = _credential.operatorId;
         identity.authenticated = true;
     }
@@ -33,7 +34,12 @@ AeroraOperatorIdentity AeroraCachedCredentialIdentityProvider::currentIdentityAt
     return identity;
 }
 
-AeroraOperatorIdentity AeroraCachedCredentialIdentityProvider::currentIdentity() const
+bool AeroraCachedCredentialIdentityProvider::isCredentialFreshAt(qint64 nowUtcMs) const
 {
-    return currentIdentityAt(QDateTime::currentMSecsSinceEpoch());
+    return _credential.isFreshAt(nowUtcMs);
+}
+
+bool AeroraCachedCredentialIdentityProvider::isAuthenticationFresh() const
+{
+    return isCredentialFreshAt(QDateTime::currentMSecsSinceEpoch());
 }

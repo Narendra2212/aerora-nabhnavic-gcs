@@ -351,7 +351,20 @@ class AeroraIdentityProvider
 {
 public:
     virtual ~AeroraIdentityProvider() = default;
+
+    /// Who the operator is, and whether anyone is logged in. This is identity, not freshness: a
+    /// provider backed by a credential that can expire reports the operator as authenticated while
+    /// they are *logged in*, so a credential lapsing mid-operation does not strip the identity and
+    /// strand the command path. Freshness is the separate question below.
     [[nodiscard]] virtual AeroraOperatorIdentity currentIdentity() const = 0;
+
+    /// Whether the authentication is fresh enough to **enter** an operation now. The operation gate
+    /// consults this at an entry and nowhere else. The default is true: a provider with no
+    /// credential-expiry concept never goes stale, so it never blocks an entry on freshness, and
+    /// only a provider that can expire overrides this. Separating it from `currentIdentity()` is
+    /// what lets an expired-but-logged-in operator keep commanding an operation already in force,
+    /// which is the owner's entry-not-continuation rule.
+    [[nodiscard]] virtual bool isAuthenticationFresh() const { return true; }
 };
 
 /// \brief Resolves an identity to opaque role identifiers. Replaceable and configuration-driven.

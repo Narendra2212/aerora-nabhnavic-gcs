@@ -62,7 +62,7 @@ first Phase C design document.
 | `AeroraAuditChain` — the hash chain `DG-STO:tamper-evidence` settles | `VERIFIED` — compiled and run on both CI legs, `fc381412f` | doc 09 |
 | `AeroraRolePolicy` — the authorization policy over the signed role set | `VERIFIED` — compiled and run on both CI legs, `32d010753` | doc 15 |
 | `AeroraAssignedRoleResolver` — the deployment's role assignment | `VERIFIED` — compiled and run on both CI legs, `de2413c09` | doc 15 |
-| `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `VERIFIED` — compiled and run on both CI legs, `23b571652` | doc 15 |
+| `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `IMPLEMENTED-UNCOMPILED` — split into identity-by-presence and separate freshness for the gate wiring; CI has not re-seen it | doc 15 |
 | `AeroraAuditQueue` — the IF-LOG-014 bounded writer buffer, without its thread | `VERIFIED` — compiled and run on both CI legs, `dc4e677cc` | doc 09 |
 | `AeroraOperationGate` — the entry-not-continuation credential gate, as a pure state machine | `VERIFIED` — compiled and run on both CI legs, `3620fe3ee`; live wiring staged | doc 15 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |

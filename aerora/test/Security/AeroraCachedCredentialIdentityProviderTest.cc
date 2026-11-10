@@ -10,8 +10,8 @@
 
 namespace {
 
-// A plausible login time and a window 24 hours wide, in wall-clock milliseconds. The values are
-// fixtures, not a compiled-in policy: the type reads whatever issuer set them.
+// A plausible login time and a 24-hour window, in wall-clock milliseconds. Fixtures, not a
+// compiled-in policy: the type reads whatever the issuer set.
 constexpr qint64 kIssued = 1'762'000'000'000;  // a 2025 wall-clock instant
 constexpr qint64 kDayMs = 24LL * 60LL * 60LL * 1000LL;
 constexpr qint64 kExpires = kIssued + kDayMs;
@@ -27,166 +27,188 @@ AeroraOperatorCredential credential(const QString& operatorId, qint64 issuedUtcM
     return value;
 }
 
-AeroraOperatorCredential validCredential()
+AeroraOperatorCredential freshCredential()
 {
     return credential(kOperatorId, kIssued, kExpires);
 }
 
 }  // namespace
 
-void AeroraCachedCredentialIdentityProviderTest::_withNoCredentialTheIdentityIsUnauthenticatedAtAnyTime()
+void AeroraCachedCredentialIdentityProviderTest::_withNoCredentialTheOperatorIsNotIdentified()
 {
     const AeroraCachedCredentialIdentityProvider provider;
 
-    // A default provider is a station on which no one has logged in. It must authenticate nobody at
-    // any instant, including the epoch and the far future.
-    QVERIFY(!provider.currentIdentityAt(0).isValid());
-    QVERIFY(!provider.currentIdentityAt(kIssued).isValid());
-    QVERIFY(!provider.currentIdentityAt(std::numeric_limits<qint64>::max()).isValid());
-}
-
-void AeroraCachedCredentialIdentityProviderTest::_withNoCredentialThereIsNoCredentialHeld()
-{
-    const AeroraCachedCredentialIdentityProvider provider;
-
+    QVERIFY(!provider.currentIdentity().isValid());
     QVERIFY(!provider.hasCredential());
     QCOMPARE(provider.credentialExpiresAtUtcMs(), qint64(0));
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_aCredentialInsideItsWindowAuthenticatesAndCarriesTheOperatorId()
+void AeroraCachedCredentialIdentityProviderTest::_aPresentCredentialIdentifiesItsOperator()
 {
-    const AeroraCachedCredentialIdentityProvider provider(validCredential());
+    const AeroraCachedCredentialIdentityProvider provider(freshCredential());
 
-    const AeroraOperatorIdentity identity = provider.currentIdentityAt(kIssued + kDayMs / 2);
-
+    const AeroraOperatorIdentity identity = provider.currentIdentity();
     QVERIFY(identity.isValid());
     QVERIFY(identity.authenticated);
     QCOMPARE(identity.opaqueId, kOperatorId);
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_theWindowIsHalfOpenAtBothEnds()
+void AeroraCachedCredentialIdentityProviderTest::_anExpiredButPresentCredentialStillIdentifiesItsOperator()
 {
-    const AeroraCachedCredentialIdentityProvider provider(validCredential());
+    // A credential whose window closed long ago, still cached. Identity follows presence, so the
+    // operator is still identified - they are logged in, their login is just stale. This is what
+    // keeps the command path resolving a role through a continuation.
+    const AeroraCachedCredentialIdentityProvider provider(credential(kOperatorId, kIssued, kIssued + 1));
 
-    // Valid at the issue instant and up to but not including the expiry instant. The expiry edge is
-    // the one that matters: a credential in force *through* its expiry is a window that never closes.
-    QVERIFY(provider.currentIdentityAt(kIssued).isValid());
-    QVERIFY(provider.currentIdentityAt(kExpires - 1).isValid());
-    QVERIFY(!provider.currentIdentityAt(kExpires).isValid());
-    QVERIFY(!provider.currentIdentityAt(kExpires + 1).isValid());
+    const AeroraOperatorIdentity identity = provider.currentIdentity();
+    QVERIFY2(identity.isValid(), "a present credential identifies its operator even when expired");
+    QCOMPARE(identity.opaqueId, kOperatorId);
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_anExpiredCredentialIsUnauthenticatedButStillHeld()
+void AeroraCachedCredentialIdentityProviderTest::_aCredentialWithNoOperatorIdIsNotPresent()
 {
-    const AeroraCachedCredentialIdentityProvider provider(validCredential());
-
-    // The 24-hour mark reached while airborne. The provider reports unauthenticated - and nothing
-    // more. What happens to the aircraft is the owner's entry-not-continuation rule, enforced above
-    // this type; a continuation block wired in here would be exactly the failure that rule forbids.
-    QVERIFY(!provider.currentIdentityAt(kExpires + 1).isValid());
-
-    // Still held, so a status surface can say "logged in, expired" rather than "never logged in".
-    QVERIFY(provider.hasCredential());
-    QCOMPARE(provider.credentialExpiresAtUtcMs(), kExpires);
-}
-
-void AeroraCachedCredentialIdentityProviderTest::_aCredentialBeforeItsIssueInstantIsUnauthenticated()
-{
-    const AeroraCachedCredentialIdentityProvider provider(validCredential());
-
-    // The wall clock reading earlier than the login. A backward clock step is the recorded limit of
-    // a wall-clock window, and the defensive answer is that a credential is not yet valid before the
-    // instant it was issued rather than silently in force.
-    QVERIFY(!provider.currentIdentityAt(kIssued - 1).isValid());
-}
-
-void AeroraCachedCredentialIdentityProviderTest::_aCredentialWithNoOperatorIdIsNeverValid()
-{
-    // A credential carrying a window but no operator identity is malformed, not a valid anonymous
-    // session. It must not authenticate even squarely inside its window.
+    // A window but no operator identity is malformed, not an anonymous session.
     const AeroraCachedCredentialIdentityProvider provider(credential(QString(), kIssued, kExpires));
 
-    QVERIFY(!provider.currentIdentityAt(kIssued + kDayMs / 2).isValid());
+    QVERIFY(!provider.currentIdentity().isValid());
     QVERIFY(!provider.hasCredential());
+    QVERIFY(!provider.isCredentialFreshAt(kIssued + kDayMs / 2));
 }
 
 void AeroraCachedCredentialIdentityProviderTest::_anIdentityIsNeverAuthenticatedWithAnEmptyId()
 {
-    // The invariant the downstream chain relies on: authenticated true never travels with an empty
-    // id, so a consumer cannot be handed a usable-looking identity that names nobody.
-    const AeroraCachedCredentialIdentityProvider provider(validCredential());
+    // The invariant the chain relies on: authenticated true never travels with an empty id, so a
+    // consumer is never handed a usable-looking identity that names nobody.
+    const AeroraCachedCredentialIdentityProvider present(freshCredential());
+    const AeroraCachedCredentialIdentityProvider absent;
 
-    const AeroraOperatorIdentity inside = provider.currentIdentityAt(kIssued);
-    const AeroraOperatorIdentity outside = provider.currentIdentityAt(kExpires);
-
-    QVERIFY(!(inside.authenticated && inside.opaqueId.isEmpty()));
-    QVERIFY(!(outside.authenticated && outside.opaqueId.isEmpty()));
+    const AeroraOperatorIdentity a = present.currentIdentity();
+    const AeroraOperatorIdentity b = absent.currentIdentity();
+    QVERIFY(!(a.authenticated && a.opaqueId.isEmpty()));
+    QVERIFY(!(b.authenticated && b.opaqueId.isEmpty()));
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_clearingRevokesTheCredential()
+void AeroraCachedCredentialIdentityProviderTest::_withNoCredentialNothingIsFresh()
 {
-    AeroraCachedCredentialIdentityProvider provider(validCredential());
-    QVERIFY(provider.currentIdentityAt(kIssued).isValid());
+    const AeroraCachedCredentialIdentityProvider provider;
+
+    QVERIFY(!provider.isCredentialFreshAt(0));
+    QVERIFY(!provider.isCredentialFreshAt(kIssued));
+    QVERIFY(!provider.isCredentialFreshAt(std::numeric_limits<qint64>::max()));
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_aCredentialInsideItsWindowIsFresh()
+{
+    const AeroraCachedCredentialIdentityProvider provider(freshCredential());
+
+    QVERIFY(provider.isCredentialFreshAt(kIssued + kDayMs / 2));
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_theFreshnessWindowIsHalfOpenAtBothEnds()
+{
+    const AeroraCachedCredentialIdentityProvider provider(freshCredential());
+
+    // Fresh at the issue instant and up to but not through expiry. The expiry edge is the one that
+    // matters: fresh *through* its expiry is a window that never closes.
+    QVERIFY(provider.isCredentialFreshAt(kIssued));
+    QVERIFY(provider.isCredentialFreshAt(kExpires - 1));
+    QVERIFY(!provider.isCredentialFreshAt(kExpires));
+    QVERIFY(!provider.isCredentialFreshAt(kExpires + 1));
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_aCredentialBeforeItsIssueInstantIsNotFresh()
+{
+    // A backward clock step is the recorded limit of a wall-clock window; the defensive answer is
+    // that a credential is not yet fresh before the instant it was issued.
+    const AeroraCachedCredentialIdentityProvider provider(freshCredential());
+
+    QVERIFY(!provider.isCredentialFreshAt(kIssued - 1));
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_anExpiredCredentialIsIdentifiedYetNotFresh()
+{
+    // The whole reason the type is shaped this way, in one assertion. Airborne, 24 hours elapsed:
+    // the operator is still identified (logged in) and no longer fresh (window closed). Identity
+    // true keeps the command path resolving their role for a continuation; freshness false blocks
+    // only a new entry.
+    const AeroraCachedCredentialIdentityProvider provider(freshCredential());
+
+    QVERIFY2(provider.currentIdentity().isValid(), "an expired credential must still identify its operator");
+    QVERIFY2(!provider.isCredentialFreshAt(kExpires + 1), "an expired credential must report not fresh");
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_clearingDropsBothIdentityAndFreshness()
+{
+    AeroraCachedCredentialIdentityProvider provider(freshCredential());
+    QVERIFY(provider.currentIdentity().isValid());
+    QVERIFY(provider.isCredentialFreshAt(kIssued));
 
     provider.clearCredential();
 
-    // Sign-out: unauthenticated regardless of the clock, and nothing held.
-    QVERIFY(!provider.currentIdentityAt(kIssued).isValid());
+    // Sign-out: neither identified nor fresh, and nothing held.
+    QVERIFY(!provider.currentIdentity().isValid());
+    QVERIFY(!provider.isCredentialFreshAt(kIssued));
     QVERIFY(!provider.hasCredential());
 }
 
 void AeroraCachedCredentialIdentityProviderTest::_settingACredentialReplacesThePreviousOneWholly()
 {
-    AeroraCachedCredentialIdentityProvider provider(validCredential());
+    AeroraCachedCredentialIdentityProvider provider(freshCredential());
 
     const QString secondOperator = QStringLiteral("opaque-operator-cloud-2");
     provider.setCredential(credential(secondOperator, kExpires, kExpires + kDayMs));
 
-    // The first operator's window is gone, not retained alongside the second.
-    QVERIFY(!provider.currentIdentityAt(kIssued).isValid());
-
-    const AeroraOperatorIdentity identity = provider.currentIdentityAt(kExpires + 1);
-    QVERIFY(identity.isValid());
-    QCOMPARE(identity.opaqueId, secondOperator);
+    // The identity is the second operator, and the first operator's window is gone.
+    QCOMPARE(provider.currentIdentity().opaqueId, secondOperator);
+    QVERIFY(!provider.isCredentialFreshAt(kIssued));
+    QVERIFY(provider.isCredentialFreshAt(kExpires + 1));
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_aShorterReloginDoesNotInheritTheOlderExpiry()
+void AeroraCachedCredentialIdentityProviderTest::_aShorterReloginDoesNotInheritTheOlderWindow()
 {
-    // The unsafe direction of a merge, asserted directly. A re-login with a shorter window must not
+    // The unsafe direction of a merge, asserted directly: a re-login with a shorter window must not
     // keep the previous credential's later expiry.
-    AeroraCachedCredentialIdentityProvider provider(validCredential());
+    AeroraCachedCredentialIdentityProvider provider(freshCredential());
 
     const qint64 shorterExpiry = kIssued + kDayMs / 4;
     provider.setCredential(credential(kOperatorId, kIssued, shorterExpiry));
 
     QCOMPARE(provider.credentialExpiresAtUtcMs(), shorterExpiry);
-    QVERIFY(provider.currentIdentityAt(shorterExpiry - 1).isValid());
-
-    // A time the old credential would still have covered, which the shorter one must not.
-    QVERIFY(!provider.currentIdentityAt(shorterExpiry + 1).isValid());
-    QVERIFY(!provider.currentIdentityAt(kExpires - 1).isValid());
+    QVERIFY(provider.isCredentialFreshAt(shorterExpiry - 1));
+    QVERIFY(!provider.isCredentialFreshAt(shorterExpiry + 1));
+    QVERIFY(!provider.isCredentialFreshAt(kExpires - 1));
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_theWallClockWrapperIsUnauthenticatedWithNoCredential()
+void AeroraCachedCredentialIdentityProviderTest::_aPresentButExpiredCredentialIsStillHeldAndDistinctFromNeverLoggedIn()
 {
-    // Exercises the real wall-clock wrapper where the answer does not depend on the time: with no
-    // credential cached, no instant authenticates.
+    // "Logged in, expired" and "never logged in" are different conditions with different remedies -
+    // re-login versus first login - and hasCredential keeps them apart while both report not fresh.
+    const AeroraCachedCredentialIdentityProvider expired(credential(kOperatorId, kIssued, kIssued + 1));
+    const AeroraCachedCredentialIdentityProvider never;
+
+    QVERIFY(expired.hasCredential());
+    QVERIFY(!never.hasCredential());
+
+    QVERIFY(!expired.isCredentialFreshAt(kExpires));
+    QVERIFY(!never.isCredentialFreshAt(kExpires));
+}
+
+void AeroraCachedCredentialIdentityProviderTest::_theWallClockFreshnessIsFalseWithNoCredential()
+{
     const AeroraCachedCredentialIdentityProvider provider;
 
-    QVERIFY(!provider.currentIdentity().isValid());
+    QVERIFY(!provider.isAuthenticationFresh());
 }
 
-void AeroraCachedCredentialIdentityProviderTest::_theWallClockWrapperAuthenticatesAGenerouslyValidCredential()
+void AeroraCachedCredentialIdentityProviderTest::_theWallClockFreshnessIsTrueForAGenerouslyValidCredential()
 {
     // A window from just after the epoch to the far future covers any plausible present, so the
-    // wrapper's answer is clock-independent and the suite stays time-agnostic while still running
-    // the production path that reads QDateTime.
+    // wrapper's answer is clock-independent while still running the production path that reads
+    // QDateTime.
     const AeroraCachedCredentialIdentityProvider provider(
         credential(kOperatorId, 1, std::numeric_limits<qint64>::max()));
 
-    const AeroraOperatorIdentity identity = provider.currentIdentity();
-    QVERIFY(identity.isValid());
-    QCOMPARE(identity.opaqueId, kOperatorId);
+    QVERIFY(provider.isAuthenticationFresh());
 }
 
 UT_REGISTER_TEST(AeroraCachedCredentialIdentityProviderTest, TestLabel::Unit)
