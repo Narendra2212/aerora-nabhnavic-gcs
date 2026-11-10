@@ -64,7 +64,7 @@ first Phase C design document.
 | `AeroraAssignedRoleResolver` — the deployment's role assignment | `VERIFIED` — compiled and run on both CI legs, `de2413c09` | doc 15 |
 | `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `VERIFIED` — split into identity-by-presence and separate freshness; compiled and run on both CI legs, `52a2711c5` | doc 15 |
 | `AeroraCommandAuthorizer::authorizeThroughOperationGate` — the composed gate + freshness + role chain, with an end-to-end enforcement test on the full real chain | `VERIFIED` — compiled and run on both CI legs, `89ea09ca6` | doc 15 |
-| `AeroraCorePlugin::authorizeMavCommand` routes the live command path through the gate, classifying arm/disarm | `IMPLEMENTED-UNCOMPILED` — CI has not seen it; the shipped default is preserved, so `isAuthorizationEnforced()` stays false until a deployment installs the chain | doc 15 |
+| `AeroraCorePlugin::authorizeMavCommand` routes the live command path through the gate, classifying arm/disarm | `VERIFIED` — compiled and run on both CI legs, `6438c067f`; the shipped default is preserved, so `isAuthorizationEnforced()` stays false until a deployment installs the chain | doc 15 |
 | `AeroraAuditQueue` — the IF-LOG-014 bounded writer buffer, without its thread | `VERIFIED` — compiled and run on both CI legs, `dc4e677cc` | doc 09 |
 | `AeroraOperationGate` — the entry-not-continuation credential gate, as a pure state machine | `VERIFIED` — compiled and run on both CI legs, `3620fe3ee`; live wiring staged | doc 15 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
