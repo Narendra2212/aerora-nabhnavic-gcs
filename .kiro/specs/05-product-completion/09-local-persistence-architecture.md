@@ -2,7 +2,7 @@
 
 Owner: **Tab 1**. Design for `P7-DAT-002`, `P7-DAT-005`, and the Q-037 assessment.
 
-Status: `DESIGNED`, with **two mechanisms now built**. `AeroraAuditChain` implements the per-record
+Status: `DESIGNED`, with **three mechanisms now built**. `AeroraAuditChain` implements the per-record
 hash chain of [§7](#7-q-037-assessment-can-this-carry-audit) and `DG-STO:tamper-evidence`, as a pure
 function over a record and its predecessor's digest: no store, no key, no thread, no I/O. It is the
 one piece of this design that needed none of the rest, because the accepted Closure_Record settles a
@@ -17,21 +17,34 @@ which is where `AERORA-GCS-REQ-025` / `IF-LOG-015` loss accounting lives — as 
 FIFO with no thread and no I/O. `AeroraAuditQueueTest` covers the taken-or-refused verdict, strict
 order including across interleaved drain, and round-trip fidelity of the whole record.
 
+A third mechanism is now built, and it is the foundation [§13](#13-implementation-owners) names.
+`AeroraLocalStore` (`aerora/src/Persistence/`) opens the single Aerora SQLite file, creates and
+versions the six-table schema of [§4](#4-schema), refuses to open an unrecognised version without
+touching the file ([§5](#5-schema-versioning)), writes the `Sessions` row every other table
+references, and counts failed writes in `WriteFailures` and an in-memory counter
+([§11](#11-failure-behaviour)). It honours `disableAllPersistence` before opening anything
+(`P7-DAT-005`). `AeroraLocalStoreTest` exercises all of this against a temporary database,
+cross-checked through a second connection, and compiles and passes on the Linux and Windows CI legs
+at commit `c1e27a6c4`. The per-table writers, export and retention stay unbuilt and with their owners.
+
 `IF-LOG-014`'s other half, *its thread*, is deliberately not built here. The overlay has no threaded
 component, so introducing its first one is a concurrency-model decision that should match how
-QGroundControl already runs work rather than be improvised as a bare worker; and the drain target,
-`AeroraAuditStore`, does not exist for a thread to feed. The queue is thread-agnostic so that choice
+QGroundControl already runs work rather than be improvised as a bare worker; and while the drain
+target now exists as `AeroraLocalStore`, the writer and thread that would feed the queue into it are
+still unbuilt. The queue is thread-agnostic so that choice
 is unconstrained: it holds no lock, and whatever owns it provides the mutex across producer and
 drain threads. This is the same split the hash chain used — the deterministic half now, the half
 that needs infrastructure later.
 
-**No honesty flag moved, and none may yet.** `isDurable()` stays false because no store exists, and
-`isTamperEvident()` stays false because the chain is the keyless half — [§7](#7-q-037-assessment-can-this-carry-audit)
-below is unchanged and is why. The register records both guards as *permitted* to become true by
-`DG-STO:tamper-evidence`, which is not the same as earned. A bounded queue does not move them
-either: a buffer in front of a store that does not exist is not durability.
+**No honesty flag moved, and none may yet.** `isDurable()` stays false because the audit sink does
+not yet write through the store: `AeroraLocalStore` exists now, but the `AuditRecords` writer that
+would make a sink durable is unbuilt. `isTamperEvident()` stays false because the chain is the
+keyless half — [§7](#7-q-037-assessment-can-this-carry-audit) below is unchanged and is why. The
+register records both guards as *permitted* to become true by `DG-STO:tamper-evidence`, which is not
+the same as earned. Neither the queue nor the store alone moves them: a buffer, and a store the sink
+does not yet write through, are not durability.
 
-Everything else here is still unbuilt. Every mechanism named below was verified against this checkout;
+The writers, export and retention named below are still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.
 
 **The durability and tamper-evidence sections state what is *not* achievable as precisely as what
@@ -506,7 +519,7 @@ Stated as a list so none of it has to be inferred from the absence of a claim.
 | 7 | **Wall-clock timestamps can be wrong.** Ordering is recoverable via `monotonicUs`; absolute times are as good as the host clock was |
 | 8 | **`monotonicUs` does not survive a reboot.** It orders within a session; cross-session ordering falls back to wall clock |
 | 9 | **`detail` is opaque JSON.** No schema is claimed or validated. A consumer must tolerate anything |
-| 10 | **Nothing here is compiled.** `D-006`. No schema has been created, no transaction executed, no failure path exercised |
+| 10 | **The store is compiled and tested; the writers are not.** `AeroraLocalStore` — its schema, versioning, the `Sessions` path and the failure path — passes on the Linux and Windows CI legs at commit `c1e27a6c4`. The `Events`/`EventValues`/`AuditRecords`/`Vehicles` writers, export and retention remain uncompiled |
 
 Items 1, 2 and 5 are the ones that must appear in any deployment document that mentions audit
 (`P7-PKG-005`).
