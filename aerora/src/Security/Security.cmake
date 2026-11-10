@@ -144,6 +144,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraManualAuthorityTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateEnforcementTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateEnforcementTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraOperationGateTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraRolePolicyTest.cc
@@ -185,6 +187,7 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraCalibrationEnforcementTest
     AeroraFleetAuthorizationTest
     AeroraManualAuthorityTest
+    AeroraOperationGateEnforcementTest
     AeroraOperationGateTest
     AeroraRolePolicyTest
     AeroraSecurityStatusTest

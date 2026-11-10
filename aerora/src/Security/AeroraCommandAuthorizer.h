@@ -2,8 +2,11 @@
 
 #include <memory>
 
+#include <QtCore/QHash>
+
 #include "AeroraAuditSink.h"
 #include "AeroraAuthorization.h"
+#include "AeroraOperationGate.h"
 
 /// \brief Runs the authorization chain for one outgoing command and records the outcome.
 ///
@@ -36,6 +39,37 @@ public:
 
     /// Convenience for the core hook: true only when \c authorize() allowed.
     bool isAuthorized(const AeroraGatedOperation& operation);
+
+    /// Whether the installed identity provider reports its authentication fresh now. The operation
+    /// gate consults this at an entry. False with no provider installed, which is the fail-closed
+    /// posture - an unconfigured station is not fresh.
+    [[nodiscard]] bool isAuthenticationFresh() const;
+
+    /// Authorize \a operation with the operation-entry credential gate layered over role
+    /// authorization. \a entersOperation and \a exitsOperation classify the command - an arm
+    /// enters, a disarm exits, a command that is neither carries both false - which the caller
+    /// derives from the command, keeping MAVLink identifiers at the call site.
+    ///
+    /// The gate adds exactly one refusal: a stale credential at an entry. Everything else - a
+    /// command within an operation, a disarm, a pre-arm command - passes the gate and faces role
+    /// authorization, which is the one thing that may permit it. The phase advances only when the
+    /// command was both not blocked by the gate and allowed by role authorization, so a refused or
+    /// dropped arm never leaves the gate believing an operation began. The phase is tracked per
+    /// vehicle, because arming one aircraft must not exempt another's commands from the check.
+    ///
+    /// This is the composed entry point the command path uses once the chain is installed;
+    /// \c authorize() and \c isAuthorized() stay the bare role-authorization path for callers that
+    /// are not an operation command.
+    bool authorizeThroughOperationGate(const AeroraGatedOperation& operation, bool entersOperation,
+                                       bool exitsOperation);
+
+    /// Forget the operation phase for one vehicle. An installer calls this on a vehicle disconnect,
+    /// so a later arm re-enters through a fresh credential check rather than inheriting a phase from
+    /// a connection that is gone.
+    void resetOperationGate(int mavlinkSystemId);
+
+    /// Forget every operation phase. For a teardown or a test between cases.
+    void resetAllOperationGates();
 
     /// True when identity provider, role resolver and a configured policy are all present.
     /// A false result means every command will be denied, which is the intended posture
@@ -113,6 +147,11 @@ private:
     std::shared_ptr<AeroraAuditSink> _auditSink;
     quint64 _droppedAuditRecords = 0;
     quint64 _failedAuditWrites = 0;
+
+    /// The operation phase per vehicle, keyed by MAVLink system id. An absent entry is
+    /// not-in-operation, so a vehicle never armed through this station reads as outside an
+    /// operation without a row having to exist for it.
+    QHash<int, AeroraOperationGate> _operationGates;
 
     /// Warned once rather than per record: a storage outage would otherwise emit a warning for
     /// every record of every command, burying the condition it reports. The counters stay exact;

@@ -168,6 +168,57 @@ void AeroraCommandAuthorizer::_audit(AeroraAuditEventType type, const QString& o
     _notifyChanged();
 }
 
+bool AeroraCommandAuthorizer::isAuthenticationFresh() const
+{
+    // False with no provider: an unconfigured station is not fresh, which is the fail-closed
+    // posture. A provider with no credential-expiry concept returns true by the base default.
+    return _identityProvider && _identityProvider->isAuthenticationFresh();
+}
+
+bool AeroraCommandAuthorizer::authorizeThroughOperationGate(const AeroraGatedOperation& operation, bool entersOperation,
+                                                            bool exitsOperation)
+{
+    // The phase is per vehicle: arming one aircraft must not exempt another's commands from the
+    // freshness check. An operation with no resolved vehicle cannot be an entry - an arm targets a
+    // vehicle - so it runs against a transient gate that persists nothing.
+    const AeroraVehicleContext addressed = operation.address.soleVehicle();
+    AeroraOperationGate transientGate;
+    AeroraOperationGate& gate = addressed.resolved ? _operationGates[addressed.mavlinkSystemId] : transientGate;
+
+    const AeroraOperationGate::Decision gateDecision =
+        gate.evaluate(entersOperation, exitsOperation, isAuthenticationFresh());
+
+    if (gateDecision.credentialBlocks) {
+        // Refused at an entry for a stale credential. The role chain is never consulted - the
+        // command does not reach it - so the refusal is audited here as its own cause. The operator
+        // is still identified, because a stale credential still names its operator, so the record
+        // says who was refused rather than leaving it blank.
+        const QString operatorId = _identityProvider ? _identityProvider->currentIdentity().opaqueId : QString();
+        _audit(AeroraAuditEventType::CommandRequested, operatorId, QString(), operation);
+        _audit(AeroraAuditEventType::CommandDenied, operatorId, gateDecision.reasonCode, operation);
+        return false;
+    }
+
+    // Freshness does not stand in the way. The command still faces role authorization, the one
+    // stage that may permit it, and authorize() audits that decision as usual. The phase advances
+    // only on an allowed command, so a role-refused arm does not enter an operation.
+    const bool allowed = authorize(operation).allowed();
+    if (allowed) {
+        gate.applyAuthorized(gateDecision);
+    }
+    return allowed;
+}
+
+void AeroraCommandAuthorizer::resetOperationGate(int mavlinkSystemId)
+{
+    _operationGates.remove(mavlinkSystemId);
+}
+
+void AeroraCommandAuthorizer::resetAllOperationGates()
+{
+    _operationGates.clear();
+}
+
 AeroraAuthorizationDecision AeroraCommandAuthorizer::authorize(const AeroraGatedOperation& operation)
 {
     AeroraAuthorizationDecision decision;
