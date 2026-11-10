@@ -2473,6 +2473,12 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraLocalStore::kSchemaVersion",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
       "symbol": "AeroraMissionAgreement::DepthCommandSequence",
       "kind": "enumerator",
       "gate": "none",

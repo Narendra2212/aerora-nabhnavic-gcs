@@ -28,8 +28,9 @@
 # failure mode is silent - the build succeeds, the application starts, and no Aerora plugin is
 # ever registered.
 #
-# All five domain manifests are aggregated. src/Supervisory/ is covered by PayloadPower.cmake: it
-# is not a sixth module but the single type M-Payload and M-Power share, held in its own directory
+# All six domain manifests are aggregated, Persistence (the WP1-C store foundation, P7-DAT-002)
+# being the most recent. src/Supervisory/ is covered by PayloadPower.cmake: it is not a module of
+# its own but the single type M-Payload and M-Power share, held in its own directory
 # so neither depends on the other for it. Whether it is absorbed into M-Telemetry is recorded OPEN
 # and assigned to Tab 1 - see 29-integration-status.md.
 # ============================================================================
@@ -47,6 +48,10 @@
 # (AeroraTelemetryState/StateValue/Source/Freshness and AeroraVehicleCapabilities) and deliberately
 # does not re-export their include directories, so the aggregation order stays visible here.
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/Security/Security.cmake)
+# Persistence (the WP1-C store foundation) depends on no overlay module - only core QGCSqlHelper and
+# QGCFileHelper - so its include order is unconstrained. The per-table writers that will build on it
+# live in their own domain modules.
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Persistence/Persistence.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/Telemetry/Telemetry.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/Vehicle/Vehicle.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/Mission/Mission.cmake)
@@ -149,6 +154,7 @@ list(
     APPEND
     _aerora_sources
     ${AERORA_SECURITY_SOURCES}
+    ${AERORA_PERSISTENCE_SOURCES}
     ${AERORA_TELEMETRY_SOURCES}
     ${AERORA_VEHICLE_SOURCES}
     ${AERORA_MISSION_SOURCES}
@@ -160,6 +166,7 @@ list(
     APPEND
     _aerora_include_directories
     ${AERORA_SECURITY_INCLUDE_DIRECTORIES}
+    ${AERORA_PERSISTENCE_INCLUDE_DIRECTORIES}
     ${AERORA_TELEMETRY_INCLUDE_DIRECTORIES}
     ${AERORA_VEHICLE_INCLUDE_DIRECTORIES}
     ${AERORA_MISSION_INCLUDE_DIRECTORIES}
@@ -284,6 +291,7 @@ if(QGC_BUILD_TESTING)
         APPEND
         _aerora_sources
         ${AERORA_SECURITY_TEST_SOURCES}
+        ${AERORA_PERSISTENCE_TEST_SOURCES}
         ${AERORA_TELEMETRY_TEST_SOURCES}
         ${AERORA_VEHICLE_TEST_SOURCES}
         ${AERORA_MISSION_TEST_SOURCES}
@@ -295,6 +303,7 @@ if(QGC_BUILD_TESTING)
         APPEND
         _aerora_include_directories
         ${AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES}
+        ${AERORA_PERSISTENCE_TEST_INCLUDE_DIRECTORIES}
         ${AERORA_TELEMETRY_TEST_INCLUDE_DIRECTORIES}
         ${AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES}
         ${AERORA_MISSION_TEST_INCLUDE_DIRECTORIES}
@@ -420,6 +429,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraPlanBridgeTest LABELS Integration Vehicle MissionManager)
     add_qgc_test(AeroraPayloadModelTest LABELS Unit)
     add_qgc_test(AeroraPowerModelTest LABELS Unit)
+    add_qgc_test(AeroraLocalStoreTest LABELS Unit)
 endif()
 
 # A source listed twice would be compiled twice; de-duplicate after aggregation rather than
