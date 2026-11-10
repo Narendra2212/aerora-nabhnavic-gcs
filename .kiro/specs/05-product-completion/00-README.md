@@ -63,7 +63,7 @@ first Phase C design document.
 | `AeroraRolePolicy` — the authorization policy over the signed role set | `VERIFIED` — compiled and run on both CI legs, `32d010753` | doc 15 |
 | `AeroraAssignedRoleResolver` — the deployment's role assignment | `VERIFIED` — compiled and run on both CI legs, `de2413c09` | doc 15 |
 | `AeroraCachedCredentialIdentityProvider` — the cached-credential reader, the third installable | `VERIFIED` — compiled and run on both CI legs, `23b571652` | doc 15 |
-| `AeroraAuditQueue` — the IF-LOG-014 bounded writer buffer, without its thread | `IMPLEMENTED-UNCOMPILED` — the CI legs have not seen it yet | doc 09 |
+| `AeroraAuditQueue` — the IF-LOG-014 bounded writer buffer, without its thread | `VERIFIED` — compiled and run on both CI legs, `dc4e677cc` | doc 09 |
 | U4 — `AeroraAutoPilotPlugin` | assigned, Tab 3 | — |
 | U5 — per-vehicle tool indicators | assigned, Tab 3 | — |
 
