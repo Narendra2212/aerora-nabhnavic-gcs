@@ -3,6 +3,7 @@
 #include <optional>
 
 #include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QString>
 #include <QtCore/QTemporaryDir>
 #include <QtSql/QSqlDatabase>
@@ -141,7 +142,9 @@ void AeroraLocalStoreTest::_newerSchemaVersionIsRefusedAndPreserved()
     }
 
     AeroraLocalStore store;
+    expectLogMessage("aerora.persistence", QtWarningMsg, QRegularExpression(QStringLiteral("newer build")));
     const AeroraLocalStore::OpenResult result = store.open(path, false);
+    verifyExpectedLogMessage();
 
     QVERIFY(!result.opened);
     QVERIFY(result.versionUnsupported);
@@ -166,7 +169,9 @@ void AeroraLocalStoreTest::_legacyUnversionedDatabaseIsRefusedAndPreserved()
     }
 
     AeroraLocalStore store;
+    expectLogMessage("aerora.persistence", QtWarningMsg, QRegularExpression(QStringLiteral("unversioned database")));
     const AeroraLocalStore::OpenResult result = store.open(path, false);
+    verifyExpectedLogMessage();
 
     QVERIFY(!result.opened);
     QVERIFY(result.versionUnsupported);
