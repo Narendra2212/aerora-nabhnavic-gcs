@@ -434,6 +434,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraLocalStoreTest LABELS Unit)
     add_qgc_test(AeroraStoreExportTest LABELS Unit)
     add_qgc_test(AeroraStorePathsTest LABELS Unit)
+    add_qgc_test(AeroraStoreRetentionTest LABELS Unit)
 endif()
 
 # A source listed twice would be compiled twice; de-duplicate after aggregation rather than
