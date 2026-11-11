@@ -3,6 +3,7 @@
 #include <optional>
 
 #include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 #include <QtCore/QTemporaryDir>
@@ -124,8 +125,11 @@ void AeroraStoreExportTest::_exportDatabaseRefusesAnExistingDestination()
     existing.write("occupied");
     existing.close();
 
-    // Overwriting a prior export silently would be worse than refusing.
+    // Overwriting a prior export silently would be worse than refusing; the refusal warns.
+    expectLogMessage("aerora.persistence.export", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("destination already exists")));
     QVERIFY(!AeroraStoreExport::exportDatabase(dbPath, dest));
+    verifyExpectedLogMessage();
 }
 
 void AeroraStoreExportTest::_exportRefusesEmptyPaths()
@@ -211,7 +215,10 @@ void AeroraStoreExportTest::_exportEventValuesCsvRefusesAnExistingDestination()
     existing.write("occupied");
     existing.close();
 
+    expectLogMessage("aerora.persistence.export", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("destination already exists")));
     QVERIFY(!AeroraStoreExport::exportEventValuesCsv(dbPath, csvPath));
+    verifyExpectedLogMessage();
 }
 
 UT_REGISTER_TEST(AeroraStoreExportTest, TestLabel::Unit)
