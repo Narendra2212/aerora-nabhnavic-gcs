@@ -431,6 +431,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraPayloadModelTest LABELS Unit)
     add_qgc_test(AeroraPowerModelTest LABELS Unit)
     add_qgc_test(AeroraLocalStoreTest LABELS Unit)
+    add_qgc_test(AeroraStorePathsTest LABELS Unit)
 endif()
 
 # A source listed twice would be compiled twice; de-duplicate after aggregation rather than

@@ -40,8 +40,9 @@ set(AERORA_PERSISTENCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 # records that constant under contractSurface so the gate check accounts for it.
 # ----------------------------------------------------------------------------
 
-set(AERORA_PERSISTENCE_SOURCES ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.cc
-                               ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.h
+set(AERORA_PERSISTENCE_SOURCES
+    ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.cc ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.h
+    ${AERORA_PERSISTENCE_DIR}/AeroraStorePaths.cc ${AERORA_PERSISTENCE_DIR}/AeroraStorePaths.h
 )
 
 set(AERORA_PERSISTENCE_INCLUDE_DIRECTORIES ${AERORA_PERSISTENCE_DIR})
@@ -53,8 +54,9 @@ set(AERORA_PERSISTENCE_INCLUDE_DIRECTORIES ${AERORA_PERSISTENCE_DIR})
 set(AERORA_PERSISTENCE_TEST_DIR ${AERORA_PERSISTENCE_DIR}/../../test/Persistence)
 cmake_path(NORMAL_PATH AERORA_PERSISTENCE_TEST_DIR)
 
-set(AERORA_PERSISTENCE_TEST_SOURCES ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.cc
-                                    ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.h
+set(AERORA_PERSISTENCE_TEST_SOURCES
+    ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.cc ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.h
+    ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStorePathsTest.cc ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStorePathsTest.h
 )
 
 set(AERORA_PERSISTENCE_TEST_INCLUDE_DIRECTORIES ${AERORA_PERSISTENCE_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
@@ -70,4 +72,4 @@ set(AERORA_PERSISTENCE_TEST_INCLUDE_DIRECTORIES ${AERORA_PERSISTENCE_TEST_DIR} $
 # file is the authority.
 # ----------------------------------------------------------------------------
 
-set(AERORA_PERSISTENCE_TEST_NAMES AeroraLocalStoreTest)
+set(AERORA_PERSISTENCE_TEST_NAMES AeroraLocalStoreTest AeroraStorePathsTest)
