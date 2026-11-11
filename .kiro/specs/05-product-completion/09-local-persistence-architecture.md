@@ -25,7 +25,11 @@ references, and counts failed writes in `WriteFailures` and an in-memory counter
 ([§11](#11-failure-behaviour)). It honours `disableAllPersistence` before opening anything
 (`P7-DAT-005`). `AeroraLocalStoreTest` exercises all of this against a temporary database,
 cross-checked through a second connection, and compiles and passes on the Linux and Windows CI legs
-at commit `c1e27a6c4`. The per-table writers, export and retention stay unbuilt and with their owners.
+at commit `c1e27a6c4`. Two more Tab 1 pieces now build on it: `AeroraStorePaths` resolves
+`<savePath>/aerora/aerora.db` and honours `disableAllPersistence` ([§3](#3-storage-locations)), and
+`AeroraStoreExport` writes the read-only SQLite (`VACUUM INTO`) and CSV exports ([§9](#9-export));
+both pass the Linux and Windows CI legs at commit `812469bd8`. The per-table writers and retention
+stay unbuilt and with their owners.
 
 `IF-LOG-014`'s other half, *its thread*, is deliberately not built here. The overlay has no threaded
 component, so introducing its first one is a concurrency-model decision that should match how
@@ -46,7 +50,7 @@ false everywhere because the chain is the keyless half — [§7](#7-q-037-assess
 below is unchanged and is why. The register records both guards as *permitted* to become true by
 `DG-STO:tamper-evidence`, which is not the same as earned.
 
-The writers, export and retention named below are still unbuilt. Every mechanism named below was verified against this checkout;
+The per-table writers and retention named below are still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.
 
 **The durability and tamper-evidence sections state what is *not* achievable as precisely as what
@@ -521,7 +525,7 @@ Stated as a list so none of it has to be inferred from the absence of a claim.
 | 7 | **Wall-clock timestamps can be wrong.** Ordering is recoverable via `monotonicUs`; absolute times are as good as the host clock was |
 | 8 | **`monotonicUs` does not survive a reboot.** It orders within a session; cross-session ordering falls back to wall clock |
 | 9 | **`detail` is opaque JSON.** No schema is claimed or validated. A consumer must tolerate anything |
-| 10 | **The store is compiled and tested; the writers are not.** `AeroraLocalStore` — its schema, versioning, the `Sessions` path and the failure path — passes on the Linux and Windows CI legs at commit `c1e27a6c4`. The `Events`/`EventValues`/`AuditRecords`/`Vehicles` writers, export and retention remain uncompiled |
+| 10 | **The store, its path accessor, the audit writer and export are compiled and tested; the per-table writers are not.** `AeroraLocalStore`, `AeroraStorePaths`, `AeroraSqliteAuditSink` and `AeroraStoreExport` pass on the Linux and Windows CI legs (latest commit `812469bd8`). The `Events`/`EventValues`/`Vehicles` writers and retention remain uncompiled |
 
 Items 1, 2 and 5 are the ones that must appear in any deployment document that mentions audit
 (`P7-PKG-005`).
