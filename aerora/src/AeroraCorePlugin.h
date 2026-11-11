@@ -1,6 +1,11 @@
 #pragma once
 
+#include <memory>
+
 #include "QGCCorePlugin.h"
+
+class AeroraAuditWriter;
+class AeroraLocalStore;
 
 /// \brief Aerora core plugin. Binds the Aerora security foundation to QGC's extension points.
 ///
@@ -20,6 +25,13 @@ public:
     ~AeroraCorePlugin() override;
 
     void init() override;
+
+    /// Tears down the durable audit path (`QGCApplication::shutdown()` calls this after the event
+    /// loop has stopped and vehicles are gone, before any static is destroyed). It is the symmetric
+    /// counterpart to `init()`'s store open, and the only safe place for the teardown: the command
+    /// authorizer is a function-local static that outlives this plugin, so its sink reference must
+    /// be cleared here while this still owns the store and writer.
+    void cleanup() override;
 
     /// Installs the Aerora QML override interceptor on the engine the base implementation creates.
     ///
@@ -129,5 +141,26 @@ public:
 private:
     void _installSigningKeyStore();
 
+    /// Opens the Aerora local store, begins the audit session, starts the asynchronous audit writer
+    /// and installs it on the command authorizer. Honours `disableAllPersistence` and fails closed:
+    /// when persistence is off or the store will not open, nothing is installed and the authorizer
+    /// keeps counting what it cannot write, which is the shipped posture. Idempotent, so a second
+    /// `init()` in a UI-test process neither reopens the store nor reinstalls the sink.
+    void _installAuditStore();
+
+    /// The teardown `cleanup()` runs: clears the authorizer's sink reference, stops the writer
+    /// (which flushes the queue and closes the connection), ends the session and closes the store,
+    /// in the one order that keeps the store alive until after the writer and the authorizer's
+    /// reference are gone. Null-safe, so it is a no-op when no store was opened.
+    void _teardownAuditStore();
+
     bool _warnedUnconfigured = false;
+
+    /// The durable audit path, owned here for the process lifetime. The store must outlive the
+    /// writer (the writer's sink holds the store by reference); the writer is shared because the
+    /// authorizer holds it as an `AeroraAuditSink`. Both are null until `_installAuditStore()`
+    /// succeeds and again after `_teardownAuditStore()`.
+    std::unique_ptr<AeroraLocalStore> _store;
+    std::shared_ptr<AeroraAuditWriter> _auditWriter;
+    qint64 _sessionId = -1;
 };

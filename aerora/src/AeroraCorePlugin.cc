@@ -1,16 +1,21 @@
 #include "AeroraCorePlugin.h"
 
 #include <QtCore/QApplicationStatic>
+#include <QtCore/QDateTime>
 #include <QtCore/QUrl>
 #include <QtCore/QVariant>
 #include <QtQml/QQmlApplicationEngine>
 
+#include "AeroraAuditWriter.h"
 #include "AeroraCommandAuthorizer.h"
+#include "AeroraLocalStore.h"
 #include "AeroraMissionExtension.h"
 #include "AeroraPlanBridge.h"
 #include "AeroraPlatformKeyProtector.h"
+#include "AeroraProvenance.h"
 #include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
+#include "AeroraStorePaths.h"
 #include "MAVLinkLib.h"
 #include "MAVLinkSigningKeys.h"
 #include "QGCLoggingCategory.h"
@@ -42,6 +47,7 @@ void AeroraCorePlugin::init()
     QGCCorePlugin::init();
 
     _installSigningKeyStore();
+    _installAuditStore();
 
     if (!AeroraCommandAuthorizer::instance()->isFullyConfigured()) {
         qCWarning(AeroraCorePluginLog)
@@ -49,6 +55,13 @@ void AeroraCorePlugin::init()
             << "The enforcement point is present in the command send path, but no decisions are made"
             << "until an approved operator role policy exists (Q-029).";
     }
+}
+
+void AeroraCorePlugin::cleanup()
+{
+    _teardownAuditStore();
+
+    QGCCorePlugin::cleanup();
 }
 
 QQmlApplicationEngine *AeroraCorePlugin::createQmlApplicationEngine(QObject *parent)
@@ -264,6 +277,94 @@ void AeroraCorePlugin::_installSigningKeyStore()
 
     qCDebug(AeroraCorePluginLog) << "signing key store installed. backend:" << backend
                                  << "protectsAtRest:" << protects;
+}
+
+void AeroraCorePlugin::_installAuditStore()
+{
+    // Idempotent: QmlUITestBase::startUI() calls init() once per scene boot, so a UI-test process
+    // can reach here more than once. A store already open is left as it is.
+    if (_store) {
+        return;
+    }
+
+    if (AeroraStorePaths::isPersistenceDisabled()) {
+        // P7-DAT-005: nothing is opened and no file is created, so the station reports durable
+        // audit as off rather than opening a file and discarding writes.
+        qCDebug(AeroraCorePluginLog) << "persistence is disabled; durable audit is off (P7-DAT-005).";
+        return;
+    }
+
+    AeroraStorePaths::ensureDirectories();
+
+    auto store = std::make_unique<AeroraLocalStore>();
+    const QString databasePath = AeroraStorePaths::databasePath();
+    const AeroraLocalStore::OpenResult result = store->open(databasePath, false);
+    if (!result.opened) {
+        // Fail closed: no store, so no sink is installed and the authorizer keeps counting what it
+        // cannot write. The store refused a file it did not recognise rather than resetting it, so
+        // this path also covers an unreadable existing store (design §5).
+        qCWarning(AeroraCorePluginLog) << "audit store did not open; durable audit is off:" << result.detail;
+        return;
+    }
+
+    const AeroraProvenance provenance;
+    AeroraLocalStore::SessionRecord session;
+    session.startedUtcMs = QDateTime::currentMSecsSinceEpoch();
+    // Base and overlay are one commit in this repository (AeroraProvenance documents why), so the
+    // one hash describes both columns. Empty when the build was not made from a checkout.
+    session.baseCommit = provenance.commit();
+    session.overlayCommit = provenance.commit();
+#ifdef QGC_CUSTOM_BUILD
+    session.customBuild = true;
+#else
+    session.customBuild = false;
+#endif
+    session.authorizationEnforced = isAuthorizationEnforced();
+
+    const qint64 sessionId = store->beginSession(session);
+    if (sessionId < 0) {
+        qCWarning(AeroraCorePluginLog) << "could not begin an audit session; durable audit is off.";
+        return;  // the store closes as the unique_ptr leaves scope
+    }
+
+    _store = std::move(store);
+    _sessionId = sessionId;
+
+    // The queue bound, a function-local const rather than a named constexpr so no queue-depth value
+    // enters the overlay's contract surface. Generous for the few records a command emits, bounded
+    // so a storage stall degrades to dropped records rather than unbounded memory.
+    const qsizetype auditQueueCapacity = 1024;
+    _auditWriter = std::make_shared<AeroraAuditWriter>(*_store, auditQueueCapacity);
+    _auditWriter->start();
+    AeroraCommandAuthorizer::instance()->setAuditSink(_auditWriter);
+
+    qCDebug(AeroraCorePluginLog) << "durable audit installed at" << databasePath << "session" << sessionId;
+}
+
+void AeroraCorePlugin::_teardownAuditStore()
+{
+    // Clear the authorizer's reference first. It is a function-local static that outlives this
+    // Q_APPLICATION_STATIC plugin, and its sink holds the store by reference, so the reference is
+    // dropped here while this still owns the lifetime. By cleanup() the event loop has stopped and
+    // vehicles are gone, so no record() is in flight.
+    AeroraCommandAuthorizer::instance()->setAuditSink(nullptr);
+
+    if (_auditWriter) {
+        // Joins the worker after it has drained the queue and closed the connection, so every
+        // record accepted before shutdown is written before the session is ended.
+        _auditWriter->stop();
+        _auditWriter.reset();
+    }
+
+    if (_store) {
+        if (_sessionId >= 0) {
+            // An unstamped session is how an unclean exit reads, so an orderly shutdown stamps it.
+            _store->endSession(_sessionId, QDateTime::currentMSecsSinceEpoch());
+            _sessionId = -1;
+        }
+        _store->close();
+        _store.reset();
+    }
 }
 
 bool AeroraCorePlugin::isAuthorizationEnforced()
