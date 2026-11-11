@@ -96,6 +96,8 @@ set(AERORA_SECURITY_SOURCES
     ${AERORA_SECURITY_DIR}/AeroraSecurityStatus.h
     ${AERORA_SECURITY_DIR}/AeroraSigningKeyStore.cc
     ${AERORA_SECURITY_DIR}/AeroraSigningKeyStore.h
+    ${AERORA_SECURITY_DIR}/AeroraSqliteAuditSink.cc
+    ${AERORA_SECURITY_DIR}/AeroraSqliteAuditSink.h
 )
 
 # ----------------------------------------------------------------------------
@@ -155,6 +157,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraSecurityTestDoubles.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraSigningKeyStoreTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraSigningKeyStoreTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraSqliteAuditSinkTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraSqliteAuditSinkTest.h
 )
 
 set(AERORA_SECURITY_TEST_INCLUDE_DIRECTORIES ${AERORA_SECURITY_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
@@ -192,4 +196,5 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraRolePolicyTest
     AeroraSecurityStatusTest
     AeroraSigningKeyStoreTest
+    AeroraSqliteAuditSinkTest
 )

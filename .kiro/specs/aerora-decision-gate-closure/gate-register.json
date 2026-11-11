@@ -2353,6 +2353,24 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraAuditOutcome::Allowed",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own audit-outcome classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraAuditOutcome::Denied",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own audit-outcome classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraAuditOutcome::Informational",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own audit-outcome classification, which no Gate's Decision_Content records"
+    },
+    {
       "symbol": "AeroraAuditWriteOutcome::Accepted",
       "kind": "enumerator",
       "gate": "none",

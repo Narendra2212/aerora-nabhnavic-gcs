@@ -328,6 +328,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraRolePolicyTest LABELS Unit)
     add_qgc_test(AeroraSecurityStatusTest LABELS Unit)
     add_qgc_test(AeroraSigningKeyStoreTest LABELS Unit)
+    add_qgc_test(AeroraSqliteAuditSinkTest LABELS Unit)
     add_qgc_test(AeroraTelemetryAttachmentTest LABELS Unit)
     add_qgc_test(AeroraScreenMetricsTest LABELS Unit)
     # Boots the production scene in a child process, once per candidate headless platform, so an
