@@ -36,13 +36,15 @@ is unconstrained: it holds no lock, and whatever owns it provides the mutex acro
 drain threads. This is the same split the hash chain used — the deterministic half now, the half
 that needs infrastructure later.
 
-**No honesty flag moved, and none may yet.** `isDurable()` stays false because the audit sink does
-not yet write through the store: `AeroraLocalStore` exists now, but the `AuditRecords` writer that
-would make a sink durable is unbuilt. `isTamperEvident()` stays false because the chain is the
-keyless half — [§7](#7-q-037-assessment-can-this-carry-audit) below is unchanged and is why. The
-register records both guards as *permitted* to become true by `DG-STO:tamper-evidence`, which is not
-the same as earned. Neither the queue nor the store alone moves them: a buffer, and a store the sink
-does not yet write through, are not durability.
+**The register guards stay false, and the shipped station is unchanged.** `AeroraAuditSink::isDurable()`
+and `isTamperEvident()` — the base defaults the register records — are both still false, and nothing
+in the overlay installs a sink, so the station reports audit as neither durable nor present. What
+changed is that the `AuditRecords` writer now exists: `AeroraSqliteAuditSink` writes through the
+store on a `synchronous=FULL` connection and reports `isDurable()` true when open, which is its own
+override and not the base guard, and it is not wired to the live gate. `isTamperEvident()` stays
+false everywhere because the chain is the keyless half — [§7](#7-q-037-assessment-can-this-carry-audit)
+below is unchanged and is why. The register records both guards as *permitted* to become true by
+`DG-STO:tamper-evidence`, which is not the same as earned.
 
 The writers, export and retention named below are still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.

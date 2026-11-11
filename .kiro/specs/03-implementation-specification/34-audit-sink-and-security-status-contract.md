@@ -7,15 +7,17 @@ Status vocabulary: [05-product-completion/00-README](../05-product-completion/00
 
 | Item | Status |
 | --- | --- |
-| `AeroraAuditSink` contract | `IMPLEMENTED-UNCOMPILED` (interface + producer); **no sink implementation exists** |
+| `AeroraAuditSink` contract | `IMPLEMENTED-UNCOMPILED` (interface + producer). The first concrete sink, `AeroraSqliteAuditSink`, is now **built and CI-verified** (`c3d95456e`), and is not wired to the live gate |
 | Audit record composition and loss accounting | `IMPLEMENTED-UNCOMPILED` |
-| Audit durability mechanism | `OPEN` → see [§2.9](#29-the-durability-decision-and-what-it-depends-on). Design supplied by WP1-C; **not implemented** |
+| Audit durability mechanism | **`IMPLEMENTED`** by `AeroraSqliteAuditSink` — `synchronous=FULL`, hash-chained, CI-verified on Linux and Windows — subject to the §6 hardware-fsync caveat. See [§2.9](#29-the-durability-decision-and-what-it-depends-on) |
 | Audit tamper-evidence | `OPEN` — blocked on a protected anchor → `AeroraPlatformKeyProtector` → `D-006` |
 | `AeroraSecurityStatus` | `IMPLEMENTED-UNCOMPILED` |
 | Tests | **Written, never executed.** No compiler on this host (`D-006`) |
 
-**Nothing in this document has been compiled, linted by `clang-tidy`/`clang-format`, or executed.**
-`VERIFIED` is not claimed. [§5](#5-what-was-actually-checked) records exactly which checks ran.
+**The original WP2-A/WP2-B artifacts here — interface, producer, status type — were authored with no
+compiler on this host, so `VERIFIED` is not claimed for them;** [§5](#5-what-was-actually-checked)
+records exactly which checks ran then. The sink added since, `AeroraSqliteAuditSink`, is the one
+exception: it is compiled and its suite executed on the Aerora CI legs at `c3d95456e`.
 
 ## Contents
 
@@ -536,7 +538,7 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | `AeroraAuthorizationPolicy`, any role mapping, allowlist, permission or approval rule | `Q-029` is `OPEN`. A policy over an unapproved role set is an invented policy — `WP2-C` |
 | A retry-time authorization check | Explicitly excluded. Authorization stays bounded to enqueue time |
 | An `AeroraPlatformKeyProtector` backend | `D-006`. An untested crypto backend is worse than none |
-| A sink implementation of any kind | `R7-11`. A mock sink would make `P7-AUDIT-001` read as met |
+| A *mock* sink | `R7-11`. A mock sink would make `P7-AUDIT-001` read as met. The sink since built, `AeroraSqliteAuditSink`, is a real durable writer backed by `AeroraLocalStore` and CI-tested — not a mock — and is not wired live, so the shipped posture is unchanged |
 | A durability or tamper-evidence mechanism | `Q-037`. The interface reports both false and the contract forbids inferring either from a hash chain |
 | A coverage property for `PARAM_SET` and other direct-send paths | Tab 9 owns that investigation. Asserting coverage would overclaim |
 | Blocking a command on an audit write | ADR-018, and `P7-AUDIT-003` belongs to product |
