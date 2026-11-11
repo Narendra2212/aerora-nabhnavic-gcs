@@ -78,6 +78,8 @@ set(AERORA_SECURITY_SOURCES
     ${AERORA_SECURITY_DIR}/AeroraAuditChain.h
     ${AERORA_SECURITY_DIR}/AeroraAuditQueue.cc
     ${AERORA_SECURITY_DIR}/AeroraAuditQueue.h
+    ${AERORA_SECURITY_DIR}/AeroraAuditWriter.cc
+    ${AERORA_SECURITY_DIR}/AeroraAuditWriter.h
     ${AERORA_SECURITY_DIR}/AeroraCachedCredentialIdentityProvider.cc
     ${AERORA_SECURITY_DIR}/AeroraCachedCredentialIdentityProvider.h
     ${AERORA_SECURITY_DIR}/AeroraAuditSink.cc
@@ -134,6 +136,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditChainTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditQueueTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditQueueTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraAuditWriterTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraAuditWriterTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraCachedCredentialIdentityProviderTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraCachedCredentialIdentityProviderTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraAuditSinkTest.cc
@@ -185,6 +189,7 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraAssignedRoleResolverTest
     AeroraAuditChainTest
     AeroraAuditQueueTest
+    AeroraAuditWriterTest
     AeroraCachedCredentialIdentityProviderTest
     AeroraAuditSinkTest
     AeroraCalibrationAuthorizationTest
