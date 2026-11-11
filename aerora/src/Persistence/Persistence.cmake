@@ -42,6 +42,7 @@ set(AERORA_PERSISTENCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(AERORA_PERSISTENCE_SOURCES
     ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.cc ${AERORA_PERSISTENCE_DIR}/AeroraLocalStore.h
+    ${AERORA_PERSISTENCE_DIR}/AeroraStoreExport.cc ${AERORA_PERSISTENCE_DIR}/AeroraStoreExport.h
     ${AERORA_PERSISTENCE_DIR}/AeroraStorePaths.cc ${AERORA_PERSISTENCE_DIR}/AeroraStorePaths.h
 )
 
@@ -56,6 +57,7 @@ cmake_path(NORMAL_PATH AERORA_PERSISTENCE_TEST_DIR)
 
 set(AERORA_PERSISTENCE_TEST_SOURCES
     ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.cc ${AERORA_PERSISTENCE_TEST_DIR}/AeroraLocalStoreTest.h
+    ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStoreExportTest.cc ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStoreExportTest.h
     ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStorePathsTest.cc ${AERORA_PERSISTENCE_TEST_DIR}/AeroraStorePathsTest.h
 )
 
@@ -72,4 +74,4 @@ set(AERORA_PERSISTENCE_TEST_INCLUDE_DIRECTORIES ${AERORA_PERSISTENCE_TEST_DIR} $
 # file is the authority.
 # ----------------------------------------------------------------------------
 
-set(AERORA_PERSISTENCE_TEST_NAMES AeroraLocalStoreTest AeroraStorePathsTest)
+set(AERORA_PERSISTENCE_TEST_NAMES AeroraLocalStoreTest AeroraStoreExportTest AeroraStorePathsTest)
