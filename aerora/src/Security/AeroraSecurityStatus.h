@@ -81,7 +81,8 @@
 ///     binding can read, rather than as prose a reviewer has to remember.
 /// \li **A sink being installed** is not **a record being durable.** `auditSinkInstalled`,
 ///     `auditDurable` and `auditTamperEvident` are three properties because they are three facts.
-///     All three are false in this build.
+///     With the durable store installed by default, the first two are true and `auditTamperEvident`
+///     stays false; with `disableAllPersistence` set or the store unavailable, all three are false.
 ///
 /// \section scope What `EnforcedAtCommandGate` does and does not mean
 ///
@@ -150,9 +151,10 @@ public:
 
     [[nodiscard]] bool isAuditSinkInstalled() const;
 
-    /// Whether audit records survive a process or host restart. False in this build: nothing
-    /// constructs a sink, and no sink that exists reports itself durable. `P7-AUDIT-002` /
-    /// `Q-037`.
+    /// Whether audit records survive a process or host restart. True when the default durable path
+    /// is installed - `AeroraCorePlugin` opens the store and installs the `AeroraAuditWriter`, whose
+    /// `synchronous=FULL` sink reports itself durable - and false when `disableAllPersistence` is
+    /// set or the store will not open. `P7-AUDIT-002` / `Q-037`.
     [[nodiscard]] bool isAuditDurable() const;
 
     /// Whether undetected modification of a stored record is prevented or detectable. False until

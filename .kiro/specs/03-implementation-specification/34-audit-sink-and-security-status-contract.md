@@ -7,7 +7,7 @@ Status vocabulary: [05-product-completion/00-README](../05-product-completion/00
 
 | Item | Status |
 | --- | --- |
-| `AeroraAuditSink` contract | `IMPLEMENTED-UNCOMPILED` (interface + producer). The first concrete sink, `AeroraSqliteAuditSink`, is now **built and CI-verified** (`c3d95456e`), and is not wired to the live gate |
+| `AeroraAuditSink` contract | `IMPLEMENTED-UNCOMPILED` (interface + producer). The first concrete sink, `AeroraSqliteAuditSink`, is **built and CI-verified** (`c3d95456e`), and is now wired to the live gate: `AeroraAuditWriter` fronts it non-blocking and `AeroraCorePlugin` installs that front by default |
 | Audit record composition and loss accounting | `IMPLEMENTED-UNCOMPILED` |
 | Audit durability mechanism | **`IMPLEMENTED`** by `AeroraSqliteAuditSink` — `synchronous=FULL`, hash-chained, CI-verified on Linux and Windows — subject to the §6 hardware-fsync caveat. See [§2.9](#29-the-durability-decision-and-what-it-depends-on) |
 | Audit tamper-evidence | `OPEN` — blocked on a protected anchor → `AeroraPlatformKeyProtector` → `D-006` |
@@ -175,7 +175,7 @@ nothing to count, and a "written" counter would be read as persistence.
 | Concern | Contract |
 | --- | --- |
 | Ownership | The installer owns the sink. `AeroraCommandAuthorizer` holds it through `std::shared_ptr` so replacing or clearing one cannot destroy it while a record is in flight |
-| No sink installed | A **valid configuration, not an error.** It is the shipped state: nothing in the overlay constructs a sink |
+| No sink installed | A **valid configuration, not an error**, and now the fail-closed fallback rather than the default: `AeroraCorePlugin` constructs and installs a sink unless `disableAllPersistence` is set or the store will not open |
 | Thread | `record()` is called synchronously on the thread running the command gate — the vehicle's thread for both existing call sites, `MavCommandQueue::sendWorker()` and `Vehicle::startCalibration()`. The interface does not promise a single producer thread, which is why `nextSequence()` is atomic |
 | Blocking | Prohibited. A sink needing file I/O hands off to its own queue and thread — `AeroraAuditWriter`'s job |
 | Re-entrancy | A sink must not call back into `AeroraCommandAuthorizer`; `record()` runs inside the authorization path |
@@ -269,7 +269,7 @@ Six properties. All `READ`-only. No `WRITE`, no `Q_INVOKABLE`, no public slot.
 | `enforcement` | `Enforcement` enum | `statusChanged` | `NotEnforced` or `EnforcedAtCommandGate` |
 | `enforcementVerified` | `bool` | `CONSTANT` | **Always false.** No build, no execution, no flight |
 | `auditSinkInstalled` | `bool` | `statusChanged` | Whether a destination exists |
-| `auditDurable` | `bool` | `statusChanged` | False — no sink, and no sink self-reports durable |
+| `auditDurable` | `bool` | `statusChanged` | True when the default durable sink is installed; false when `disableAllPersistence` is set or the store will not open |
 | `auditTamperEvident` | `bool` | `statusChanged` | False — `Q-037` tamper-evidence is `OPEN` |
 | `auditRecordsLost` | `qulonglong` | `statusChanged` | `lostAuditRecordCount()` |
 
@@ -525,7 +525,7 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | --- | --- | --- | --- |
 | `Q-029` | Operator role set | Product + operations | `enforcement` can only ever report `NotEnforced` in a shipped build. `AeroraAuthorizationPolicy` stays unimplemented — `WP2-C` |
 | `ADR-014` | Outbound authorization scope | Architecture | No coverage property may exist. No retry-time check was added |
-| `Q-037` | Audit integrity | Tab 2 | **Partially resolved.** Durability designed by WP1-C; tamper-evidence `OPEN`. No sink implemented |
+| `Q-037` | Audit integrity | Tab 2 | **Partially resolved.** Durability implemented by `AeroraSqliteAuditSink` and now wired live through `AeroraAuditWriter`; tamper-evidence `OPEN` |
 | `P7-AUDIT-003` | Must an unauditable allow be denied? | **Product** | ADR-018 counts and does not block. Reversible at one place |
 | `D-006` | Build host | User | `enforcementVerified` stays false. No test executed. Blocks the platform key protector, and through it tamper-evidence |
 | `D-UI-02` | Contrast target | Tab 7 + product | Not this work. The status type carries no presentation |
@@ -538,7 +538,7 @@ Per the [handoff protocol](../05-product-completion/07-phase-7-work-packages-and
 | `AeroraAuthorizationPolicy`, any role mapping, allowlist, permission or approval rule | `Q-029` is `OPEN`. A policy over an unapproved role set is an invented policy — `WP2-C` |
 | A retry-time authorization check | Explicitly excluded. Authorization stays bounded to enqueue time |
 | An `AeroraPlatformKeyProtector` backend | `D-006`. An untested crypto backend is worse than none |
-| A *mock* sink | `R7-11`. A mock sink would make `P7-AUDIT-001` read as met. The sink since built, `AeroraSqliteAuditSink`, is a real durable writer backed by `AeroraLocalStore` and CI-tested — not a mock — and is not wired live, so the shipped posture is unchanged |
+| A *mock* sink | `R7-11`. A mock sink would make `P7-AUDIT-001` read as met. The sink built instead, `AeroraSqliteAuditSink`, is a real durable writer backed by `AeroraLocalStore` and CI-tested — not a mock — and is now fronted by `AeroraAuditWriter` and installed live by default |
 | A durability or tamper-evidence mechanism | `Q-037`. The interface reports both false and the contract forbids inferring either from a hash chain |
 | A coverage property for `PARAM_SET` and other direct-send paths | Tab 9 owns that investigation. Asserting coverage would overclaim |
 | Blocking a command on an audit write | ADR-018, and `P7-AUDIT-003` belongs to product |

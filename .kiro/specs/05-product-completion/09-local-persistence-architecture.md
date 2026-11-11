@@ -40,15 +40,18 @@ is unconstrained: it holds no lock, and whatever owns it provides the mutex acro
 drain threads. This is the same split the hash chain used — the deterministic half now, the half
 that needs infrastructure later.
 
-**The register guards stay false, and the shipped station is unchanged.** `AeroraAuditSink::isDurable()`
-and `isTamperEvident()` — the base defaults the register records — are both still false, and nothing
-in the overlay installs a sink, so the station reports audit as neither durable nor present. What
-changed is that the `AuditRecords` writer now exists: `AeroraSqliteAuditSink` writes through the
-store on a `synchronous=FULL` connection and reports `isDurable()` true when open, which is its own
-override and not the base guard, and it is not wired to the live gate. `isTamperEvident()` stays
-false everywhere because the chain is the keyless half — [§7](#7-q-037-assessment-can-this-carry-audit)
-below is unchanged and is why. The register records both guards as *permitted* to become true by
-`DG-STO:tamper-evidence`, which is not the same as earned.
+**The base register guards stay false; the shipped station now installs a durable sink.**
+`AeroraAuditSink::isDurable()` and `isTamperEvident()` — the base defaults the register records — are
+both still false, and that default is the guard the register tracks. What changed is the whole path
+above it: `AeroraSqliteAuditSink` writes through the store on a `synchronous=FULL` connection and
+overrides `isDurable()` true when open, `AeroraAuditWriter` is the non-blocking front that drains to
+it off the vehicle thread, and `AeroraCorePlugin` opens the store and installs that front by default.
+So the shipped station reports audit as durable and present unless `disableAllPersistence` is set or
+the store will not open, in which case it fails closed to counting what it cannot write.
+`isTamperEvident()` stays false everywhere because the chain is the keyless half —
+[§7](#7-q-037-assessment-can-this-carry-audit) below is unchanged and is why. The register records
+both guards as *permitted* to become true by `DG-STO:tamper-evidence`, which is not the same as
+earned.
 
 The per-table writers and retention named below are still unbuilt. Every mechanism named below was verified against this checkout;
 nothing is proposed that QGroundControl does not already do somewhere.

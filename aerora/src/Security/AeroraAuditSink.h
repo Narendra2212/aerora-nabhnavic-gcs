@@ -291,10 +291,12 @@ struct AeroraAuditEvent {
 /// through a `std::shared_ptr` so that replacing or clearing a sink cannot destroy it while a
 /// record is in flight through `record()`.
 ///
-/// **No sink installed is a valid configuration, not an error.** It is the shipped state: nothing
-/// in this overlay constructs a sink, because no store exists to put records in. The producer
-/// counts what it could not write and continues - see
-/// `AeroraCommandAuthorizer::lostAuditRecordCount()`.
+/// **No sink installed is a valid configuration, not an error.** It is the fail-closed posture when
+/// persistence is disabled or the store will not open: the producer counts what it could not write
+/// and continues - see `AeroraCommandAuthorizer::lostAuditRecordCount()`. It is no longer the
+/// shipped default - `AeroraCorePlugin` opens the store and installs the `AeroraAuditWriter` front
+/// unless `disableAllPersistence` is set - so an absent sink now means persistence was off or
+/// unavailable, not that nothing was ever built.
 ///
 /// \section notblocking What a failed write does not do
 ///

@@ -79,16 +79,18 @@ enum class AeroraAuditOutcome
 /// export/verifier concern and not this writer's; the writer's duty is to compute and store the
 /// chain correctly, which its suite checks against the original events.
 ///
-/// \section notlive Why this is not installed on the live command gate
+/// \section notlive Why this is not installed directly on the live command gate
 ///
 /// `record()` performs a synchronous, `fsync`-backed write. `IF-LOG-014` and the WP2-A contract
 /// (§2.7) require the sink installed on the command gate to **never block** the caller, because
 /// `record()` runs on the vehicle thread; a sink that needs file I/O hands off to its own queue and
-/// thread (`AeroraAuditWriter`). That thread is the deferred concurrency decision `AeroraAuditQueue`
-/// was built without. So this synchronous writer is the durable half, to be driven by that async
-/// front once it exists, or used where blocking is acceptable — as its tests do. Nothing in the
-/// overlay installs it, exactly as nothing installs the store: the shipped audit posture is
-/// unchanged, and the producer still counts what it cannot write.
+/// thread (`AeroraAuditWriter`). That thread is the concurrency decision `AeroraAuditQueue` was
+/// built without, and it now exists: `AeroraAuditWriter` drives this sink from its worker thread and
+/// is the non-blocking front installed on the gate. This synchronous sink is therefore the durable
+/// half, used directly only where blocking is acceptable — as its tests do. `AeroraCorePlugin`
+/// installs that front and opens the store by default, so the shipped audit posture is durable audit
+/// on, failing closed to counting what it cannot write when `disableAllPersistence` is set or the
+/// store will not open.
 ///
 /// \section notthreadsafe Not thread-safe
 ///
