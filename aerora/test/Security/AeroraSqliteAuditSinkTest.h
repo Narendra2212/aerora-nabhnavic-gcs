@@ -2,12 +2,15 @@
 
 #include <QtCore/QScopedPointer>
 #include <QtCore/QString>
+#include <QtCore/QTemporaryDir>
 
+#include "AeroraLocalStore.h"
+#include "AeroraSqliteAuditSink.h"
 #include "UnitTest.h"
 
-class AeroraLocalStore;
-class AeroraSqliteAuditSink;
-class QTemporaryDir;
+// AeroraLocalStore, AeroraSqliteAuditSink and QTemporaryDir are included in full rather than
+// forward-declared: the QScopedPointer members below need a complete type for their deleter, which
+// moc instantiates in the generated metatype where only this header is visible.
 
 /// \brief Asserts `AeroraSqliteAuditSink`: that it persists `AuditRecords` rows through
 /// `AeroraLocalStore`, chains them with `AeroraAuditChain`, classifies the outcome as the owner
