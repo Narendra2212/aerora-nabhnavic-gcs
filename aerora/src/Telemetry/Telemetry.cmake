@@ -55,6 +55,8 @@ set(AERORA_TELEMETRY_DIR ${CMAKE_CURRENT_LIST_DIR})
 # ----------------------------------------------------------------------------
 
 set(AERORA_TELEMETRY_SOURCES
+    ${AERORA_TELEMETRY_DIR}/AeroraEventStore.cc
+    ${AERORA_TELEMETRY_DIR}/AeroraEventStore.h
     ${AERORA_TELEMETRY_DIR}/AeroraFactGroupBase.cc
     ${AERORA_TELEMETRY_DIR}/AeroraFactGroupBase.h
     ${AERORA_TELEMETRY_DIR}/AeroraFactGroupRegistrar.cc
@@ -93,6 +95,8 @@ set(AERORA_TELEMETRY_TEST_DIR ${AERORA_TELEMETRY_DIR}/../../test/Telemetry)
 cmake_path(NORMAL_PATH AERORA_TELEMETRY_TEST_DIR)
 
 set(AERORA_TELEMETRY_TEST_SOURCES
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraEventStoreTest.cc
+    ${AERORA_TELEMETRY_TEST_DIR}/AeroraEventStoreTest.h
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraLinkProfileTest.cc
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraLinkProfileTest.h
     ${AERORA_TELEMETRY_TEST_DIR}/AeroraTelemetryAttachmentTest.cc

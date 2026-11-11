@@ -3382,8 +3382,8 @@ def test_contract_surface_reads_the_real_source_tree_and_qualifies_every_symbol(
     kinds = Counter(element.kind for element in declared)
 
     assert collisions == []
-    assert len(declared) == 200
-    assert kinds == {ENUMERATOR_KIND: 142, REGISTRY_KEY_KIND: 37, CONSTANT_KIND: 21}
+    assert len(declared) == 205
+    assert kinds == {ENUMERATOR_KIND: 147, REGISTRY_KEY_KIND: 37, CONSTANT_KIND: 21}
     for module in (
         "AeroraTelemetrySet",
         "AeroraPayloadModel",

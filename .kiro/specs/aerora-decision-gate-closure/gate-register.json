@@ -2467,6 +2467,36 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraEventCategory::AuthorizationOutcome",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own event-category classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraEventCategory::OperatorAction",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own event-category classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraEventCategory::StateTransition",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own event-category classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraEventCategory::SystemEvent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own event-category classification, which no Gate's Decision_Content records"
+    },
+    {
+      "symbol": "AeroraEventCategory::VehicleEvent",
+      "kind": "enumerator",
+      "gate": "none",
+      "reason": "an enumerator of the overlay's own event-category classification, which no Gate's Decision_Content records"
+    },
+    {
       "symbol": "AeroraFirmwareClaim::kFirmwareClass",
       "kind": "constant",
       "gate": "none",

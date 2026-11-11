@@ -420,6 +420,7 @@ if(QGC_BUILD_TESTING)
     # passing.
     # ----------------------------------------------------------------------------------------
     add_qgc_test(AeroraLinkProfileTest LABELS Unit)
+    add_qgc_test(AeroraEventStoreTest LABELS Unit)
     add_qgc_test(AeroraTelemetryStateTest LABELS Unit)
     add_qgc_test(AeroraVehicleIntegrationTest LABELS Unit)
     add_qgc_test(AeroraVehicleSetupTest LABELS Unit)
