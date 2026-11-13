@@ -35,7 +35,7 @@
       "label": "Desktop (noVNC)"
     }
   },
-  "postCreateCommand": "git submodule update --init --recursive && /opt/qgc-venv/bin/python tools/setup/setup_vscode.py --python-interpreter /opt/qgc-venv/bin/python",
+  "postCreateCommand": "git submodule update --init --recursive && /opt/qgc-venv/bin/python tools/setup/setup_vscode.py --python-interpreter /opt/qgc-venv/bin/python && (grep -q 'profile.d/qt.sh' ~/.bashrc || echo '. /etc/profile.d/qt.sh' >> ~/.bashrc)",
   "remoteUser": "vscode",
   "workspaceFolder": "/workspaces/qgroundcontrol",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/qgroundcontrol,type=bind,consistency=cached"
