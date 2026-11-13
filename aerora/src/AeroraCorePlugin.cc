@@ -18,6 +18,7 @@
 #include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
 #include "AeroraStorePaths.h"
+#include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleServices.h"
 #include "AeroraVehicleStore.h"
 #include "MAVLinkLib.h"
