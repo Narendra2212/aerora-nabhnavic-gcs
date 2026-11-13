@@ -101,6 +101,8 @@ set(AERORA_VEHICLE_SOURCES
     ${AERORA_VEHICLE_DIR}/AeroraVehicleLog.h
     ${AERORA_VEHICLE_DIR}/AeroraVehicleServices.cc
     ${AERORA_VEHICLE_DIR}/AeroraVehicleServices.h
+    ${AERORA_VEHICLE_DIR}/AeroraVehicleStore.cc
+    ${AERORA_VEHICLE_DIR}/AeroraVehicleStore.h
 )
 
 # ----------------------------------------------------------------------------
@@ -180,6 +182,8 @@ set(AERORA_VEHICLE_TEST_SOURCES
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleLifecycleTest.h
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleSetupTest.cc
     ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleSetupTest.h
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleStoreTest.cc
+    ${AERORA_VEHICLE_TEST_DIR}/AeroraVehicleStoreTest.h
 )
 
 set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES ${AERORA_VEHICLE_TEST_DIR} ${CMAKE_SOURCE_DIR}/test
@@ -193,5 +197,5 @@ set(AERORA_VEHICLE_TEST_INCLUDE_DIRECTORIES ${AERORA_VEHICLE_TEST_DIR} ${CMAKE_S
 # AeroraVehicleLifecycleTest drives a MockLink connection. See the integration snippet at the top
 # of this file for the exact calls.
 set(AERORA_VEHICLE_TEST_NAMES AeroraVehicleIntegrationTest AeroraVehicleSetupTest AeroraProfileRegistryTest
-                              AeroraVehicleLifecycleTest
+                              AeroraVehicleLifecycleTest AeroraVehicleStoreTest
 )

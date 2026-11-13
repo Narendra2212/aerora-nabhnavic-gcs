@@ -2,10 +2,13 @@
 
 #include <memory>
 
+#include <QtCore/QByteArray>
+
 #include "QGCCorePlugin.h"
 
 class AeroraAuditWriter;
 class AeroraLocalStore;
+class AeroraVehicleStore;
 
 /// \brief Aerora core plugin. Binds the Aerora security foundation to QGC's extension points.
 ///
@@ -32,6 +35,12 @@ public:
     /// authorizer is a function-local static that outlives this plugin, so its sink reference must
     /// be cleared here while this still owns the store and writer.
     void cleanup() override;
+
+    /// Observes `AUTOPILOT_VERSION` traffic to resolve `DG-FLT`'s fleet identity (see
+    /// _resolveFleetIdentity()) and otherwise does nothing; every message, including the one it
+    /// inspects, passes through to the base unexamined. This is an observer, never a gate: it must
+    /// not and does not return false.
+    bool mavlinkMessage(Vehicle* vehicle, LinkInterface* link, const mavlink_message_t& message) override;
 
     /// Installs the Aerora QML override interceptor on the engine the base implementation creates.
     ///
@@ -138,29 +147,52 @@ public:
     /// than in the authorization types, which carry \c mavCommand as an opaque int.
     static void classifyOperationBoundary(int command, float param1, bool& entersOperation, bool& exitsOperation);
 
+    /// Extracts the board identifier `AUTOPILOT_VERSION` carries, as `DG-FLT`'s authority
+    /// requires: \a uid2 when it carries evidence (at least one non-zero byte), \a uid as the
+    /// fallback the MAVLink field itself documents ("If this is non-zero, use this field,
+    /// otherwise use uid"). Hex-encoded, lower-case, so a binary or numeric board identifier
+    /// becomes one `TEXT` lookup key. Empty when neither carries evidence - MockLink's simulated
+    /// reply is exactly that state - which is reported rather than answered with an invented
+    /// sentinel to mint against.
+    ///
+    /// Pure and static, and takes the two already-decoded fields rather than the MAVLink struct
+    /// itself, so it is testable with no MAVLink type in this header and no packed message
+    /// required in a test - the same reasoning that keeps classifyOperationBoundary() a call-site
+    /// boundary over primitives rather than a MAVLink-typed one.
+    [[nodiscard]] static QString boardUidFromAutopilotVersion(quint64 uid, const QByteArray& uid2);
+
 private:
     void _installSigningKeyStore();
 
-    /// Opens the Aerora local store, begins the audit session, starts the asynchronous audit writer
-    /// and installs it on the command authorizer. Honours `disableAllPersistence` and fails closed:
-    /// when persistence is off or the store will not open, nothing is installed and the authorizer
-    /// keeps counting what it cannot write, which is the shipped posture. Idempotent, so a second
-    /// `init()` in a UI-test process neither reopens the store nor reinstalls the sink.
-    void _installAuditStore();
+    /// Opens the Aerora local store, begins the audit session, opens the vehicle store, starts the
+    /// asynchronous audit writer and installs it on the command authorizer. Honours
+    /// `disableAllPersistence` and fails closed: when persistence is off or the store will not
+    /// open, nothing is installed and the authorizer keeps counting what it cannot write, which is
+    /// the shipped posture. Idempotent, so a second `init()` in a UI-test process neither reopens
+    /// the store nor reinstalls the sink.
+    void _installPersistence();
 
-    /// The teardown `cleanup()` runs: clears the authorizer's sink reference, stops the writer
-    /// (which flushes the queue and closes the connection), ends the session and closes the store,
-    /// in the one order that keeps the store alive until after the writer and the authorizer's
-    /// reference are gone. Null-safe, so it is a no-op when no store was opened.
-    void _teardownAuditStore();
+    /// The teardown `cleanup()` runs: clears the authorizer's sink reference, stops the audit
+    /// writer (which flushes the queue and closes its connection), closes the vehicle store, ends
+    /// the session and closes the store - in the one order that keeps the store alive until after
+    /// both writers and the authorizer's reference are gone. Null-safe, so it is a no-op when
+    /// nothing was opened.
+    void _teardownPersistence();
+
+    /// Decodes an `AUTOPILOT_VERSION` \a message for \a vehicle, resolves its board identifier
+    /// through the vehicle store, and reports the result into \a vehicle's `AeroraVehicleIdentity`.
+    /// A no-op when the vehicle store is not open, \a vehicle carries no attached Aerora services
+    /// yet, or the message carries no board identifier at all (see boardUidFromAutopilotVersion()).
+    void _resolveFleetIdentity(Vehicle* vehicle, const mavlink_message_t& message);
 
     bool _warnedUnconfigured = false;
 
-    /// The durable audit path, owned here for the process lifetime. The store must outlive the
-    /// writer (the writer's sink holds the store by reference); the writer is shared because the
-    /// authorizer holds it as an `AeroraAuditSink`. Both are null until `_installAuditStore()`
-    /// succeeds and again after `_teardownAuditStore()`.
+    /// The durable persistence path, owned here for the process lifetime. The store must outlive
+    /// both writers: the audit writer's sink and the vehicle store each hold it by reference. The
+    /// audit writer is shared because the authorizer holds it as an `AeroraAuditSink`. All three
+    /// are null until `_installPersistence()` succeeds and again after `_teardownPersistence()`.
     std::unique_ptr<AeroraLocalStore> _store;
+    std::unique_ptr<AeroraVehicleStore> _vehicleStore;
     std::shared_ptr<AeroraAuditWriter> _auditWriter;
     qint64 _sessionId = -1;
 };

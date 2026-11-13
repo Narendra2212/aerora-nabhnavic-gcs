@@ -11,10 +11,11 @@
 /// fleet. It is therefore usable for addressing a connected vehicle and for nothing that outlives
 /// the connection.
 ///
-/// Aerora fleet identity is a product-level identifier. Its format is **OPEN / NOT-EVIDENCED**:
-/// no fleet-identifier format, serial-number format, UUID scheme or registration-number format is
-/// evidenced, so this class stores an opaque token reported by an evidence source and parses
-/// nothing.
+/// Aerora fleet identity is a product-level identifier. Its format is settled by `DG-FLT`: a
+/// UUID version 4, minted and bound by `AeroraVehicleStore` from the board's `AUTOPILOT_VERSION`
+/// identity rather than from anything protocol-level. This class is the passive holder the
+/// closure assumed - it stores the token an evidence source reports verbatim and parses nothing,
+/// so it carries no format knowledge of its own and needs none to change if the format ever does.
 ///
 /// The two are kept apart structurally, not by convention:
 ///

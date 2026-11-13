@@ -77,6 +77,10 @@ void AeroraVehicleLifecycleTest::_aeroraServicesAttachToADiscoveredVehicle()
 
     // Fleet identity is not. A connected vehicle with a known system id still has no fleet
     // identity, because no source has reported one and the system id is not a substitute.
+    // AeroraCorePlugin::_resolveFleetIdentity() is such a source since DG-FLT closed, but
+    // MockLink's simulated AUTOPILOT_VERSION reply carries uid and uid2 both zero, which is no
+    // board evidence at all - so it still reports nothing here, by the same rule that keeps a
+    // genuine first contact unminted rather than by this test predating the mechanism.
     QVERIFY(!services->identity()->fleetIdentityKnown());
     QVERIFY(services->identity()->fleetIdentity().isEmpty());
 

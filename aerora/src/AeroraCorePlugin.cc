@@ -1,5 +1,7 @@
 #include "AeroraCorePlugin.h"
 
+#include <algorithm>
+
 #include <QtCore/QApplicationStatic>
 #include <QtCore/QDateTime>
 #include <QtCore/QUrl>
@@ -16,6 +18,8 @@
 #include "AeroraQmlOverrides.h"
 #include "AeroraSigningKeyStore.h"
 #include "AeroraStorePaths.h"
+#include "AeroraVehicleServices.h"
+#include "AeroraVehicleStore.h"
 #include "MAVLinkLib.h"
 #include "MAVLinkSigningKeys.h"
 #include "QGCLoggingCategory.h"
@@ -47,7 +51,7 @@ void AeroraCorePlugin::init()
     QGCCorePlugin::init();
 
     _installSigningKeyStore();
-    _installAuditStore();
+    _installPersistence();
 
     if (!AeroraCommandAuthorizer::instance()->isFullyConfigured()) {
         qCWarning(AeroraCorePluginLog)
@@ -59,9 +63,18 @@ void AeroraCorePlugin::init()
 
 void AeroraCorePlugin::cleanup()
 {
-    _teardownAuditStore();
+    _teardownPersistence();
 
     QGCCorePlugin::cleanup();
+}
+
+bool AeroraCorePlugin::mavlinkMessage(Vehicle* vehicle, LinkInterface* link, const mavlink_message_t& message)
+{
+    if (message.msgid == MAVLINK_MSG_ID_AUTOPILOT_VERSION) {
+        _resolveFleetIdentity(vehicle, message);
+    }
+
+    return QGCCorePlugin::mavlinkMessage(vehicle, link, message);
 }
 
 QQmlApplicationEngine *AeroraCorePlugin::createQmlApplicationEngine(QObject *parent)
@@ -279,7 +292,7 @@ void AeroraCorePlugin::_installSigningKeyStore()
                                  << "protectsAtRest:" << protects;
 }
 
-void AeroraCorePlugin::_installAuditStore()
+void AeroraCorePlugin::_installPersistence()
 {
     // Idempotent: QmlUITestBase::startUI() calls init() once per scene boot, so a UI-test process
     // can reach here more than once. A store already open is left as it is.
@@ -289,8 +302,10 @@ void AeroraCorePlugin::_installAuditStore()
 
     if (AeroraStorePaths::isPersistenceDisabled()) {
         // P7-DAT-005: nothing is opened and no file is created, so the station reports durable
-        // audit as off rather than opening a file and discarding writes.
-        qCDebug(AeroraCorePluginLog) << "persistence is disabled; durable audit is off (P7-DAT-005).";
+        // audit as off and resolves no fleet identity, rather than opening a file and discarding
+        // writes.
+        qCDebug(AeroraCorePluginLog) << "persistence is disabled; durable audit and fleet identity are off "
+                                        "(P7-DAT-005).";
         return;
     }
 
@@ -303,7 +318,8 @@ void AeroraCorePlugin::_installAuditStore()
         // Fail closed: no store, so no sink is installed and the authorizer keeps counting what it
         // cannot write. The store refused a file it did not recognise rather than resetting it, so
         // this path also covers an unreadable existing store (design §5).
-        qCWarning(AeroraCorePluginLog) << "audit store did not open; durable audit is off:" << result.detail;
+        qCWarning(AeroraCorePluginLog) << "persistence store did not open; durable audit and fleet identity are off:"
+                                       << result.detail;
         return;
     }
 
@@ -323,12 +339,21 @@ void AeroraCorePlugin::_installAuditStore()
 
     const qint64 sessionId = store->beginSession(session);
     if (sessionId < 0) {
-        qCWarning(AeroraCorePluginLog) << "could not begin an audit session; durable audit is off.";
+        qCWarning(AeroraCorePluginLog) << "could not begin a session; durable audit and fleet identity are off.";
         return;  // the store closes as the unique_ptr leaves scope
     }
 
     _store = std::move(store);
     _sessionId = sessionId;
+
+    // DG-FLT's authority: opened unconditionally alongside the store, since every vehicle connect
+    // can carry AUTOPILOT_VERSION evidence regardless of whether the audit path is healthy.
+    auto vehicleStore = std::make_unique<AeroraVehicleStore>(*_store);
+    if (vehicleStore->open()) {
+        _vehicleStore = std::move(vehicleStore);
+    } else {
+        qCWarning(AeroraCorePluginLog) << "vehicle store did not open; fleet identity resolution is off.";
+    }
 
     // The queue bound, a function-local const rather than a named constexpr so no queue-depth value
     // enters the overlay's contract surface. Generous for the few records a command emits, bounded
@@ -338,15 +363,16 @@ void AeroraCorePlugin::_installAuditStore()
     _auditWriter->start();
     AeroraCommandAuthorizer::instance()->setAuditSink(_auditWriter);
 
-    qCDebug(AeroraCorePluginLog) << "durable audit installed at" << databasePath << "session" << sessionId;
+    qCDebug(AeroraCorePluginLog) << "persistence installed at" << databasePath << "session" << sessionId
+                                 << "fleet identity resolution:" << (_vehicleStore != nullptr);
 }
 
-void AeroraCorePlugin::_teardownAuditStore()
+void AeroraCorePlugin::_teardownPersistence()
 {
     // Clear the authorizer's reference first. It is a function-local static that outlives this
     // Q_APPLICATION_STATIC plugin, and its sink holds the store by reference, so the reference is
     // dropped here while this still owns the lifetime. By cleanup() the event loop has stopped and
-    // vehicles are gone, so no record() is in flight.
+    // vehicles are gone, so no record() and no mavlinkMessage() is in flight.
     AeroraCommandAuthorizer::instance()->setAuditSink(nullptr);
 
     if (_auditWriter) {
@@ -354,6 +380,11 @@ void AeroraCorePlugin::_teardownAuditStore()
         // record accepted before shutdown is written before the session is ended.
         _auditWriter->stop();
         _auditWriter.reset();
+    }
+
+    if (_vehicleStore) {
+        _vehicleStore->close();
+        _vehicleStore.reset();
     }
 
     if (_store) {
@@ -365,6 +396,52 @@ void AeroraCorePlugin::_teardownAuditStore()
         _store->close();
         _store.reset();
     }
+}
+
+void AeroraCorePlugin::_resolveFleetIdentity(Vehicle* vehicle, const mavlink_message_t& message)
+{
+    if (!vehicle || !_vehicleStore || !_vehicleStore->isOpen()) {
+        return;
+    }
+
+    AeroraVehicleServices* const services = AeroraVehicleServices::forVehicle(vehicle);
+    if (!services || !services->identity()) {
+        // initializeVehicle() attaches services before the initial-connect state machine's
+        // AUTOPILOT_VERSION reply can arrive (it only starts the async request), so this guards a
+        // vehicle this class does not otherwise expect rather than a real race.
+        return;
+    }
+
+    mavlink_autopilot_version_t autopilotVersion;
+    mavlink_msg_autopilot_version_decode(&message, &autopilotVersion);
+
+    const QByteArray uid2(reinterpret_cast<const char*>(autopilotVersion.uid2), sizeof(autopilotVersion.uid2));
+    const QString boardUid = boardUidFromAutopilotVersion(autopilotVersion.uid, uid2);
+    if (boardUid.isEmpty()) {
+        // Neither field carried evidence - MockLink's simulated reply is exactly this state. No
+        // board identifier is no contact, not a reason to invent one; the vehicle stays a first
+        // contact (fleetIdentityKnown() false) rather than being minted against a sentinel.
+        return;
+    }
+
+    const QString fleetIdentity = _vehicleStore->resolveFleetIdentity(boardUid, QDateTime::currentMSecsSinceEpoch());
+    if (!fleetIdentity.isEmpty()) {
+        (void) services->identity()->reportFleetIdentity(fleetIdentity);
+    }
+}
+
+QString AeroraCorePlugin::boardUidFromAutopilotVersion(quint64 uid, const QByteArray& uid2)
+{
+    const bool uid2Present = std::any_of(uid2.cbegin(), uid2.cend(), [](char byte) { return byte != 0; });
+    if (uid2Present) {
+        return QString::fromLatin1(uid2.toHex());
+    }
+
+    if (uid != 0) {
+        return QString::number(uid, 16);
+    }
+
+    return QString();
 }
 
 bool AeroraCorePlugin::isAuthorizationEnforced()

@@ -264,8 +264,13 @@ bool AeroraLocalStore::_createSchema()
                        "overlayCommit TEXT NOT NULL, "
                        "customBuild   INTEGER NOT NULL, "
                        "authzEnforced INTEGER NOT NULL)"),
+        // boardUid is the DG-FLT lookup key - AUTOPILOT_VERSION.uid2, falling back to uid - that
+        // AeroraVehicleStore mints or recalls fleetIdentity against. Added once DG-FLT closed,
+        // before any build shipped this table, so this is a revision to an unreleased schema and
+        // not a migration (design §5).
         QStringLiteral("CREATE TABLE Vehicles ("
                        "vehicleId      INTEGER PRIMARY KEY NOT NULL, "
+                       "boardUid       TEXT NOT NULL UNIQUE, "
                        "fleetIdentity  TEXT NOT NULL UNIQUE, "
                        "profileId      TEXT, "
                        "firstSeenUtcMs INTEGER NOT NULL, "
@@ -314,6 +319,7 @@ bool AeroraLocalStore::_createSchema()
         QStringLiteral("CREATE INDEX idx_eventvalues_event ON EventValues(eventId)"),
         QStringLiteral("CREATE INDEX idx_audit_session_monotonic ON AuditRecords(sessionId, monotonicUs)"),
         QStringLiteral("CREATE UNIQUE INDEX idx_vehicles_identity ON Vehicles(fleetIdentity)"),
+        QStringLiteral("CREATE UNIQUE INDEX idx_vehicles_boarduid ON Vehicles(boardUid)"),
     };
 
     QSqlQuery query(db);

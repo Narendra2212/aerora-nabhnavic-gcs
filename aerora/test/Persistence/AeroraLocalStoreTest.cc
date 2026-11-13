@@ -102,9 +102,10 @@ void AeroraLocalStoreTest::_schemaCarriesEveryTableAndIndex()
         QVERIFY2(schemaObjectExists(path, QStringLiteral("table"), table), qPrintable(table));
     }
 
-    const QStringList indices = {QStringLiteral("idx_events_session_monotonic"), QStringLiteral("idx_events_category"),
-                                 QStringLiteral("idx_eventvalues_event"), QStringLiteral("idx_audit_session_monotonic"),
-                                 QStringLiteral("idx_vehicles_identity")};
+    const QStringList indices = {
+        QStringLiteral("idx_events_session_monotonic"), QStringLiteral("idx_events_category"),
+        QStringLiteral("idx_eventvalues_event"),        QStringLiteral("idx_audit_session_monotonic"),
+        QStringLiteral("idx_vehicles_identity"),        QStringLiteral("idx_vehicles_boarduid")};
     for (const QString& index : indices) {
         QVERIFY2(schemaObjectExists(path, QStringLiteral("index"), index), qPrintable(index));
     }

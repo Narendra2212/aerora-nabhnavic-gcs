@@ -88,7 +88,8 @@ bool AeroraEventStore::recordEvent(const AeroraEventRecord& event, const QList<A
     }
 
     QSqlQuery eventQuery(db);
-    // vehicleId is NULL: no Vehicles writer exists yet, so no vehicle row could be referenced.
+    // vehicleId is NULL: no caller resolves a Vehicles-table row id for an event yet, though
+    // AeroraVehicleStore now exists and could supply one.
     eventQuery.prepare(
         QStringLiteral("INSERT INTO Events (sessionId, vehicleId, occurredUtcMs, monotonicUs, category, "
                        "subject, stateClass, detail) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)"));
