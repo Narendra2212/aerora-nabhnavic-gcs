@@ -1,0 +1,42 @@
+{
+  "build": {
+    "context": "../..",
+    "dockerfile": "../../deploy/docker/Dockerfile",
+    "target": "devcontainer"
+  },
+  "containerEnv": {
+    "DISPLAY": ":1",
+    "LIBGL_ALWAYS_SOFTWARE": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "QML.qml-official",
+        "ms-python.python"
+      ]
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/desktop-lite:1": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [6080, 5901],
+  "name": "QGroundControl Dev + Desktop",
+  "overrideCommand": true,
+  "portsAttributes": {
+    "5901": {
+      "label": "VNC"
+    },
+    "6080": {
+      "label": "Desktop (noVNC)"
+    }
+  },
+  "postCreateCommand": "git submodule update --init --recursive && /opt/qgc-venv/bin/python tools/setup/setup_vscode.py --python-interpreter /opt/qgc-venv/bin/python",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/qgroundcontrol",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/qgroundcontrol,type=bind,consistency=cached"
+}
