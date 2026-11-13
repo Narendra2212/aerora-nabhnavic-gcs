@@ -1,6 +1,6 @@
 #include "AeroraVehicleStore.h"
 
-#include <QtCore/QUuid.h>
+#include <QtCore/QUuid>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
