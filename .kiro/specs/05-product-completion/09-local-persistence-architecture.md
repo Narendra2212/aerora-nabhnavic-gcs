@@ -528,7 +528,7 @@ Stated as a list so none of it has to be inferred from the absence of a claim.
 | 7 | **Wall-clock timestamps can be wrong.** Ordering is recoverable via `monotonicUs`; absolute times are as good as the host clock was |
 | 8 | **`monotonicUs` does not survive a reboot.** It orders within a session; cross-session ordering falls back to wall clock |
 | 9 | **`detail` is opaque JSON.** No schema is claimed or validated. A consumer must tolerate anything |
-| 10 | **The store, its path accessor, the audit writer and export are compiled and tested; the per-table writers are not.** `AeroraLocalStore`, `AeroraStorePaths`, `AeroraSqliteAuditSink` and `AeroraStoreExport` pass on the Linux and Windows CI legs (latest commit `812469bd8`). The `Events`/`EventValues`/`Vehicles` writers and retention remain uncompiled |
+| 10 | **Every writer this design names is now compiled and tested.** The store, its path accessor, the audit sink and its async front, export, retention, the `Events`/`EventValues` writer and the `Vehicles` writer all pass on the Linux and Windows CI legs (`Vehicles`, latest: `75ba80879`). Only the six UI screens that read them (Tab 7, `aerora/src/UI/`) remain unbuilt |
 
 Items 1, 2 and 5 are the ones that must appear in any deployment document that mentions audit
 (`P7-PKG-005`).
@@ -545,7 +545,7 @@ schema under one owner while avoiding Tab 1 writing other tabs' semantics.
 | Provenance source (`Sessions` columns) | **Tab 1** | WP1-D `AeroraBuildInfo` | — |
 | `Events` / `EventValues` writer and the timeline model | **Tab 4** | `aerora/src/Telemetry/` | store; `P7-TEL-004` |
 | `AuditRecords` writer — the `AeroraAuditSink` implementation | **Tab 2** | `aerora/src/Security/` | store; `Q-037` |
-| `Vehicles` writer and fleet records | **Tab 3** | `aerora/src/Vehicle/` | store; **fleet identity format `OPEN`** |
+| `Vehicles` writer and fleet records | **Tab 3** | `aerora/src/Vehicle/` | store; `DG-FLT` **closed and built** (`AeroraVehicleStore`, `75ba80879`) |
 | Export (SQLite + CSV) | **Tab 1** store side, **Tab 7** UI | `aerora/src/Persistence/`, `aerora/src/UI/` | store |
 | `SCR-TEL-02`, `SCR-LOG-01`, `SCR-LOG-02`, `SCR-SEC-03`, `SCR-FLT-01`, `SCR-FLT-02` | **Tab 7** | `aerora/src/UI/` | the writers above |
 
@@ -554,7 +554,8 @@ schema under one owner while avoiding Tab 1 writing other tabs' semantics.
 1. Tab 1: `AeroraLocalStore` + schema + path + failure accounting. Nothing else can start
 2. Tab 1: WP1-D provenance, which `Sessions` needs
 3. Tab 4 and Tab 2 in parallel: their writers. Independent tables, no shared file
-4. Tab 3: `Vehicles` writer — **gated on the fleet identity decision**, not on the store
+4. Tab 3: `Vehicles` writer — was gated on the fleet identity decision; `DG-FLT` closed 2026-11-05
+   and the writer is built
 5. Tab 7: the six screens
 
 New module, so `aerora/CMakeLists.txt` needs the manifest include and a sentinel mapping if any
