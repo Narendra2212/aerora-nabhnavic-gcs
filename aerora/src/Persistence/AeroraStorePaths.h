@@ -43,6 +43,14 @@ namespace AeroraStorePaths {
 /// `<saveRoot>/aerora/export`, or empty when \a saveRoot is empty.
 [[nodiscard]] QString exportDirectoryFor(const QString& saveRoot);
 
+/// `<saveRoot>/aerora/credential.json`, or empty when \a saveRoot is empty.
+///
+/// The administrator-provisioned operator credential, read at startup and never written by the
+/// station. It lives beside the store because that is a directory the overlay already owns; its
+/// integrity rests on the signature rather than on the location, which is why a writable directory
+/// is sufficient - see `AeroraEd25519Verifier` for why the issuer key is a build input instead.
+[[nodiscard]] QString credentialPathFor(const QString& saveRoot);
+
 /// Creates the `aerora/` directory and its `export/` child under \a saveRoot. Returns whether the
 /// data directory exists afterwards. A no-op returning false for an empty root.
 bool ensureDirectoriesFor(const QString& saveRoot);
@@ -61,6 +69,13 @@ bool ensureDirectoriesFor(const QString& saveRoot);
 
 /// `exportDirectoryFor(saveRoot())`.
 [[nodiscard]] QString exportDirectory();
+
+/// `credentialPathFor(saveRoot())` — the file to read a provisioned credential from.
+///
+/// Deliberately not gated on `isPersistenceDisabled()`: that setting governs whether the station
+/// *records*, and reading a credential records nothing. Disabling persistence turns off the audit
+/// trail, not the authorization chain.
+[[nodiscard]] QString credentialPath();
 
 /// `ensureDirectoriesFor(saveRoot())`. Run before opening the store.
 bool ensureDirectories();

@@ -182,6 +182,20 @@ private:
     /// open, nothing is installed and the authorizer keeps counting what it cannot write, which is
     /// the shipped posture. Idempotent, so a second `init()` in a UI-test process neither reopens
     /// the store nor reinstalls the sink.
+    /// Reads the administrator-provisioned credential, verifies it against the issuer key fixed at
+    /// build time, and installs the three collaborators
+    /// `AeroraCommandAuthorizer::isFullyConfigured()` requires: the identity provider, the role
+    /// resolver and the role policy. After this, and only after it, the command gate evaluates.
+    ///
+    /// Every failure path leaves the chain uninstalled and warns: no issuer key configured in the
+    /// build, no credential file present, a credential that does not verify, or one whose contents
+    /// are incomplete. So the station either enforces with a credential the issuer signed, or
+    /// enforces nothing and says which - it never enforces against something it could not verify.
+    ///
+    /// Independent of `disableAllPersistence` and of whether the store opened, because reading a
+    /// credential records nothing: turning off the audit trail must not turn off authorization.
+    void _installAuthorizationChain();
+
     void _installPersistence();
 
     /// The teardown `cleanup()` runs: clears the authorizer's sink reference, stops the audit

@@ -4,18 +4,25 @@
 
 #include <QtCore/QApplicationStatic>
 #include <QtCore/QDateTime>
+#include <QtCore/QFile>
+#include <QtCore/QIODevice>
 #include <QtCore/QUrl>
 #include <QtCore/QVariant>
 #include <QtQml/QQmlApplicationEngine>
 
+#include "AeroraAssignedRoleResolver.h"
 #include "AeroraAuditWriter.h"
+#include "AeroraCachedCredentialIdentityProvider.h"
 #include "AeroraCommandAuthorizer.h"
+#include "AeroraCredentialDocument.h"
+#include "AeroraEd25519Verifier.h"
 #include "AeroraLocalStore.h"
 #include "AeroraMissionExtension.h"
 #include "AeroraPlanBridge.h"
 #include "AeroraPlatformKeyProtector.h"
 #include "AeroraProvenance.h"
 #include "AeroraQmlOverrides.h"
+#include "AeroraRolePolicy.h"
 #include "AeroraSigningKeyStore.h"
 #include "AeroraStorePaths.h"
 #include "AeroraVehicleIdentity.h"
@@ -26,6 +33,7 @@
 #include "QGCLoggingCategory.h"
 #include "QmlComponentInfo.h"
 #include "Vehicle.h"
+#include "aerora_credential_issuer.h"
 
 QGC_LOGGING_CATEGORY(AeroraCorePluginLog, "Aerora.CorePlugin")
 
@@ -53,6 +61,7 @@ void AeroraCorePlugin::init()
 
     _installSigningKeyStore();
     _installPersistence();
+    _installAuthorizationChain();
 
     if (!AeroraCommandAuthorizer::instance()->isFullyConfigured()) {
         qCWarning(AeroraCorePluginLog)
@@ -291,6 +300,74 @@ void AeroraCorePlugin::_installSigningKeyStore()
 
     qCDebug(AeroraCorePluginLog) << "signing key store installed. backend:" << backend
                                  << "protectsAtRest:" << protects;
+}
+
+void AeroraCorePlugin::_installAuthorizationChain()
+{
+    AeroraCommandAuthorizer* const authorizer = AeroraCommandAuthorizer::instance();
+    if (authorizer->isFullyConfigured()) {
+        // Idempotent: QmlUITestBase::startUI() calls init() once per scene boot.
+        return;
+    }
+
+    std::unique_ptr<AeroraEd25519Verifier> verifier =
+        AeroraEd25519Verifier::fromHex(QString::fromLatin1(AERORA_CREDENTIAL_ISSUER_PUBLIC_KEY));
+    if (!verifier) {
+        // The shipped default. Stated at debug rather than warning level because it is the
+        // configured posture of a build nobody provisioned, and init() already warns once that
+        // authorization is not being enforced.
+        qCDebug(AeroraCorePluginLog) << "no credential issuer key is configured in this build, so no credential can be"
+                                     << "verified and command authorization stays unenforced.";
+        return;
+    }
+
+    const QString credentialPath = AeroraStorePaths::credentialPath();
+    QFile credentialFile(credentialPath);
+    if (credentialPath.isEmpty() || !credentialFile.exists()) {
+        qCDebug(AeroraCorePluginLog) << "no operator credential is provisioned at" << credentialPath
+                                     << "so command authorization stays unenforced.";
+        return;
+    }
+    if (!credentialFile.open(QIODevice::ReadOnly)) {
+        qCWarning(AeroraCorePluginLog) << "could not read the operator credential at" << credentialPath
+                                       << "so command authorization stays unenforced:" << credentialFile.errorString();
+        return;
+    }
+
+    const AeroraCredentialDocument::Result credential =
+        AeroraCredentialDocument::parseAndVerify(credentialFile.readAll(), verifier.get());
+    credentialFile.close();
+
+    if (!credential.accepted) {
+        // Warning rather than debug: a credential is present and was refused, which is a
+        // provisioning fault an operator can act on, unlike the absence of one.
+        qCWarning(AeroraCorePluginLog) << "the provisioned operator credential was refused, so command"
+                                       << "authorization stays unenforced:" << credential.detail;
+        return;
+    }
+
+    // The assignment carries exactly the operator this credential names, holding exactly the roles
+    // the issuer bound to them. One credential provisions one operator; a station serving several
+    // needs the cloud reconciliation IF-SEC-009 describes, which replaces this source and leaves
+    // everything below it untouched.
+    AeroraAssignedRoleResolver::Assignment assignment;
+    assignment.insert(credential.credential.operatorId, credential.roleIds);
+
+    // The command class is the one seam ADR-014 Option C records as built: MavCommandQueue through
+    // QGCCorePlugin::authorizeMavCommand(), with Vehicle::startCalibration() under ADR-015. The
+    // parameter, mission, manual-control and payload classes have no seam here, so no policy is
+    // installed for them and nothing claims to gate them.
+    auto policy = std::make_unique<AeroraRolePolicy>(QStringLiteral("command"), credential.roleGrants);
+    const bool policyConfigured = policy->isConfigured();
+
+    authorizer->setIdentityProvider(std::make_unique<AeroraCachedCredentialIdentityProvider>(credential.credential));
+    authorizer->setRoleResolver(std::make_unique<AeroraAssignedRoleResolver>(assignment));
+    authorizer->setPolicy(std::move(policy));
+
+    qCDebug(AeroraCorePluginLog) << "installed the authorization chain from a verified credential."
+                                 << "issuer:" << verifier->verifierName() << "roles:" << credential.roleIds
+                                 << "policy configured:" << policyConfigured
+                                 << "enforcing:" << authorizer->isFullyConfigured();
 }
 
 void AeroraCorePlugin::_installPersistence()

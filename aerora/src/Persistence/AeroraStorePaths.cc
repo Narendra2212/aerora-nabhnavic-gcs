@@ -33,6 +33,15 @@ QString exportDirectoryFor(const QString& saveRoot)
     return QGCFileHelper::joinPath(dataDir, QStringLiteral("export"));
 }
 
+QString credentialPathFor(const QString& saveRoot)
+{
+    const QString dataDir = dataDirectoryFor(saveRoot);
+    if (dataDir.isEmpty()) {
+        return QString();
+    }
+    return QGCFileHelper::joinPath(dataDir, QStringLiteral("credential.json"));
+}
+
 bool ensureDirectoriesFor(const QString& saveRoot)
 {
     const QString dataDir = dataDirectoryFor(saveRoot);
@@ -75,6 +84,11 @@ QString databasePath()
 QString exportDirectory()
 {
     return exportDirectoryFor(saveRoot());
+}
+
+QString credentialPath()
+{
+    return credentialPathFor(saveRoot());
 }
 
 bool ensureDirectories()

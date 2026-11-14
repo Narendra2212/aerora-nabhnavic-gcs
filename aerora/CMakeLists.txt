@@ -82,6 +82,30 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/aerora_provenance.h.in" "${CMAKE_BINARY_DIR}/aerora_provenance.h" @ONLY)
 
 # ----------------------------------------------------------------------------
+# Operator-credential issuer key
+#
+# The Ed25519 public key a provisioned credential must be signed by, as a build input. Empty by
+# default, and that default is the shipped fail-closed posture rather than a placeholder: with no
+# key there is no verifier, so no credential is accepted and authorization stays unenforced. See
+# src/aerora_credential_issuer.h.in for why this is a build input rather than a file the save
+# directory holds.
+#
+# Generated into CMAKE_BINARY_DIR for the same reason the provenance header is: src/CMakeLists.txt
+# already puts that directory on the application target's include path, so the consumer includes it
+# unqualified with no include-directory change anywhere.
+# ----------------------------------------------------------------------------
+
+set(AERORA_CREDENTIAL_ISSUER_PUBLIC_KEY
+    ""
+    CACHE STRING "Ed25519 public key (64 hex characters) of the operator-credential issuer. Empty leaves command \
+authorization unenforced, which is the shipped default."
+)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/aerora_credential_issuer.h.in"
+               "${CMAKE_BINARY_DIR}/aerora_credential_issuer.h" @ONLY
+)
+
+# ----------------------------------------------------------------------------
 # Cross-module dependency assertion
 #
 # AeroraFirmwarePlugin::initializeVehicle() is the per-vehicle composition root and references four
