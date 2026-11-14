@@ -48,4 +48,10 @@ private slots:
     void _boardUidFallsBackToUidWhenUid2IsAllZero();
     void _boardUidIsEmptyWhenNeitherCarriesEvidence();
     void _boardUidHexEncodingIsLowercase();
+
+    // The whole decode-resolve-report path, over a real packed AUTOPILOT_VERSION. This is what
+    // runs on every vehicle connect, and the only coverage of the uid2 byte-array extraction.
+    void _aRealMessageResolvesAnIdentityIntoTheVehicle();
+    void _aMessageWithNoBoardEvidenceReportsNothing();
+    void _aLegacyUidOnlyMessageStillResolves();
 };

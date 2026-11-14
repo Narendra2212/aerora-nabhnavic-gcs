@@ -8,6 +8,7 @@
 
 class AeroraAuditWriter;
 class AeroraLocalStore;
+class AeroraVehicleIdentity;
 class AeroraVehicleStore;
 
 /// \brief Aerora core plugin. Binds the Aerora security foundation to QGC's extension points.
@@ -160,6 +161,17 @@ public:
     /// required in a test - the same reasoning that keeps classifyOperationBoundary() a call-site
     /// boundary over primitives rather than a MAVLink-typed one.
     [[nodiscard]] static QString boardUidFromAutopilotVersion(quint64 uid, const QByteArray& uid2);
+
+    /// Decodes an `AUTOPILOT_VERSION` \a message, resolves its board identifier through \a
+    /// vehicleStore, and reports the result into \a identity. Returns the fleet identity reported,
+    /// or an empty string when the message carried no board evidence or the store resolved none.
+    ///
+    /// Static and taking its two collaborators by reference so the whole decode-resolve-report
+    /// path is testable without a `Vehicle`, a plugin instance or `init()` - which a unit-test
+    /// process never calls, so the member below could not otherwise be exercised at all. The
+    /// member is the plumbing that finds these two from a vehicle; this is the behaviour.
+    static QString reportFleetIdentityFrom(AeroraVehicleStore& vehicleStore, AeroraVehicleIdentity& identity,
+                                           const mavlink_message_t& message, qint64 nowUtcMs);
 
 private:
     void _installSigningKeyStore();

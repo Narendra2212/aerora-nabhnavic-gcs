@@ -10,7 +10,9 @@
 
 #include "AeroraCorePlugin.h"
 #include "AeroraLocalStore.h"
+#include "AeroraVehicleIdentity.h"
 #include "AeroraVehicleStore.h"
+#include "MAVLinkLib.h"
 #include "QGCSqlHelper.h"
 
 namespace {
@@ -38,6 +40,37 @@ int rowCount(const QString& path, const QString& table)
         return -1;
     }
     return query.value(0).toInt();
+}
+
+/// An 18-byte `uid2` whose first byte is \a marker and the rest zero - enough to count as present.
+QByteArray boardUid2(char marker)
+{
+    QByteArray uid2(18, '\0');
+    uid2[0] = marker;
+    return uid2;
+}
+
+/// A real packed `AUTOPILOT_VERSION` carrying \a uid and \a uid2, so a test exercises the same
+/// decode the live path does rather than a hand-built field.
+mavlink_message_t autopilotVersionMessage(quint64 uid, const QByteArray& uid2)
+{
+    const QByteArray customVersion(8, '\0');
+    mavlink_message_t message{};
+    (void) mavlink_msg_autopilot_version_pack(1,  // system id
+                                              1,  // component id
+                                              &message,
+                                              0,  // capabilities
+                                              0,  // flight_sw_version
+                                              0,  // middleware_sw_version
+                                              0,  // os_sw_version
+                                              0,  // board_version
+                                              reinterpret_cast<const uint8_t*>(customVersion.constData()),
+                                              reinterpret_cast<const uint8_t*>(customVersion.constData()),
+                                              reinterpret_cast<const uint8_t*>(customVersion.constData()),
+                                              0,  // vendor_id
+                                              0,  // product_id
+                                              uid, reinterpret_cast<const uint8_t*>(uid2.constData()));
+    return message;
 }
 
 /// Reads `firstSeenUtcMs`/`lastSeenUtcMs` for \a boardUid, or (-1, -1) if the row does not exist.
@@ -227,6 +260,91 @@ void AeroraVehicleStoreTest::_boardUidHexEncodingIsLowercase()
 
     QCOMPARE(boardUid, boardUid.toLower());
     QVERIFY(boardUid.startsWith(QStringLiteral("ab")));
+}
+
+void AeroraVehicleStoreTest::_aRealMessageResolvesAnIdentityIntoTheVehicle()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    AeroraVehicleStore vehicles(store);
+    QVERIFY(vehicles.open());
+
+    AeroraVehicleIdentity identity(7, 1);
+    QVERIFY(!identity.fleetIdentityKnown());
+
+    // A real packed AUTOPILOT_VERSION, so the decode this exercises is the one that runs on every
+    // vehicle connect - including the uid2 byte-array extraction, which a hand-built QByteArray
+    // test cannot cover.
+    const mavlink_message_t message = autopilotVersionMessage(0, boardUid2(0x5A));
+
+    const QString reported = AeroraCorePlugin::reportFleetIdentityFrom(vehicles, identity, message, 1700000000000LL);
+
+    QVERIFY(!reported.isEmpty());
+    QVERIFY(identity.fleetIdentityKnown());
+    QCOMPARE(identity.fleetIdentity(), reported);
+    QVERIFY2(canonicalUuidPattern().match(reported).hasMatch(), qPrintable(reported));
+
+    // The identity is bound to the board, so the same board on a later connect recalls it rather
+    // than minting a second one - asserted here through the real decode path, not just the store.
+    AeroraVehicleIdentity reconnected(9, 1);  // a different MAVLink system id, the same board
+    const QString recalled = AeroraCorePlugin::reportFleetIdentityFrom(vehicles, reconnected, message, 1700000005000LL);
+
+    QCOMPARE(recalled, reported);
+    QCOMPARE(rowCount(path, QStringLiteral("Vehicles")), 1);
+}
+
+void AeroraVehicleStoreTest::_aMessageWithNoBoardEvidenceReportsNothing()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    AeroraVehicleStore vehicles(store);
+    QVERIFY(vehicles.open());
+
+    AeroraVehicleIdentity identity(7, 1);
+
+    // uid and uid2 both zero, which is exactly what MockLink's simulated reply carries. The
+    // vehicle stays a first contact rather than being minted against a sentinel.
+    const mavlink_message_t message = autopilotVersionMessage(0, QByteArray(18, '\0'));
+
+    QVERIFY(AeroraCorePlugin::reportFleetIdentityFrom(vehicles, identity, message, 1700000000000LL).isEmpty());
+    QVERIFY(!identity.fleetIdentityKnown());
+    QVERIFY(identity.fleetIdentity().isEmpty());
+    QCOMPARE(rowCount(path, QStringLiteral("Vehicles")), 0);
+}
+
+void AeroraVehicleStoreTest::_aLegacyUidOnlyMessageStillResolves()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    AeroraVehicleStore vehicles(store);
+    QVERIFY(vehicles.open());
+
+    AeroraVehicleIdentity identity(7, 1);
+
+    // An autopilot that fills only the legacy 8-byte uid: the documented fallback, and the case a
+    // uid2-only implementation would silently fail to identify.
+    const mavlink_message_t message = autopilotVersionMessage(0x1234567890ABCDEFULL, QByteArray(18, '\0'));
+
+    const QString reported = AeroraCorePlugin::reportFleetIdentityFrom(vehicles, identity, message, 1700000000000LL);
+
+    QVERIFY(!reported.isEmpty());
+    QCOMPARE(identity.fleetIdentity(), reported);
+    QCOMPARE(rowCount(path, QStringLiteral("Vehicles")), 1);
 }
 
 UT_REGISTER_TEST(AeroraVehicleStoreTest, TestLabel::Unit)

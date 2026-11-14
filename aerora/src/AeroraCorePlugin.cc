@@ -413,6 +413,12 @@ void AeroraCorePlugin::_resolveFleetIdentity(Vehicle* vehicle, const mavlink_mes
         return;
     }
 
+    (void) reportFleetIdentityFrom(*_vehicleStore, *services->identity(), message, QDateTime::currentMSecsSinceEpoch());
+}
+
+QString AeroraCorePlugin::reportFleetIdentityFrom(AeroraVehicleStore& vehicleStore, AeroraVehicleIdentity& identity,
+                                                  const mavlink_message_t& message, qint64 nowUtcMs)
+{
     mavlink_autopilot_version_t autopilotVersion;
     mavlink_msg_autopilot_version_decode(&message, &autopilotVersion);
 
@@ -422,13 +428,16 @@ void AeroraCorePlugin::_resolveFleetIdentity(Vehicle* vehicle, const mavlink_mes
         // Neither field carried evidence - MockLink's simulated reply is exactly this state. No
         // board identifier is no contact, not a reason to invent one; the vehicle stays a first
         // contact (fleetIdentityKnown() false) rather than being minted against a sentinel.
-        return;
+        return QString();
     }
 
-    const QString fleetIdentity = _vehicleStore->resolveFleetIdentity(boardUid, QDateTime::currentMSecsSinceEpoch());
-    if (!fleetIdentity.isEmpty()) {
-        (void) services->identity()->reportFleetIdentity(fleetIdentity);
+    const QString fleetIdentity = vehicleStore.resolveFleetIdentity(boardUid, nowUtcMs);
+    if (fleetIdentity.isEmpty()) {
+        return QString();
     }
+
+    (void) identity.reportFleetIdentity(fleetIdentity);
+    return fleetIdentity;
 }
 
 QString AeroraCorePlugin::boardUidFromAutopilotVersion(quint64 uid, const QByteArray& uid2)
