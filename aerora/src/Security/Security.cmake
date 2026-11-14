@@ -89,6 +89,8 @@ set(AERORA_SECURITY_SOURCES
     ${AERORA_SECURITY_DIR}/AeroraCalibrationAuthorization.h
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.cc
     ${AERORA_SECURITY_DIR}/AeroraCommandAuthorizer.h
+    ${AERORA_SECURITY_DIR}/AeroraCredentialDocument.cc
+    ${AERORA_SECURITY_DIR}/AeroraCredentialDocument.h
     ${AERORA_SECURITY_DIR}/AeroraCredentialVerifier.h
     ${AERORA_SECURITY_DIR}/AeroraEd25519Verifier.cc
     ${AERORA_SECURITY_DIR}/AeroraEd25519Verifier.h
@@ -149,6 +151,8 @@ set(AERORA_SECURITY_TEST_SOURCES
     ${AERORA_SECURITY_TEST_DIR}/AeroraCalibrationAuthorizationTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraCalibrationEnforcementTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraCalibrationEnforcementTest.h
+    ${AERORA_SECURITY_TEST_DIR}/AeroraCredentialDocumentTest.cc
+    ${AERORA_SECURITY_TEST_DIR}/AeroraCredentialDocumentTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraEd25519VerifierTest.cc
     ${AERORA_SECURITY_TEST_DIR}/AeroraEd25519VerifierTest.h
     ${AERORA_SECURITY_TEST_DIR}/AeroraFleetAuthorizationTest.cc
@@ -199,6 +203,7 @@ set(AERORA_SECURITY_TEST_NAMES
     AeroraAuditSinkTest
     AeroraCalibrationAuthorizationTest
     AeroraCalibrationEnforcementTest
+    AeroraCredentialDocumentTest
     AeroraEd25519VerifierTest
     AeroraFleetAuthorizationTest
     AeroraManualAuthorityTest

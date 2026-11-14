@@ -103,7 +103,8 @@ void AeroraEd25519VerifierTest::_anUnusableKeyRefusesEverything()
 {
     // The state a build with no configured issuer would reach if a caller installed a verifier
     // anyway: it reports itself unusable and refuses a signature that is otherwise perfectly good.
-    const AeroraEd25519Verifier empty(QByteArray());
+    // Braces, not parentheses: `empty(QByteArray())` is a function declaration, not a variable.
+    const AeroraEd25519Verifier empty{QByteArray()};
     QVERIFY(!empty.isUsable());
     QVERIFY(!empty.verify(hex(kTest2Message), hex(kTest2Signature)));
 
