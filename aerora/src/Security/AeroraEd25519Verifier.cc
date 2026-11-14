@@ -31,8 +31,15 @@ std::unique_ptr<AeroraEd25519Verifier> AeroraEd25519Verifier::fromHex(const QStr
         return nullptr;
     }
 
-    // QByteArray::fromHex skips characters it cannot parse rather than failing, so the decoded
-    // length is the only reliable check that the input was a well-formed key.
+    // Two checks, and both are needed. QByteArray::fromHex pads odd-length input as though it had
+    // a leading zero, so 63 characters of a 64-character key decode to a full 32 bytes and would
+    // otherwise be accepted as a different key than the one intended. It also silently skips
+    // characters it cannot parse, so a 64-character string containing spaces decodes short. The
+    // character count catches the first, the decoded length catches the second.
+    if (trimmed.size() != (kPublicKeyBytes * 2)) {
+        return nullptr;
+    }
+
     const QByteArray decoded = QByteArray::fromHex(trimmed.toLatin1());
     if (decoded.size() != kPublicKeyBytes) {
         return nullptr;
