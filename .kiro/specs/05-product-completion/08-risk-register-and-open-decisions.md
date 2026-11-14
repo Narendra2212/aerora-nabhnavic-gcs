@@ -21,19 +21,28 @@ register reads as a history instead of only as a snapshot.
 
 | ID | Blocker | Owner | Stops | Status |
 | --- | --- | --- | --- | --- |
-| `D-006` | **Build host.** No `cmake`, `ninja`, `qmake`, `ctest`, `qmllint`, `clang-format`, `clang-tidy`, `pre-commit` or `just`. `C:\Qt` absent. Disk insufficient; no administrator elevation — two separate gates | **User** | Every compile, lint, test, launch and `VERIFIED` claim | `NO-GO` — re-measured this pass, unchanged |
+| `D-006` | **Build host.** No `cmake`, `ninja`, `qmake`, `ctest`, `qmllint`, `clang-format`, `clang-tidy`, `pre-commit` or `just`. `C:\Qt` absent. Disk insufficient; no administrator elevation — two separate gates | **User** | Local compile, lint, launch and any claim needing a running application or hardware. **No longer every compile and test** — the Aerora CI legs build the overlay and run its suites | `NO-GO` on this host — unchanged. Narrowed in effect by CI, not resolved |
 | `D-007` | **Product authorization.** External evidence required | **External** | Every product feature (`P7-PROF-003`) | `EXTERNAL EVIDENCE REQUIRED` |
 | ~~`D-005`~~ | **Aerora git origin.** `origin` stays `https://github.com/mavlink/qgroundcontrol.git` and has never been pushed to | **User** | — | **RESOLVED.** An `aerora` remote is configured and `aerora/phase7-product-completion` is published on it |
 | ~~`Q-029`~~ | **Operator role set** | **Product + operations** | — | **RESOLVED.** `DG-ROL` is `CLOSED`; the role set is settled and signed in `closures/DG-ROL.role-set.json`. See below |
 
 ### Why `D-006` is listed first
 
-It does not block a single screen. It blocks every *claim*. 105 C++ files and 4 QML files have never
-been through a compiler or a linter, 14 tests have never run, and the honest ceiling for all Phase 7
-work is `IMPLEMENTED-UNCOMPILED`. That is not a small caveat — it means the programme is producing
-reviewed source rather than verified software, and the gap between those two is unmeasured.
+It was listed first because it blocked every *claim*: 105 C++ files and 4 QML files had never been
+through a compiler or a linter, 14 tests had never run, and the honest ceiling for all Phase 7 work
+was `IMPLEMENTED-UNCOMPILED`.
 
-**The build-host prohibition is unchanged by Phase 7.** No build was attempted.
+**Three Aerora CI legs have since changed what it blocks, and the row above is narrowed rather than
+closed.** `aerora-lint.yml`, `aerora-linux.yml` and `aerora-windows.yml` build the overlay and run
+its registered suites on both platforms — 34 `Unit` and 9 `Integration` entries green on the latest
+Linux run — so "never compiled, never executed" is no longer true of the overlay. What `D-006` still
+blocks is unchanged and is not small: no build on the deployment host, no linter or QML tooling
+locally, no running application to look at, and therefore no claim that rests on observing the
+software behave. Every CI run is a Debug build against `MockLink` on a hosted runner, so the gap that
+remains is not compilation but **execution against real hardware**.
+
+The ceiling moved accordingly: from "reviewed source" to "compiled and CI-tested against a simulated
+vehicle". That is a real rung, and it is still several below anything that may be called verified.
 
 ### `Q-029` was a blocker as well as a decision, and it has resolved
 
@@ -66,11 +75,11 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | `Q-036` | Freshness budget values | `P7-MOD-013`, `P7-TEL-002`, `SCR-TEL-03` content | `OPEN` — **no value invented** |
 | `Q-024` | Mission/payload command interaction | Fact-group implementation gate | `OPEN` |
 | `Q4-004` | Consequences of disabling vendor firmware factories | — | `OPEN` — neither factory disabled |
-| — | Fleet identity format | 2 screens, journey 6.7. **MAVLink sysid is explicitly not it** | `OPEN` |
+| ~~`D-DAT-03`~~ | Fleet identity format | — | **SETTLED, SIGNED AND BUILT.** `closures/DG-FLT.identity-format.json`, Product, 2026-11-05: a UUIDv4 minted by the station on first contact from `AUTOPILOT_VERSION.uid2` falling back to `uid`, permanent for the airframe, and derived from the board rather than the MAVLink sysid. `AeroraVehicleStore` implements it and is CI-tested |
 | — | Power thresholds, arbitration, tether/battery transition, safety actions | `P7-PWR-003`..`006` | `OPEN` — **none invented**; four `false` flags and `kDefinedThresholdCount == 0` enforce it |
 | — | Payload ICD / painting reported-value set | `SCR-LIV-03`, `SCR-MIS-05`/`06`, journey 6.1 | `OPEN` |
 | — | Reported-consumable set and an approved consumption model | `SCR-MIS-06` | `OPEN` — [benchmark §7.4](02-gcs-reference-benchmark.md#74-consumable-constrained-multi-pass-work) |
-| — | Must an unauditable *allow* be denied? | `P7-AUDIT-003` | `OPEN` — losses counted, commands not blocked |
+| ~~`P7-AUDIT-003`~~ | Must an unauditable *allow* be denied? | — | **ANSWERED: deny for actuating classes.** `closures/DG-ROL.authorization-scope.json`, Architecture, 2026-11-05 — denied for `payload` and `manual-control`, counted and allowed for `command`, `parameter` and `mission`, so an audit outage cannot start refusing the command to land. Not yet implemented: the two actuating seams are unbuilt, and `AeroraCommandAuthorizer` counts without blocking today |
 | `D-NAV-01` | Top-level entry: hub (decided) vs `SelectViewDropdown.qml` fork | Nothing — hub is sufficient | **DECIDED** (hub); fork deferred and available |
 
 ### Architecture decisions
@@ -168,15 +177,15 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 
 | ID | Risk | P | I | Evidence | Mitigation | Owner |
 | --- | --- | --- | --- | --- | --- | --- |
-| `R7-01` | **The first build reveals substantial compile and lint failure**, and the gap between "reviewed source" and "working software" turns out to be large | **High** | High | 105 C++ files never compiled; 4 QML files with **zero** tooling applied. Declaration/definition parity checked by reading only | Build module by module, not all at once. Treat the first result as a measurement, not a regression. [04 §10](04-subsystem-and-interface-completion-matrix.md#10-first-build-expectations) sets the expectation in writing | Tab 8 |
+| ~~`R7-01`~~ | **The first build reveals substantial compile and lint failure**, and the gap between "reviewed source" and "working software" turns out to be large | — | — | Was: 105 C++ files never compiled, 4 QML files with zero tooling | **LARGELY REALISED AND ABSORBED.** The overlay now builds and tests green on two platforms in CI, so the measurement was taken. It cost a run of compile errors fixed forward one at a time — missing includes, an incomplete type, a mis-suffixed Qt header — which is the predicted shape rather than a surprise. The residue is the Windows `AeroraProfileRegistryTest` process-exit timeout, a confirmed intermittent | Tab 8 |
 | `R7-02` | **`QGC_CUSTOM_BUILD` is not set and nobody notices.** The overlay compiles, the application starts, the authorization gate is never consulted | Medium | **Critical** | ADR-012. `QGCCorePlugin::instance()` routes to `CUSTOMCLASS` only under that definition | Make the CI leg **assert** it. Surface it in `SCR-SHL-04` provenance. This is the worst failure mode in the build because it is invisible | Tab 8 + Tab 1 |
-| `R7-03` | **`Q-029` stays open indefinitely**, and the product ships with an authorization point that permits everything | Medium | **Critical** | `isAuthorizationEnforced()` returns `false` today | `P7-FLY-004` is `FORBIDDEN-UNTIL`, so no action control can ship into the gap. `SCR-SHL-03` makes the state visible to the operator. **Escalate — see [§7](#7-decision-escalation)** | Product |
+| `R7-03` | **The product ships with an authorization point that permits everything.** No longer because `Q-029` is open — that is signed — but because no credential seam can produce an authenticated operator | Medium | **Critical** | `isAuthorizationEnforced()` returns `false` today, and `authorizeMavCommand()` returns `true` with one latched warning | `P7-FLY-004` is `FORBIDDEN-UNTIL`, so no action control can ship into the gap. `SCR-SHL-03` and `SCR-SEC-01` make the state visible to the operator, and the audit trail now durably records every command that passes. **Escalate — see [§7.2](#2-q-029--the-operator-role-set-resolved--superseded-by-the-credential-seam)** | Product |
 | `R7-04` | **A tab invents a value to unblock itself** — a freshness budget, a threshold, a capability, a MAVLink identifier | Medium | High | 11 `OPEN` product decisions block real work. The temptation is structural | The ten `false` flags, `kDefinedThresholdCount == 0`, and the static MAVLink-identifier check. `P7-NOINV-002`: emit the requirement ID, not a number | All tabs; Tab 1 enforces |
 | `R7-05` | **The class-X fork count rises above 0** and upstream rebase stops being mechanical | Medium | High | 3 fork candidates identified, all currently declined | `AeroraQmlOverrides::forbiddenPaths()` + `AeroraUiFoundationTest`. Every class-X fork needs a recorded fork point, a named owner and a drift review (`P7-ARCH-023`) | Tab 7; Tab 1 approves |
 | `R7-06` | **A source is added without a manifest entry.** It compiles into nothing, silently | Medium | Medium | The manifest is hand-maintained; the aggregation does not glob | Re-run `aerora-manifest-check.ps1` after **every** commit that adds a file. It has caught 0 problems so far across 109 entries | All tabs |
-| `R7-07` | **`AeroraUiSafetyTest` fails on first run due to a list error**, and the failure is read as a regression or, worse, the test is weakened to make it pass | **High** | High | Its reviewed-method lists were derived by reading headers, never by running | Recorded in advance ([04 §8](04-subsystem-and-interface-completion-matrix.md#coverage-gaps)). **Fix the list, never the assertion.** The test is the QML safety boundary | Tab 7 |
+| ~~`R7-07`~~ | **`AeroraUiSafetyTest` fails on first run due to a list error**, and the failure is read as a regression or, worse, the test is weakened to make it pass | — | — | Its reviewed-method lists were derived by reading headers, never by running | **DID NOT OCCUR.** The suite runs in the Aerora `Unit` label on both platforms and passes, so the hand-derived lists were correct. `D-UI-07` — deriving the audited set rather than listing it — stays open as the durable fix, because the list being right once is not the same as it staying right | Tab 7 |
 | `R7-08` | **The 19 `SPECIFIED-NOT-DESIGNED` screens get designed anyway**, by inventing the decisions that block them | Medium | High | 16 of 19 are decision-blocked. Schedule pressure acts on exactly these | [05 §4](05-implementation-dependency-graph.md#4-what-is-blocked-and-by-what) names the blocker per screen. A design that resolves its own blocker must be rejected in review | Tab 1 |
-| `R7-09` | **`D-006` is never resolved** and the programme accumulates unverified source indefinitely | Medium | **Critical** | 109 files, 14 tests, zero executions, across Phases 4–7 | Every document caps its claims at `IMPLEMENTED-UNCOMPILED`. **Escalate — the cost of this risk compounds with every commit** | User |
+| `R7-09` | **`D-006` is never resolved** and the programme accumulates source that has never run on real hardware | Medium | **High** | Was 109 files with zero executions; CI has since removed the compile-and-test half of this. What remains has had **zero executions on the deployment host, zero on hardware and zero in flight** | CI caps the compounding, which is why the impact is no longer Critical. It does not substitute for hardware: a Debug build against `MockLink` cannot establish a flight claim. **Still escalate** | User |
 | `R7-10` | **`geoMapVisualQML()` is omitted** on the Aerora complex item and the item is silently invisible under the GeoMap engine | Medium | Medium | `mapVisualQML()` is pure virtual and enforced; `geoMapVisualQML()` returns `QString()` by default | `SCR-MIS-04` is a **separate** inventory entry so the omission is visible in the screen count, not buried in an item's definition of done | Tab 5 |
 | `R7-11` | **An interface gets a mock implementation** to make a screen demonstrable | Low | **Critical** | 8 interfaces with no implementation, 6 of them decision-gated | `AeroraPayloadCommandSink` and `AeroraPlatformKeyProtector` are deliberately unimplemented for safety. Phase B rule: **identify missing functionality, do not create mock production behaviour** | All tabs; Tab 1 enforces |
 | `R7-12` | **`registerCustomSettingsGroup()` is called with a wrong accessor name** and the group is silently deleted | Medium | Low | The call **takes ownership** and deletes a rejected group. Accessor must be camelCase JSON stem + `Settings`, matching `^[a-z_][A-Za-z0-9_]*$`, no collision with a built-in | Record the exact expected accessor name in the settings specification. A startup assertion would be better | Tab 7 |
@@ -194,16 +203,22 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 
 | Impact | Count | IDs |
 | --- | --- | --- |
-| **Critical** | 4 | `R7-02`, `R7-03`, `R7-09`, `R7-11` |
-| High | 7 | `R7-01`, `R7-04`, `R7-05`, `R7-07`, `R7-08`, `R7-14`, `R7-15` |
+| **Critical** | 3 | `R7-02`, `R7-03`, `R7-11` |
+| High | 6 | `R7-04`, `R7-05`, `R7-08`, `R7-09`, `R7-14`, `R7-15` |
 | Medium | 5 | `R7-06`, `R7-10`, `R7-16`, `R7-17`, plus `R7-12` at low impact |
-| High probability | 2 | `R7-01`, `R7-07` — both first-build effects, both pre-recorded |
+| Retired by the first build | 2 | `R7-01` largely realised and absorbed, `R7-07` did not occur |
 
-The four critical risks share a shape: **each is a way for the programme to look finished while
+The three critical risks share a shape: **each is a way for the programme to look finished while
 something load-bearing is absent**. `R7-02` is an invisible build misconfiguration, `R7-03` an
-enforcement point that permits everything, `R7-09` source that was never verified, `R7-11` a mock
-standing in for a real interface. The mitigations are correspondingly uniform — make the absence
-visible, mechanically, and refuse to let a status column hide it.
+enforcement point that permits everything, `R7-11` a mock standing in for a real interface. The
+mitigations are correspondingly uniform — make the absence visible, mechanically, and refuse to let
+a status column hide it.
+
+`R7-09` dropped from Critical to High for one reason only: CI removed the never-compiled half of it.
+The half it did not remove is that nothing has run on the deployment host or on an aircraft, and
+`R7-02` is the reason that still matters — the Aerora legs and `aerora-package.yml` each assert
+`QGC_CUSTOM_DIR` is `aerora` before trusting a build, because without that assertion a green run
+could be stock QGroundControl.
 
 ## 5. Risks the overlay already mitigates
 
@@ -243,41 +258,54 @@ A distinct category: ways the programme could misrepresent its own state without
 | 6 | Regulatory or standards conformance gets claimed | `P7-NOINV-001` includes regulatory compliance claims. Veronte's "partial STANAG 4586" is the cautionary precedent |
 | 7 | A benchmark feature gets attributed to a product whose identity was not verified | [02 §2](02-gcs-reference-benchmark.md#2-identity-corrections) reports all three corrections rather than substituting plausible products |
 | 8 | A screen count is quoted as a completion measure | 45 screens, of which 2 have a service behind them and 19 are decision-blocked. The breakdown accompanies the number everywhere it appears |
-| 9 | Test *registration* gets reported as test *coverage* | 14 tests registered, **0 executed**. Stated in [04](04-subsystem-and-interface-completion-matrix.md) and [06](06-requirements-to-test-traceability.md) |
+| 9 | Test *execution* gets reported as *validation* | The suites now run: 34 `Unit` and 9 `Integration` entries green on the Aerora Linux and Windows legs. Every one is a Debug build against `MockLink`, so what is established is that the code behaves against a simulated vehicle — not on hardware, and not in flight |
 | 10 | "Production ready" gets said | Prohibited until actual build, tests and hardware validation support it. Phase D ends with an explicit statement that it is **not** claimed |
 
 ## 7. Decision escalation
 
-Three decisions should be escalated now, because each one's cost grows with time.
+Two of the three below have resolved since they were written, and their rows are kept rather than
+deleted so this section reads as a history. **One live escalation replaces them**, and it is now the
+single thing standing between the overlay and an enforcing command gate: see
+[§7.2](#2-q-029--the-operator-role-set-resolved--superseded-by-the-credential-seam).
 
 ### 1. `D-006` — the build host
 
 | Field | Detail |
 | --- | --- |
 | Owner | **User** |
-| Cost of delay | **Compounds with every commit.** Every file added without a compiler is another file whose correctness is assumed. 109 files and 14 tests are already in that state, accumulated across four phases |
-| What resolving it buys | The first real measurement of the overlay. `R7-01` and `R7-07` both resolve into facts rather than probabilities |
+| Cost of delay | **No longer compounding, and still real.** This row's own recommendation — "if a local host is not viable, a CI-only build is better than none" — was taken, and the Aerora legs now compile and test every push. What still accumulates is code that has never run on the deployment host, never on hardware and never in flight |
+| What resolving it buys | What CI cannot: a running application on the target, QML tooling locally, and the hardware validation every flight claim rests on. `R7-01` has already resolved into fact through CI; `R7-07` resolved the same way |
 | Minimum needed | CMake ≥ 3.25, Ninja, MSVC, Qt 6.11.1, sufficient disk, and administrator elevation — the last two are separate gates, and cache cleanup was already established as insufficient (`R4-003`) |
-| Recommendation | Resolve before Phase C adds substantially more unverified source. If a local host is not viable, a CI-only build is better than none |
+| Recommendation | The CI fallback is in place, so this is no longer the critical path for *correctness*. It is still the critical path for anything demonstrable: a reviewable installer is produced by `aerora-package.yml` on dispatch, and a Codespace can build and display the overlay through `.devcontainer/desktop`, but neither is the deployment host |
 
-### 2. `Q-029` — the operator role set
+### 2. `Q-029` — the operator role set (resolved) → superseded by the credential seam
+
+`Q-029` is **settled and signed**: four roles with their command classes, in
+`closures/DG-ROL.role-set.json`, and `ADR-014` Option C signed alongside it. The decision that was
+escalated here is closed, and the chain it blocked is unblocked as far as *decisions* go.
+
+**What replaced it is narrower and is the live escalation.**
+`AeroraCommandAuthorizer::isFullyConfigured()` requires three installables, and two of them are now
+specified by signed records — the role resolver reads the signed table, the policy is `ADR-014`
+Option C. The third cannot be built from anything in this repository:
 
 | Field | Detail |
 | --- | --- |
-| Owner | **Product + operations** |
-| Cost of delay | Blocks the longest chain in the programme: `Q-029` → ADR-014 → policy → command path → **every operator action**. Journeys 6.2 and 6.4 cannot complete |
-| What it is not | An engineering decision. The gate, the chain and the enforcement point are all implemented. What is missing is the list of roles an operating organisation will actually authorise |
-| Minimum needed | The role names, and for each, which command classes it may authorise. Not a full policy — enough to make the policy implementable |
-| Recommendation | A small decision with a large unblock. Highest ratio of any open item |
+| The gap | Nothing can produce an **authenticated operator identity**. `AeroraCachedCredentialIdentityProvider` reports an operator only once something calls `setCredential()`, and the cloud login that would do so does not exist — its own header records that. [15 §10](15-operator-identity-and-the-single-role-deployment.md) names the authority as the Aeroradynamics cloud user database; no endpoint, credential format or client exists for it |
+| Why it cannot be worked around | `IF-SEC-009` delivers **credential and role data together** from the cloud, inbound and non-blocking, and `IF-SEC-010` records that the station never calls out. So a local provisioning file would be inventing a second provisioning path the architecture does not have. A stand-in always-authenticated provider is the `R7-11` mock failure in its purest form: it would make the station report enforcement while a hardcoded identity passed every command |
+| Consequence while it is open | `isAuthorizationEnforced()` is `false`, `authorizeMavCommand()` returns `true` for every command, and `R7-03` stands at **Critical**. The audit trail records the commands; nothing refuses one |
+| Owner | **Product** for what issues a credential, **security architecture** for where it is stored given no protected store exists (`D-DAT-05`, `F3.1-01`) |
+| Minimum needed | How a credential reaches the station, in a form that does not require the station to call out at flight time. [15 §9](15-operator-identity-and-the-single-role-deployment.md) carries the four narrower questions this splits into |
+| Recommendation | Highest ratio of any open item, same as the row it replaces. Two of three installables are specified; this is the one that keeps the enforcement point from evaluating anything |
 
 ### 3. `P7-DAT-002` — the persistence design
 
 | Field | Detail |
 | --- | --- |
 | Owner | **Tab 1** |
-| Cost of delay | 5 screens blocked, and `Q-037` audit durability stays a separate unsolved problem when one mechanism could serve both |
-| Why escalated | It is the **only** high-leverage blocker Tab 1 can resolve without external input. Leaving it open while waiting on product decisions is self-inflicted |
-| Recommendation | WP1-C, immediately, in parallel with U1 and U2 |
+| Status | **RESOLVED AND BUILT.** No longer an escalation. The row is kept because this register reads as a history |
+| What landed | `AeroraLocalStore` and its schema, `AeroraStorePaths`, `AeroraSqliteAuditSink` with the `AeroraAuditWriter` async front, `AeroraStoreExport`, `AeroraStoreRetention`, the `Events`/`EventValues` writer and the `Vehicles` writer — all compiled and CI-tested on Linux and Windows, and the audit path installed by default at plugin startup |
+| What it did not resolve | Tamper-evidence stays `OPEN` (`D-DAT-05` → `AeroraPlatformKeyProtector`, no backend on any platform), and the retention caps `D-DAT-01` stay a product call, so `AeroraStoreRetention` takes an explicit cutoff and ships no default |
 
 ### Decisions deliberately not escalated
 
