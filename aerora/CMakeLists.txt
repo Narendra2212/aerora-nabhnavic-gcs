@@ -269,6 +269,19 @@ list(APPEND _aerora_libraries ${AERORA_TELEMETRY_LIBRARIES} ${AERORA_MISSION_LIB
 )
 
 # ----------------------------------------------------------------------------
+# Ed25519 verification primitive
+#
+# Included here rather than from Security.cmake because a manifest declares no target and a
+# third-party dependency has to become one. Qt offers no asymmetric verification and OpenSSL is not
+# available to the desktop application, so the primitive AeroraEd25519Verifier needs is absent
+# without this - see aerora/src/Security/Monocypher.cmake for why this library and why its
+# src/optional/ translation unit is required rather than optional.
+# ----------------------------------------------------------------------------
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/Security/Monocypher.cmake)
+list(APPEND _aerora_libraries aerora_monocypher)
+
+# ----------------------------------------------------------------------------
 # Test sources and CTest registration
 #
 # Gated on QGC_BUILD_TESTING so no mock or test translation unit can reach a shipped binary
@@ -321,6 +334,7 @@ if(QGC_BUILD_TESTING)
     add_qgc_test(AeroraAuditSinkTest LABELS Unit)
     add_qgc_test(AeroraCalibrationAuthorizationTest LABELS Unit)
     add_qgc_test(AeroraCalibrationEnforcementTest LABELS Integration Vehicle)
+    add_qgc_test(AeroraEd25519VerifierTest LABELS Unit)
     add_qgc_test(AeroraFleetAuthorizationTest LABELS Unit)
     add_qgc_test(AeroraManualAuthorityTest LABELS Unit)
     add_qgc_test(AeroraOperationGateEnforcementTest LABELS Unit)
