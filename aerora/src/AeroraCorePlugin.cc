@@ -304,34 +304,40 @@ void AeroraCorePlugin::_installSigningKeyStore()
 
 void AeroraCorePlugin::_installAuthorizationChain()
 {
-    AeroraCommandAuthorizer* const authorizer = AeroraCommandAuthorizer::instance();
-    if (authorizer->isFullyConfigured()) {
+    (void) installAuthorizationChainInto(*AeroraCommandAuthorizer::instance(),
+                                         QString::fromLatin1(AERORA_CREDENTIAL_ISSUER_PUBLIC_KEY),
+                                         AeroraStorePaths::credentialPath());
+}
+
+AeroraCorePlugin::ChainInstallation AeroraCorePlugin::installAuthorizationChainInto(AeroraCommandAuthorizer& authorizer,
+                                                                                    const QString& issuerKeyHex,
+                                                                                    const QString& credentialPath)
+{
+    if (authorizer.isFullyConfigured()) {
         // Idempotent: QmlUITestBase::startUI() calls init() once per scene boot.
-        return;
+        return {false, QStringLiteral("the authorization chain is already installed")};
     }
 
-    std::unique_ptr<AeroraEd25519Verifier> verifier =
-        AeroraEd25519Verifier::fromHex(QString::fromLatin1(AERORA_CREDENTIAL_ISSUER_PUBLIC_KEY));
+    std::unique_ptr<AeroraEd25519Verifier> verifier = AeroraEd25519Verifier::fromHex(issuerKeyHex);
     if (!verifier) {
         // The shipped default. Stated at debug rather than warning level because it is the
         // configured posture of a build nobody provisioned, and init() already warns once that
         // authorization is not being enforced.
         qCDebug(AeroraCorePluginLog) << "no credential issuer key is configured in this build, so no credential can be"
                                      << "verified and command authorization stays unenforced.";
-        return;
+        return {false, QStringLiteral("no credential issuer key is configured in this build")};
     }
 
-    const QString credentialPath = AeroraStorePaths::credentialPath();
     QFile credentialFile(credentialPath);
     if (credentialPath.isEmpty() || !credentialFile.exists()) {
         qCDebug(AeroraCorePluginLog) << "no operator credential is provisioned at" << credentialPath
                                      << "so command authorization stays unenforced.";
-        return;
+        return {false, QStringLiteral("no operator credential is provisioned")};
     }
     if (!credentialFile.open(QIODevice::ReadOnly)) {
         qCWarning(AeroraCorePluginLog) << "could not read the operator credential at" << credentialPath
                                        << "so command authorization stays unenforced:" << credentialFile.errorString();
-        return;
+        return {false, QStringLiteral("the operator credential could not be read")};
     }
 
     const AeroraCredentialDocument::Result credential =
@@ -343,7 +349,7 @@ void AeroraCorePlugin::_installAuthorizationChain()
         // provisioning fault an operator can act on, unlike the absence of one.
         qCWarning(AeroraCorePluginLog) << "the provisioned operator credential was refused, so command"
                                        << "authorization stays unenforced:" << credential.detail;
-        return;
+        return {false, credential.detail};
     }
 
     // The assignment carries exactly the operator this credential names, holding exactly the roles
@@ -360,14 +366,16 @@ void AeroraCorePlugin::_installAuthorizationChain()
     auto policy = std::make_unique<AeroraRolePolicy>(QStringLiteral("command"), credential.roleGrants);
     const bool policyConfigured = policy->isConfigured();
 
-    authorizer->setIdentityProvider(std::make_unique<AeroraCachedCredentialIdentityProvider>(credential.credential));
-    authorizer->setRoleResolver(std::make_unique<AeroraAssignedRoleResolver>(assignment));
-    authorizer->setPolicy(std::move(policy));
+    authorizer.setIdentityProvider(std::make_unique<AeroraCachedCredentialIdentityProvider>(credential.credential));
+    authorizer.setRoleResolver(std::make_unique<AeroraAssignedRoleResolver>(assignment));
+    authorizer.setPolicy(std::move(policy));
 
     qCDebug(AeroraCorePluginLog) << "installed the authorization chain from a verified credential."
                                  << "issuer:" << verifier->verifierName() << "roles:" << credential.roleIds
                                  << "policy configured:" << policyConfigured
-                                 << "enforcing:" << authorizer->isFullyConfigured();
+                                 << "enforcing:" << authorizer.isFullyConfigured();
+
+    return {true, QStringLiteral("the authorization chain is installed from a verified credential")};
 }
 
 void AeroraCorePlugin::_installPersistence()

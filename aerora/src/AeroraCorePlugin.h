@@ -3,10 +3,12 @@
 #include <memory>
 
 #include <QtCore/QByteArray>
+#include <QtCore/QString>
 
 #include "QGCCorePlugin.h"
 
 class AeroraAuditWriter;
+class AeroraCommandAuthorizer;
 class AeroraLocalStore;
 class AeroraVehicleIdentity;
 class AeroraVehicleStore;
@@ -172,6 +174,39 @@ public:
     /// member is the plumbing that finds these two from a vehicle; this is the behaviour.
     static QString reportFleetIdentityFrom(AeroraVehicleStore& vehicleStore, AeroraVehicleIdentity& identity,
                                            const mavlink_message_t& message, qint64 nowUtcMs);
+
+    /// The outcome of one authorization-chain installation attempt. Shaped after
+    /// `AeroraCredentialDocument::Result`: `installed` false always carries a `detail`, and
+    /// nothing is partially applied, so a caller never sees an identity installed without the
+    /// roles the issuer bound to it.
+    struct ChainInstallation
+    {
+        bool installed = false;
+        /// Operator-facing reason, set on every outcome including success. Carries which refusal
+        /// occurred, which the log alone cannot establish: of the five refusal paths two are at
+        /// debug level and the already-installed one logs nothing at all.
+        QString detail;
+    };
+
+    /// Reads the credential at \a credentialPath, verifies it against the issuer key \a
+    /// issuerKeyHex, and installs the three collaborators
+    /// `AeroraCommandAuthorizer::isFullyConfigured()` requires into \a authorizer: the identity
+    /// provider, the role resolver and the role policy.
+    ///
+    /// Returns without installing anything when \a authorizer is already fully configured, when
+    /// \a issuerKeyHex is not a usable key, when no credential is readable at \a credentialPath,
+    /// or when the credential does not verify. So the station either enforces with a credential
+    /// the issuer signed, or enforces nothing and says which.
+    ///
+    /// Static, and taking the authorizer by reference with both inputs as parameters, so the whole
+    /// verify-and-install path is testable without a plugin instance, the compile-time issuer-key
+    /// macro, the credential path singleton or `init()` - which a unit-test process never calls,
+    /// so the member below could not otherwise be exercised at all. The member is the plumbing
+    /// that finds these from the build and the store; this is the behaviour. Same reasoning as
+    /// reportFleetIdentityFrom() above.
+    [[nodiscard]] static ChainInstallation installAuthorizationChainInto(AeroraCommandAuthorizer& authorizer,
+                                                                         const QString& issuerKeyHex,
+                                                                         const QString& credentialPath);
 
 private:
     void _installSigningKeyStore();
