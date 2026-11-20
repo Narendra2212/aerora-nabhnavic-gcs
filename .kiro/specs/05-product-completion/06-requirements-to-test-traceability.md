@@ -41,7 +41,7 @@ in the product, and it is the matrix's job to show it.
 | `P7-MOD-010` `PROPOSED` â‰  `REQUESTED` | `AeroraTelemetryState` | `AeroraTelemetryStateTest` | UT | `IMPLEMENTED-UNCOMPILED` |
 | `P7-MOD-011` proposal carries source + freshness + basis | â€” | `TBW` | UT | `SPECIFIED-NOT-DESIGNED` |
 | `P7-MOD-012` explicit per-proposal approval, no standing approval | â€” | `TBW` | UT + QML | `SPECIFIED-NOT-DESIGNED` |
-| `P7-MOD-013` stale proposal not approvable | `AeroraFreshness` (mechanism) | `TBW` | UT | `OPEN` â€” `Q-036` has no values |
+| `P7-MOD-013` stale proposal not approvable | `AeroraFreshness` (mechanism) | `TBW` | UT | **SIGNED, NOT CONFIGURED**: `Q-036` has values as of 2026-11-05 and nothing registers them |
 | `P7-MOD-014` four distinct recorded events | `AeroraAuditSink` | `TBW` | UT | `CONTRACT-ONLY` |
 | `P7-MOD-020` autonomy needs capability **and** authorization | `AeroraVehicleCapabilities` + policy | `TBW` | IT | `BLOCKED` â€” `Q-029` |
 | `P7-MOD-021` absent capability = `UNKNOWN`, not permissive | `AeroraTelemetryState` | `AeroraTelemetryStateTest` | UT | `IMPLEMENTED-UNCOMPILED` |

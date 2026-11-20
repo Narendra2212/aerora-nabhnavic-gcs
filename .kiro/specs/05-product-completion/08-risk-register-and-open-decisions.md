@@ -72,7 +72,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | --- | --- | --- | --- |
 | ~~`Q-029`~~ | Operator role set | — | **SETTLED AND SIGNED.** Four roles, `closures/DG-ROL.role-set.json`, Product and operations, 2026-11-05. See [§1](#1-blockers) and [15](15-operator-identity-and-the-single-role-deployment.md) |
 | `Q-021` / `Q-023` | Aerora complex item and mission command set | 5 screens, journeys 6.1 and 6.5 | `OPEN` |
-| `Q-036` | Freshness budget values | `P7-MOD-013`, `P7-TEL-002`, `SCR-TEL-03` content | `OPEN` — **no value invented** |
+| ~~`Q-036`~~ | Freshness budget values | `P7-MOD-013`, `P7-TEL-002`, `SCR-TEL-03` content | **SETTLED AND SIGNED.** `closures/DG-FRS.freshness-budget.json`, Product, 2026-11-05: `Attitude`, `Position` and `System` each take **ten times the expected update interval of the class**, resolved to microseconds at configuration time, so no absolute number is compiled in; `Configuration` carries an explicit exception and resolves to `ObservedFreshnessUnevaluated`. **Not implemented** — nothing calls `AeroraFreshness::setThreshold()`, so every class still reads unevaluated. Found still marked `OPEN` at this reconciliation |
 | `Q-024` | Mission/payload command interaction | Fact-group implementation gate | `OPEN` |
 | `Q4-004` | Consequences of disabling vendor firmware factories | — | `OPEN` — neither factory disabled |
 | ~~`D-DAT-03`~~ | Fleet identity format | — | **SETTLED, SIGNED AND BUILT.** `closures/DG-FLT.identity-format.json`, Product, 2026-11-05: a UUIDv4 minted by the station on first contact from `AUTOPILOT_VERSION.uid2` falling back to `uid`, permanent for the airframe, and derived from the board rather than the MAVLink sysid. `AeroraVehicleStore` implements it and is CI-tested |
@@ -87,7 +87,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
 | ~~`ADR-014`~~ | Outbound authorization scope, Options A/B/C | Architecture | — | **SELECTED: Option C**, signed in `closures/DG-ROL.authorization-scope.json`, Architecture, 2026-11-05. [Doc 30's own ADR-014 status line still reads `OPEN`](../03-implementation-specification/30-outbound-command-security-audit.md#adr-014-outbound-authorization-scope) and is Architecture's to update |
-| `P7-DAT-002` | Local persistence design | Tab 1 | 7 screens; carries `Q-037` durability but not tamper-evidence | **CLOSED — `DESIGNED`.** [09](09-local-persistence-architecture.md). Seven new decisions `D-DAT-01`..`07` fall out of it, four of them product calls |
+| `P7-DAT-002` | Local persistence design | Tab 1 | 7 screens; carries `Q-037` durability and, since `DG-STO` closed, tamper-evidence as a signed decision rather than a built mechanism | **CLOSED — `DESIGNED`.** [09](09-local-persistence-architecture.md). Seven new decisions `D-DAT-01`..`07` fell out of it; six are now signed and only `D-DAT-06` is open ([below](#new-decisions-raised-by-wp1-c)) |
 | `P7-AI-004` | GPU/autonomy interface | Architecture + external | 2 screens, journey 6.4 | `OPEN` — **no endpoint, schema or response may be invented** |
 | `D-UI-06` | Multi-station authority | Architecture | `SCR-SHL-03`, `SCR-LIV-07` | `OPEN` — [new, §3](#3-new-open-decisions-raised-by-the-benchmark) |
 | — | Authorization lifetime: re-evaluate on retry? | Architecture + Tab 2 | — | `OPEN` — bounded to enqueue time; **no second check added** |
@@ -97,7 +97,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 
 | ID | Decision | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
-| `Q-037` / `Q4-003` | Audit integrity mechanism | Tab 2 | 2 screens, journey 6.6 | **`PARTIALLY RESOLVED`** — [09](09-local-persistence-architecture.md) designs durability (WAL + `synchronous=FULL` for audit, `ON DELETE RESTRICT`, write-failure accounting). **Tamper-evidence stays `OPEN`** and is now explicitly blocked on `D-DAT-05`, a protected chain anchor, which is blocked on `AeroraPlatformKeyProtector` having a backend, which is blocked on `D-006` |
+| ~~`Q-037`~~ / ~~`Q4-003`~~ | Audit integrity mechanism | Tab 2 | 2 screens, journey 6.6 | **SETTLED AND SIGNED.** `closures/DG-STO.tamper-evidence.json`, Tab 2 and security architecture, 2026-11-05, settling the audit chain construction, the protected chain anchor of `D-DAT-05` and the `AeroraPlatformKeyProtector` backend for each of the five target platforms. Durability is built — WAL + `synchronous=FULL` for audit, `ON DELETE RESTRICT`, write-failure accounting. **`isTamperEvident()` is not implemented**: the record is permission to build the anchor, not the anchor. Found still marked `PARTIALLY RESOLVED` and blocked on `D-006` at this reconciliation |
 | — | Platform key protection per OS | Tab 2 + architecture | `P7-SEC-003` | `OPEN` — **no backend on any of the 5 platforms, and gated on `D-006`: an untested crypto backend is worse than none** |
 | `Q-035` / `R-021` | Overlay test configuration leg | Tab 8 + CI | All denial-path tests | `OPEN` |
 | `Q-018` | Aerora `MAV_AUTOPILOT` value | Firmware | — | `OPEN` — **Aerora claims `Generic`; no value invented** |
@@ -126,13 +126,55 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 
 ### New decisions raised by WP1-C
 
-Seven, in [09 §14](09-local-persistence-architecture.md#14-open-decisions). Four are product calls
-(`D-DAT-01` retention caps, `D-DAT-02` whether audit may be deleted at all, `D-DAT-03` fleet
-identity, `D-DAT-06` encryption at rest), one is security architecture (`D-DAT-05` protected chain
-anchor), two are engineering (`D-DAT-04` event categories, `D-DAT-07` multi-instance behaviour).
+Seven, in [09 §14](09-local-persistence-architecture.md#14-open-decisions). **Six have since been
+signed and one is still open**, which is the reverse of how this paragraph read until this
+reconciliation:
 
-**No default retention value was invented.** A retention period carries regulatory weight in some
-domains, and a placeholder would outlive the decision it substituted for (`P7-NOINV-002`).
+| Decision | State |
+| --- | --- |
+| ~~`D-DAT-01`~~ retention caps | **SIGNED.** `closures/DG-STO.retention.json`, Product, 2026-11-05 |
+| ~~`D-DAT-02`~~ whether audit may be deleted at all | **SIGNED.** Same record: no, export only |
+| ~~`D-DAT-03`~~ fleet identity | **SIGNED AND BUILT.** `closures/DG-FLT.identity-format.json` |
+| ~~`D-DAT-04`~~ event categories | **SIGNED.** Same record as `D-DAT-01`: nine categories, stored values 0–8 |
+| ~~`D-DAT-05`~~ protected chain anchor | **SIGNED.** `closures/DG-STO.tamper-evidence.json`, Tab 2 and security architecture |
+| `D-DAT-06` encryption at rest | **`OPEN`.** Named in no Closure_Record. The one genuinely open member of this set |
+| ~~`D-DAT-07`~~ multi-instance behaviour | Engineering, Tab 1 |
+
+**No default retention value was invented, and none needed to be.** `D-DAT-01` is settled as
+operator-adjustable `SettingsFact`s in the Aerora settings group, mirroring how `maxCacheDiskSize`
+drives tile pruning, defaulting to **365 days of age** and **2 GB of total size** across `Events`
+and `EventValues`. Those two numbers are Product's, recorded in the Closure_Record and transcribed
+here rather than chosen (`P7-NOINV-002`). `Sessions` follow `Events`; `Vehicles` are never pruned
+automatically; and the caps cannot reach an audit record, because `AuditRecords` uses
+`ON DELETE RESTRICT` where every other table uses `CASCADE`.
+
+**The mechanism is still not wired to the decision.** `AeroraStoreRetention` is referenced by
+nothing but its own test, so no cap is applied at runtime. That is now an implementation gap rather
+than a decision gap.
+
+### Reconciliation debt this pass created and did not pay
+
+`R7-20` is the risk that a status row closes while the prose still calls the defect live. This pass
+updated `Q-036`, `D-DAT-01`, `D-DAT-02`, `D-DAT-04` and `D-DAT-05` in the live Phase 7 documents
+(`01`, `06`, `07`, `08`, `09`) and in [29](../03-implementation-specification/29-integration-status.md),
+and the grep for those five reading `OPEN` comes back empty outside the exclusions below.
+
+**`Q-037` was not reconciled past this document, and that is a known inconsistency rather than an
+oversight.** Its decision is signed in `closures/DG-STO.tamper-evidence.json`, so the row in §2 now
+says so, while these still carry the older reading:
+
+| Still reading `Q-037` as open or partially resolved | Why it was left |
+| --- | --- |
+| [34 §status, §contract, §decisions](../03-implementation-specification/34-audit-sink-and-security-status-contract.md) | Tab 2's contract document. Most of its lines describe `isTamperEvident()` returning false, which is still true, so each needs reading individually rather than a status substitution |
+| [31](../03-implementation-specification/31-layer-1-security-command-boundary.md), [29 §decisions](../03-implementation-specification/29-integration-status.md), [19 `IF-LOG-020`](../03-implementation-specification/19-interface-traceability.md) | Same shape: a mix of decision status and implementation status in one cell |
+| [01 §`P7-AUDIT-002`](01-product-requirements-and-completion-plan.md), [06 §`P7-AUDIT-002`](06-requirements-to-test-traceability.md), [10 §`Q-037`](10-parameter-write-path-and-authorization-boundary.md) | Requirement and traceability rows owned by their tabs |
+| `21`, `22`, `25`, `33` (Phase 4 and Phase 6 records) | **Deliberately untouched.** Dated records of a past state; rewriting them would destroy the history this register depends on |
+| `requirements.md` §gate rules | Conditional `SHALL` rules for the Gate_Review, not status claims |
+
+Owner: **Tab 2** for `34`, `31`, `29` and `19`; the owning tab for `01`, `06` and `10`. The
+distinction each needs is the one this pass applied to `D-DAT-01` and `D-DAT-05`: a signed decision
+with no implementation is an implementation gap, and saying `OPEN` for it overstates what is
+undecided while understating what is unbuilt.
 
 ## 3. New open decisions raised by the benchmark
 
@@ -306,7 +348,7 @@ Option C. The third cannot be built from anything in this repository:
 | Owner | **Tab 1** |
 | Status | **RESOLVED AND BUILT.** No longer an escalation. The row is kept because this register reads as a history |
 | What landed | `AeroraLocalStore` and its schema, `AeroraStorePaths`, `AeroraSqliteAuditSink` with the `AeroraAuditWriter` async front, `AeroraStoreExport`, `AeroraStoreRetention`, the `Events`/`EventValues` writer and the `Vehicles` writer — all compiled and CI-tested on Linux and Windows, and the audit path installed by default at plugin startup |
-| What it did not resolve | Tamper-evidence stays `OPEN` (`D-DAT-05` → `AeroraPlatformKeyProtector`, no backend on any platform), and the retention caps `D-DAT-01` stay a product call, so `AeroraStoreRetention` takes an explicit cutoff and ships no default |
+| What it did not resolve | **Both of the decisions this row named have since been signed, and neither is implemented**, which is a different and smaller gap than the one recorded here until this reconciliation. `D-DAT-05` is settled in `closures/DG-STO.tamper-evidence.json` and `isTamperEvident()` is still unimplemented, because a signed anchor is permission to build one. `D-DAT-01` is settled in `closures/DG-STO.retention.json` and `AeroraStoreRetention` still takes an explicit cutoff and is called from nothing, so no cap is applied at runtime |
 
 ### Decisions deliberately not escalated
 

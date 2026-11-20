@@ -90,7 +90,7 @@ or `UNKNOWN` when the vehicle has not said.
 | `P7-MOD-010` | An autonomy source may emit a `PROPOSED` action. It is not `REQUESTED` until the operator approves and the station transmits |
 | `P7-MOD-011` | Every proposal carries its source, its freshness, and the evidence behind it. A proposal with no displayable basis is shown as such, not hidden |
 | `P7-MOD-012` | Approval is explicit, per-proposal or per-bounded-batch. There is no standing approval that survives a session |
-| `P7-MOD-013` | A stale proposal is not approvable. Freshness budget is `Q-036`, `OPEN` â€” no value invented |
+| `P7-MOD-013` | A stale proposal is not approvable. Freshness budget is `Q-036`, **signed** 2026-11-05 as ten times the class's expected update interval. Not yet configured, so no class is evaluated |
 | `P7-MOD-014` | Approval, transmission, acceptance and rejection are four distinct recorded events |
 
 ### 2.3 Fully autonomous
@@ -300,7 +300,7 @@ Owner: Tab 3.
 | ID | Requirement | Status |
 | --- | --- | --- |
 | `P7-TEL-001` | Every telemetry item carries a declared kind, an observation and a derived state class | `IMPLEMENTED-UNCOMPILED` (`AeroraTelemetryState`) |
-| `P7-TEL-002` | Freshness is evaluated against a per-item budget. Budgets are `Q-036`, `OPEN` â€” none invented | `IMPLEMENTED-UNCOMPILED` (mechanism) + `OPEN` (values) |
+| `P7-TEL-002` | Freshness is evaluated against a per-item budget. Budgets are `Q-036`, **signed** 2026-11-05 as ten times each class's expected update interval, with `Configuration` excepted | `IMPLEMENTED-UNCOMPILED` (mechanism) + **SIGNED, NOT CONFIGURED** (values): nothing calls `setThreshold()`, so every class resolves to `ObservedFreshnessUnevaluated` |
 | `P7-TEL-003` | Aerora fact groups attach per-vehicle through the ADR-016 registrar | `CONTRACT-ONLY` â€” `isRegistrationAvailable()` returns `true` (both `ADR-016` halves are applied and Tab 1 authorised them in the accepted `DG-TLM` core-edit Closure_Record), and the six groups are contract-only, which is the remaining gate |
 | `P7-TEL-004` | An event timeline records state transitions, operator actions and authorization outcomes on one time axis | `SPECIFIED-NOT-DESIGNED` |
 | `P7-TEL-005` | Telemetry source attribution is carried where the source is known. `IF-MAV-022` is `OPEN`; no attribution is invented | `OPEN` |

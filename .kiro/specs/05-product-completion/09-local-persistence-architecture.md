@@ -563,13 +563,19 @@ module declares a hard dependency on it. Both are Tab 1's file.
 
 ## 14. Open decisions
 
+**Five of the seven have since been signed.** This section is kept as a history rather than
+rewritten, so the struck rows record what this document raised and the right-hand column records
+where each landed. Only `D-DAT-06` and `D-DAT-07` are still open, and every signed row below is a
+decision without an implementation rather than a decision without an answer — which is a different
+gap, and the one the programme should now be measured against.
+
 | ID | Decision | Owner | Blocks |
 | --- | --- | --- | --- |
-| `D-DAT-01` | Retention age and size caps for `Events` | **Product** | Default values only; the mechanism ships without them |
-| `D-DAT-02` | Whether audit records may be deleted by an operator at all, or only exported | **Product + compliance** | The confirmation flow in `SCR-SEC-03` |
-| `D-DAT-03` | Fleet identity format | **Product** | `Vehicles` table population, `SCR-FLT-01`, `SCR-FLT-02` |
-| `D-DAT-04` | `Events.category` enumeration | Tab 4 | `Events` writer |
-| `D-DAT-05` | Whether a protected chain anchor will ever exist, and on which platforms | Tab 2 + architecture | **Tamper-evidence. Blocked on `AeroraPlatformKeyProtector`, blocked on `D-006`** |
+| ~~`D-DAT-01`~~ | Retention age and size caps for `Events` | **Product** | **SIGNED** 2026-11-05, `closures/DG-STO.retention.json`: operator-adjustable `SettingsFact`s defaulting to 365 days and 2 GB across `Events` and `EventValues`. Unimplemented — `AeroraStoreRetention` is called from nothing |
+| ~~`D-DAT-02`~~ | Whether audit records may be deleted by an operator at all, or only exported | **Product + compliance** | **SIGNED** 2026-11-05, same record: no, export only. `SCR-SEC-03`'s flow is therefore an export flow and not a destructive one |
+| ~~`D-DAT-03`~~ | Fleet identity format | **Product** | **SIGNED AND BUILT**, `closures/DG-FLT.identity-format.json`. `AeroraVehicleStore` implements it |
+| ~~`D-DAT-04`~~ | `Events.category` enumeration | Tab 4 | **SIGNED** 2026-11-05, same record as `D-DAT-01`: nine categories, stored values 0–8 |
+| ~~`D-DAT-05`~~ | Whether a protected chain anchor will ever exist, and on which platforms | Tab 2 + architecture | **SIGNED** 2026-11-05, `closures/DG-STO.tamper-evidence.json`, with a backend settled per target platform. `isTamperEvident()` stays unimplemented: the record is permission to build the anchor, not the anchor |
 | `D-DAT-06` | Encryption at rest — required or not | Product + security | Limitation 5 |
 | `D-DAT-07` | Multi-instance behaviour: prevent, or define | Tab 1 | Limitation 6 |
 
@@ -579,7 +585,7 @@ module declares a hard dependency on it. Both are Tab 1's file.
 | --- | --- | --- |
 | `P7-DAT-002` | `SPECIFIED-NOT-DESIGNED` | **`DESIGNED`** |
 | `P7-DAT-005` | `SPECIFIED-NOT-DESIGNED` | **`DESIGNED`** |
-| `Q-037` | `OPEN` | **`PARTIALLY RESOLVED`** — durability designed; tamper-evidence stays `OPEN` and is now explicitly blocked on `D-DAT-05` |
+| `Q-037` | `OPEN` | **`PARTIALLY RESOLVED`** at the time of writing — durability designed, tamper-evidence left `OPEN` and blocked on `D-DAT-05`. **Superseded:** `DG-STO.tamper-evidence` was signed on 2026-11-05, so `Q-037` is settled as a decision and `isTamperEvident()` is an implementation gap |
 | `SCR-TEL-02`, `SCR-LOG-01`, `SCR-LOG-02`, `SCR-SEC-03` | `SPECIFIED-NOT-DESIGNED` | **`DESIGNED`**, pending their writers |
 | `SCR-FLT-01`, `SCR-FLT-02` | `SPECIFIED-NOT-DESIGNED` | still blocked — on `D-DAT-03`, not on the store |
 

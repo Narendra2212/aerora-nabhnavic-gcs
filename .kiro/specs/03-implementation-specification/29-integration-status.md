@@ -186,7 +186,7 @@ gaps and process conflicts, each with an owner.
 | `Q-018` | Aerora `MAV_AUTOPILOT` value | Firmware | No | `OPEN` — Aerora claims Generic; no value invented |
 | `Q-007` | Flight-mode / authority mapping | Firmware + product | No | `OPEN` |
 | `Q3-009` | Capability presence reporting | Firmware | No | `OPEN` |
-| `Q-036` | Freshness thresholds | Product | No | `OPEN` — no value invented |
+| ~~`Q-036`~~ | Freshness thresholds | Product | No | **SETTLED AND SIGNED** 2026-11-05, `closures/DG-FRS.freshness-budget.json`: ten times each class's expected update interval, `Configuration` excepted. Not configured, so no class is evaluated yet |
 | `IF-MAV-022` | Telemetry source attribution | Dialect | No | `OPEN` |
 | `Q-021` / `Q-023` | Aerora complex item / mission command set | Product | No | `OPEN` — no extension registered |
 | `Q-035` / `R-021` | Overlay test configuration | Tab 1 + CI | **Yes** for denial tests | `OPEN` — needs an overlay leg with `QGC_BUILD_TESTING=ON` |

@@ -278,9 +278,9 @@ definition of done.
 
 | Field | Detail |
 | --- | --- |
-| Prerequisite | `Q-036` pending |
-| Deliverable | What a budget must express (per-item, per-kind, or per-source), what happens at the boundary, and how a budget change propagates. **No value invented** |
-| Done | `DESIGNED`, values `OPEN` |
+| Prerequisite | `Q-036` **signed** 2026-11-05 in `closures/DG-FRS.freshness-budget.json`, so this is no longer blocked |
+| Deliverable | What a budget must express (per-item, per-kind, or per-source), what happens at the boundary, and how a budget change propagates. **No value invented**: the signed rule is ten times the class's expected update interval, and the expected interval is deployment configuration |
+| Done | `DESIGNED`; values signed and **not configured**, so the work is now to register them rather than to decide them |
 
 **WP4-D: event timeline model**
 
