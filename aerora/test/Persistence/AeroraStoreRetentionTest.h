@@ -23,6 +23,22 @@
 /// \li **A prune before open is a no-op that reports failure.** Each prune returns -1 rather than
 ///     touching a database it has no connection to.
 ///
+/// \section size The size prune, and what is asserted without depending on the build
+///
+/// `pruneEventsToFitBytes` can only run where SQLite carries `dbstat`, which is a compile-time
+/// option of whatever library this build links. So the properties that matter are asserted
+/// **unconditionally**, and only the happy path is conditional on the probe:
+///
+/// \li **A size prune never deletes an audit record**, asserted with a cap of zero - the most
+///     aggressive request possible - so it holds whether the prune ran or refused. This is the
+///     property that makes the whole-database shortcut unacceptable, and it is checked rather
+///     than argued.
+/// \li **It refuses rather than approximating.** With no byte attribution available, `eventBytes()`
+///     is -1 and the prune returns -1 having deleted nothing, so an unenforceable cap leaves the
+///     log intact instead of emptying it.
+/// \li **`eventBytes()` agrees with the probe**, so the two cannot drift into a state where a
+///     measurement is reported that the prune does not trust, or the reverse.
+///
 /// Verified through independent SQLite connections to the same file, so each assertion reads what
 /// was persisted rather than what the class reported in memory.
 class AeroraStoreRetentionTest : public UnitTest
@@ -36,4 +52,9 @@ private slots:
     void _pruneEmptySessionsKeepsReferencedAndActive();
     void _pruneBeforeOpenReturnsMinusOne();
     void _openFailsWhenStoreIsNotOpen();
+
+    void _eventBytesAgreesWithTheMeasurementProbe();
+    void _aSizePruneNeverDeletesAnAuditRecord();
+    void _aSizePruneRefusesANegativeCap();
+    void _aSizePruneRemovesOldestEventsFirst();
 };

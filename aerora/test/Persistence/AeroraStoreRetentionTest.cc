@@ -280,6 +280,12 @@ void AeroraStoreRetentionTest::_pruneBeforeOpenReturnsMinusOne()
     QCOMPARE(retention.pruneEventsOlderThan(1700000000000LL), -1);
     QCOMPARE(retention.pruneWriteFailuresOlderThan(1700000000000LL), -1);
     QCOMPARE(retention.pruneEmptySessions(), -1);
+
+    // The size prune and its measurement answer the same way before open, and neither probes a
+    // connection it does not have.
+    QCOMPARE(retention.eventBytes(), -1);
+    QCOMPARE(retention.pruneEventsToFitBytes(1024), -1);
+    QVERIFY(!retention.canMeasureEventBytes());
 }
 
 void AeroraStoreRetentionTest::_openFailsWhenStoreIsNotOpen()
@@ -293,6 +299,188 @@ void AeroraStoreRetentionTest::_openFailsWhenStoreIsNotOpen()
     verifyExpectedLogMessage();
 
     QVERIFY(!retention.isOpen());
+}
+
+void AeroraStoreRetentionTest::_eventBytesAgreesWithTheMeasurementProbe()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    AeroraStoreRetention retention(store);
+    QVERIFY(retention.open());
+
+    // The two must not drift apart: a reported measurement the prune would refuse to trust, or a
+    // prune willing to run against a measurement that is not available, are both failures.
+    const bool measurable = retention.canMeasureEventBytes();
+    const qint64 bytes = retention.eventBytes();
+
+    QCOMPARE(bytes >= 0, measurable);
+
+    // And the probe is stable. It is cached after the first call, so a second must not disagree.
+    QCOMPARE(retention.canMeasureEventBytes(), measurable);
+}
+
+void AeroraStoreRetentionTest::_aSizePruneNeverDeletesAnAuditRecord()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    {
+        QGCSqlHelper::ScopedConnection seed(path);
+        QVERIFY(seed.isValid());
+        QSqlDatabase db = seed.database();
+        QVERIFY(seedSession(db, 1));
+
+        for (int i = 0; i < 40; ++i) {
+            const qint64 eventId = seedEvent(db, 1, 1700000000000LL + i);
+            QVERIFY(eventId > 0);
+            QVERIFY(seedEventValue(db, eventId, QStringLiteral("battery.voltage")));
+        }
+        for (int i = 0; i < 10; ++i) {
+            QVERIFY(seedAudit(db, 1));
+        }
+    }
+
+    QCOMPARE(rowCount(path, QStringLiteral("Events")), 40);
+    QCOMPARE(rowCount(path, QStringLiteral("AuditRecords")), 10);
+
+    AeroraStoreRetention retention(store);
+    QVERIFY(retention.open());
+
+    // A cap of zero is the most aggressive request the interface can make: no event log is small
+    // enough, so the prune removes everything it is permitted to remove. Asserted without
+    // depending on whether this build can measure bytes, because the property has to hold either
+    // way - if the prune ran it must have spared the audit trail, and if it refused it must have
+    // deleted nothing at all.
+    const bool measurable = retention.canMeasureEventBytes();
+
+    // Tolerated rather than required, because which of the two fires depends on the build and, on
+    // a measuring build, on whether the emptied tables still report pages. The return value and
+    // the row counts below are the assertions; these only keep strict log mode from failing on a
+    // warning that is correct either way.
+    ignoreLogMessage("aerora.persistence.retention", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("refusing to enforce a size cap")));
+    ignoreLogMessage("aerora.persistence.retention", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("no prunable event remains")));
+
+    const int deleted = retention.pruneEventsToFitBytes(0);
+
+    // The one thing that must be true in both worlds.
+    QCOMPARE(rowCount(path, QStringLiteral("AuditRecords")), 10);
+    QVERIFY(sessionExists(path, 1));
+
+    if (measurable) {
+        QCOMPARE(deleted, 40);
+        QCOMPARE(rowCount(path, QStringLiteral("Events")), 0);
+        // The values went with their events rather than being orphaned.
+        QCOMPARE(rowCount(path, QStringLiteral("EventValues")), 0);
+    } else {
+        QCOMPARE(deleted, -1);
+        QCOMPARE(rowCount(path, QStringLiteral("Events")), 40);
+        QCOMPARE(rowCount(path, QStringLiteral("EventValues")), 40);
+    }
+}
+
+void AeroraStoreRetentionTest::_aSizePruneRefusesANegativeCap()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    {
+        QGCSqlHelper::ScopedConnection seed(path);
+        QVERIFY(seed.isValid());
+        QSqlDatabase db = seed.database();
+        QVERIFY(seedSession(db, 1));
+        QVERIFY(seedEvent(db, 1, 1700000000000LL) > 0);
+    }
+
+    AeroraStoreRetention retention(store);
+    QVERIFY(retention.open());
+
+    // A negative cap is a caller error, not a request to delete everything. Checked before the
+    // measurement probe, so it reports the same way on every build.
+    QCOMPARE(retention.pruneEventsToFitBytes(-1), -1);
+    QCOMPARE(rowCount(path, QStringLiteral("Events")), 1);
+}
+
+void AeroraStoreRetentionTest::_aSizePruneRemovesOldestEventsFirst()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("aerora.db"));
+
+    AeroraLocalStore store;
+    QVERIFY(store.open(path, false).opened);
+
+    AeroraStoreRetention retention(store);
+    QVERIFY(retention.open());
+
+    if (!retention.canMeasureEventBytes()) {
+        QSKIP(
+            "this build's SQLite has no dbstat, so a size cap cannot be enforced and the "
+            "ordering of a size prune cannot be exercised; the refusal path is covered by "
+            "_aSizePruneNeverDeletesAnAuditRecord");
+    }
+
+    const qint64 oldest = 1700000000000LL;
+    const int seeded = 1200;  // several batches' worth, so the prune can stop part-way
+    {
+        QGCSqlHelper::ScopedConnection seed(path);
+        QVERIFY(seed.isValid());
+        QSqlDatabase db = seed.database();
+        QVERIFY(seedSession(db, 1));
+
+        for (int i = 0; i < seeded; ++i) {
+            const qint64 eventId = seedEvent(db, 1, oldest + i);
+            QVERIFY(eventId > 0);
+            QVERIFY(seedEventValue(db, eventId, QStringLiteral("a.reasonably.long.item.identifier")));
+        }
+    }
+
+    const qint64 full = retention.eventBytes();
+    QVERIFY(full > 0);
+
+    const qint64 cap = full / 2;
+    const int deleted = retention.pruneEventsToFitBytes(cap);
+    QVERIFY2(deleted > 0,
+             qPrintable(QStringLiteral("deleted %1 at a cap of %2 from %3 bytes").arg(deleted).arg(cap).arg(full)));
+
+    // Nothing lost or double-counted, whichever batch the prune stopped on. The cap is re-checked
+    // only between batches, so the count is a multiple of the batch size unless it ran out of rows.
+    const int remaining = rowCount(path, QStringLiteral("Events"));
+    QCOMPARE(remaining + deleted, seeded);
+    QCOMPARE(rowCount(path, QStringLiteral("EventValues")), remaining);
+
+    if (remaining == 0) {
+        // It exhausted the table rather than reaching the cap, so there is no surviving order to
+        // check. Still a pass: the prune is permitted to delete every event, and never more.
+        return;
+    }
+
+    // The cap was genuinely reached rather than the loop running out of rows.
+    QVERIFY(retention.eventBytes() <= cap);
+
+    // Oldest first: every surviving event is newer than every deleted one, which for a contiguous
+    // oldest-first delete means the minimum remaining timestamp moved forward by exactly the
+    // number deleted. A prune taking an arbitrary slice would not satisfy this.
+    QGCSqlHelper::ScopedConnection check(path);
+    QVERIFY(check.isValid());
+    QSqlQuery query(check.database());
+    QVERIFY(query.exec(QStringLiteral("SELECT MIN(occurredUtcMs) FROM Events")));
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toLongLong(), oldest + deleted);
 }
 
 UT_REGISTER_TEST(AeroraStoreRetentionTest, TestLabel::Unit)

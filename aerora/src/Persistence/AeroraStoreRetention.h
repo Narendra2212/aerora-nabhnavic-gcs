@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 class AeroraLocalStore;
 
@@ -22,10 +23,11 @@ class ScopedConnection;
 ///
 /// \section caps The caps are not here
 ///
-/// The age and size caps, and whether a size cap is counted in bytes or rows, are `D-DAT-01` and
-/// `OPEN`: a retention period carries regulatory weight and `P7-NOINV-002` forbids inventing one.
-/// So this takes an explicit cutoff from the caller and ships no default. The row-exact age prune
-/// is the mechanism; a byte-exact size prune waits on that decision.
+/// The age and size caps are `D-DAT-01`, **signed** on 2026-11-05 in
+/// `closures/DG-STO.retention.json` as operator-adjustable settings defaulting to 365 days of age
+/// and 2 GB of total size across `Events` and `EventValues`. The values live with the settings that
+/// carry them, not here: this takes an explicit cutoff or cap from the caller and ships no default,
+/// so no retention value is compiled into the mechanism (`P7-NOINV-002`).
 ///
 /// \section how Deletes in bounded batches inside a transaction
 ///
@@ -65,8 +67,52 @@ public:
     /// references is kept - by this query, and by `ON DELETE RESTRICT` if a query ever missed it.
     [[nodiscard]] int pruneEmptySessions();
 
+    /// Whether this build can attribute bytes to individual tables, probed once per connection.
+    ///
+    /// `dbstat` is the only thing in SQLite that answers "how many bytes does this table occupy",
+    /// and it exists only when the library was compiled with `SQLITE_ENABLE_DBSTAT_VTAB`. Qt's
+    /// bundled SQLite may or may not carry it and a deployment may link a system library instead,
+    /// so this is probed at runtime rather than assumed at compile time.
+    [[nodiscard]] bool canMeasureEventBytes();
+
+    /// Bytes `Events` and `EventValues` occupy, including the three indexes over them, or -1 when
+    /// canMeasureEventBytes() is false.
+    ///
+    /// Indexes are counted deliberately: they are part of what keeping those rows costs on disk,
+    /// so excluding them would report a size smaller than the one a size cap is meant to bound.
+    /// `AuditRecords`, `Sessions` and `Vehicles` are excluded, because the signed cap governs the
+    /// operational event log and nothing else.
+    [[nodiscard]] qint64 eventBytes();
+
+    /// Deletes the oldest `Events`, cascading their `EventValues`, in bounded batches until
+    /// eventBytes() is at or below \a maxBytes. Returns the number of events deleted, or -1.
+    ///
+    /// \section closed Refuses rather than approximates
+    ///
+    /// Returns -1 without deleting anything when canMeasureEventBytes() is false. The tempting
+    /// substitute is the whole database size, which needs only two standard pragmas - and it is
+    /// wrong in a way that costs data: a store whose bytes are mostly `AuditRecords` can never be
+    /// brought under the cap by deleting events, so a loop measuring the whole file would delete
+    /// the entire event log chasing bytes it must never reclaim. Refusing leaves the operator with
+    /// an unenforced size cap and an intact log, which is the safe direction.
+    ///
+    /// \section batches Commits per batch, not once overall
+    ///
+    /// Unlike the age prunes this commits each batch, because freed pages are only visible to the
+    /// measurement after a commit, so the number deciding whether to continue cannot be read inside
+    /// the transaction that deleted. An interrupted size prune therefore leaves a consistent store
+    /// at a batch boundary having deleted fewer events than the cap asked for.
+    ///
+    /// Stops when no prunable event remains even if still over \a maxBytes, and says so. Oldest
+    /// first, so the cap costs the least recent history rather than an arbitrary slice.
+    [[nodiscard]] int pruneEventsToFitBytes(qint64 maxBytes);
+
 private:
     AeroraLocalStore& _store;
     std::unique_ptr<QGCSqlHelper::ScopedConnection> _connection;
     bool _ready = false;
+
+    /// Cached result of the `dbstat` probe. Reset by close() so a reopened instance probes the
+    /// connection it actually has.
+    std::optional<bool> _canMeasureEventBytes;
 };
