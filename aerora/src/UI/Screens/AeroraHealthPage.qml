@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
@@ -71,7 +72,7 @@ SetupPage {
     // derived page has to supply one or that binding raises a ReferenceError on every load.
     QGCPalette {
         id: qgcPal
-        colorGroupEnabled: enabled
+        colorGroupEnabled: root.enabled
     }
 
     /// The active vehicle, or null. Null is a normal state here: the Configure view can be open

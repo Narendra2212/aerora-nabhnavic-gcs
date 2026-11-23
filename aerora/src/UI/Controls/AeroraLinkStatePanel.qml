@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
@@ -160,6 +161,6 @@ QGCGroupBox {
 
     QGCPalette {
         id: qgcPal
-        colorGroupEnabled: enabled
+        colorGroupEnabled: root.enabled
     }
 }

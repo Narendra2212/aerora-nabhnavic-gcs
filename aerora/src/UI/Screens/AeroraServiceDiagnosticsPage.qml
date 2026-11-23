@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
@@ -75,7 +76,7 @@ SetupPage {
     // is why every upstream SetupPage carries the same declaration.
     QGCPalette {
         id: qgcPal
-        colorGroupEnabled: enabled
+        colorGroupEnabled: root.enabled
     }
 
     /// Truthy test rather than a null comparison, so an unresolved property reads as unavailable

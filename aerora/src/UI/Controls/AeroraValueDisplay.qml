@@ -86,6 +86,6 @@ RowLayout {
 
     QGCPalette {
         id: qgcPal
-        colorGroupEnabled: enabled
+        colorGroupEnabled: root.enabled
     }
 }
