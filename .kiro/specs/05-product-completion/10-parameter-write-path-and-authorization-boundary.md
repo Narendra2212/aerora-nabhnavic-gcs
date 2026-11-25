@@ -412,6 +412,23 @@ here would be the invention `P7-NOINV-001` prohibits, and WP9-B prohibits a seco
 gate. What follows maps each candidate onto ADR-014's existing Options A/B/C vocabulary so the
 decision can be taken with the parameter path in view instead of without it.
 
+> **Update — the precondition in the paragraph above no longer holds, and the selection is
+> therefore takeable.** Both decisions it waited on were signed on 2026-11-05: `Q-029` as four roles
+> in `closures/DG-ROL.role-set.json`, and **ADR-014 as Option C** in
+> `closures/DG-ROL.authorization-scope.json`, whose accepted record also places `parameter` among
+> the classes that are *counted and allowed* rather than denied. C1 is already mapped below as
+> "Option C — a parameter-class seam at its natural convergence point", so the option the
+> architecture selected and the candidate this document described in Option C terms are the same
+> shape.
+>
+> **The selection is still not made here.** It is Tab 9's, two things remain genuinely open that
+> bear on it — the authorization-lifetime-on-retry question, which §5.3 shows bites harder on
+> `PARAM_SET` than on `MAV_CMD`, and the `D-DAT-08`-style question of what a denial does to a
+> half-written parameter set — and a seam installed while
+> `AeroraCommandAuthorizer::isFullyConfigured()` is still `false` would add a claim surface without
+> adding enforcement, which is `R7-15` read backwards. What changed is only that the blocker named
+> above is gone, so this is now work rather than a wait.
+
 | # | Candidate | File:line | Covers | Misses | ADR-014 fit |
 | --- | --- | --- | --- | --- | --- |
 | C1 | `ParameterManager::_mavlinkParamSet` entry | `ParameterManager.cc:306` | E1–E6: all C++ and QML parameter writes | X1–X4. Authorizes once per write, not per transmission | **Option C** — a parameter-class seam at its natural convergence point |
@@ -517,11 +534,11 @@ the single path that bypasses the Fact layer.
 
 | ID | Status | Why Tab 9 does not touch it |
 | --- | --- | --- |
-| `Q-029` operator role set | `OPEN` — [08 § 1](08-risk-register-and-open-decisions.md#1-blockers) | Product + operations. No role, permission or allow-list is proposed here |
-| `ADR-014` outbound scope | `OPEN — ARCHITECTURAL DECISION REQUIRED` — [doc 30](../03-implementation-specification/30-outbound-command-security-audit.md#adr-014-outbound-authorization-scope) | Architecture. §7 informs Options A/B/C; it does not select |
-| Authorization lifetime on retry | `OPEN` — [08 § 2](08-risk-register-and-open-decisions.md#2-open-decisions) | §5.3 shows it bites harder on `PARAM_SET` than on `MAV_CMD`. Still Architecture + Tab 2 |
-| `Q-037` audit mechanism | `OPEN` | §3 records that the parameter path has no audit record at all. The mechanism is Tab 2's, gated on WP1-C |
-| `D-006` build host | `NO-GO` | Nothing here was compiled or run |
+| ~~`Q-029`~~ operator role set | **SETTLED AND SIGNED** 2026-11-05, `closures/DG-ROL.role-set.json` — four roles. Was `OPEN` when this document was written | Product + operations. No role, permission or allow-list is proposed here, and none needs to be now |
+| ~~`ADR-014`~~ outbound scope | **SELECTED: Option C**, signed 2026-11-05 in `closures/DG-ROL.authorization-scope.json`. Was `OPEN — ARCHITECTURAL DECISION REQUIRED` | Architecture, and now answered. §7 mapped C1 onto Option C, so the selected option and this document's Option C candidate describe the same seam |
+| Authorization lifetime on retry | `OPEN` — [08 § 2](08-risk-register-and-open-decisions.md#2-open-decisions) | §5.3 shows it bites harder on `PARAM_SET` than on `MAV_CMD`. Still Architecture + Tab 2, and still a genuine input to selecting a seam |
+| ~~`Q-037`~~ audit mechanism | **SETTLED AND SIGNED** 2026-11-05, `closures/DG-STO.tamper-evidence.json`, Tab 2 and security architecture. `isTamperEvident()` remains unimplemented, so §3's observation that the parameter path has no audit record at all still stands as an implementation fact | Tab 2's. No longer gated on WP1-C, which landed |
+| ~~`D-006`~~ build host | **LARGELY RESOLVED on one host** — [08 §1.1](08-risk-register-and-open-decisions.md#11-what-a-real-build-host-established). The overlay builds, launches and passes its suites on a provisioned Windows host; what remains is hardware. Was `NO-GO` | Nothing *in this document* was compiled or run, which is unchanged — the statement was about this investigation, not about the programme |
 
 ### Resolved by this investigation
 
