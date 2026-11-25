@@ -1,4 +1,9 @@
-pragma ComponentBehavior: Bound
+// No `pragma ComponentBehavior: Bound` here, and qmllint's UnqualifiedAccess warnings in this
+// file are left standing because of it. This page roots at upstream SetupPage, which reads
+// `vehicleComponent` from dynamic scope (SetupPage.qml:16,17,40,42). Binding the component
+// context makes that name unresolvable and every setup page fails to render with
+// "ReferenceError: vehicleComponent is not defined" - caught by AeroraVehicleConfigUITest, which
+// runs on the Linux leg only.
 import QtQuick
 import QtQuick.Layouts
 

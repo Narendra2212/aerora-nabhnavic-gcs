@@ -1,4 +1,6 @@
-pragma ComponentBehavior: Bound
+// No `pragma ComponentBehavior: Bound` here - see the note in AeroraHealthPage.qml. This page
+// roots at upstream SetupPage, which reads `vehicleComponent` from dynamic scope, so binding the
+// component context breaks rendering for every setup page.
 import QtQuick
 import QtQuick.Layouts
 
