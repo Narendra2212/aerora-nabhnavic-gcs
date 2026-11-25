@@ -40,7 +40,10 @@ outside a hosted CI runner, and it produced facts rather than only a green tick.
 | Startup self-report | The application logs, unprompted, `no platform key protector available: MAVLink signing keys remain stored WITHOUT protection at rest` and `command authorization is NOT being enforced` |
 | Interface | The Fly view renders and the toolbar shows **"Command authorization: not enforced"** — `SCR-SHL-03` observed, not inferred |
 | `clang-tidy` | **0 diagnostics** over all 57 overlay compilation units, with a positive control proving the harness reports: the same invocation returns 17 on upstream `NTRIPConnectionStats.cc`. Version 19.1.1 locally against the `analysis.llvm_version: 18` CI pins |
+| `cppcheck` | **36 findings, none at `error` or `warning` severity** — 14 `returnByReference`, 11 `useStlAlgorithm`, 3 `shadowFunction`, 3 `ignoredReturnErrorCode`, 3 `CastIntegerToAddressAtReturn`, 1 `knownEmptyContainer`, and style or performance throughout. The three classes that could have been real were each run down and none is a defect — see [§1.2](#12-what-cppcheck-found-and-what-it-did-not) |
 | `qmllint` | First run ever: **205 warnings, all `unqualified`, all in `aerora/`**. Reduced to 83 — see `D-UI-08` |
+| `clazy` | **Not run.** It is a clang plugin that has to be built against LLVM development libraries, which is why `build-config.json` pins `clazy_revision` and `clazy_sha256` for CI to build it. Infeasible on this host; it stays never-executed |
+| `pre-commit --all-files` | **Cannot complete on Windows**, and the cause is the host rather than the overlay: the `vale-sync` hook is `language: golang`, so pre-commit builds a Go environment that vendors the Docker module, whose `testdata` filenames run past 260 characters. With `LongPathsEnabled=0` it fails identically on every attempt with `WinError 3`. `SKIP` does not help, because the half-created cache is scanned before any hook runs. The gate's authority is the Linux `Aerora Lint` leg, which runs these hooks over `aerora/` on every push and is green |
 
 **What this does not establish.** Every number above is a Debug build against `MockLink` on one
 developer host. Nothing ran against an autopilot or a radio, nothing flew, and
@@ -65,6 +68,27 @@ installer **silently installs the compiler without a Windows SDK when not elevat
 moc'd while their bodies compile away and the application fails to link with ten `LNK2019`s. That
 last one is an upstream QGC defect; it is recorded here rather than patched, because no shipped or
 CI configuration builds with GStreamer off.
+
+### 1.2 What `cppcheck` found, and what it did not
+
+Run with `--library=qt` — without it the output is dominated by `unknownMacro` "errors" for
+`QGC_LOGGING_CATEGORY`, `Q_ENUM` and `Q_DECLARE_LOGGING_CATEGORY`, which are the tool not knowing Qt
+rather than anything about the code. With the Qt macros understood: **36 findings over
+`aerora/src`, none at `error` or `warning` severity.**
+
+Three classes could have been real. None was, and the reasoning is recorded so the next run does not
+re-investigate them:
+
+| Finding | Verdict |
+| --- | --- |
+| `CastIntegerToAddressAtReturn` ×3 — "returning an integer in a function with pointer return type" at `AeroraStateValue.h:152`, `AeroraFactGroupBase.h:166`, `AeroraFreshness.h:119` | **False positive.** All three are plain pointer getters returning a pointer member — `Fact *fact()`, `AeroraFreshness *_freshnessEvaluator()`, `RuntimeScheduler *scheduler()`. Without full include resolution cppcheck cannot type the member, assumes an integer, and flags the return |
+| `knownEmptyContainer` — "iterating over container `declaredIndicators()` that is always empty" at `AeroraToolIndicators.cc:60` | **Correct, and intentional.** `declaredIndicators()` returns `{}` literally: the overlay declares no *vehicle* tool indicator, and its one indicator reaches the toolbar through the non-vehicle `toolBarIndicators()` registry. Empty by construction, in the same shape as the overlay's other empty-by-default registries |
+| `ignoredReturnErrorCode` ×3 — `QSqlQuery::prepare()` unchecked at `AeroraVehicleStore.cc:72`, `:84`, `:105` | **Real, already handled one step later.** Each `prepare()` is followed by an `exec()` that *is* checked, and whose failure path calls `recordWriteFailure()` with `lastError().text()`. A failed `prepare()` surfaces there with a better message than a separate check would give. Checking both would add three branches that can only fire together |
+
+So two independent C++ analysers now report the overlay clean: `clang-tidy` at zero, and `cppcheck`
+at zero defects. Neither is evidence that the code is correct — they are evidence that it is free of
+the classes those tools detect, which is a narrower claim and the only one available from static
+analysis.
 
 ### Why `D-006` is listed first
 
