@@ -571,7 +571,7 @@ gap, and the one the programme should now be measured against.
 
 | ID | Decision | Owner | Blocks |
 | --- | --- | --- | --- |
-| ~~`D-DAT-01`~~ | Retention age and size caps for `Events` | **Product** | **SIGNED** 2026-11-05, `closures/DG-STO.retention.json`: operator-adjustable `SettingsFact`s defaulting to 365 days and 2 GB across `Events` and `EventValues`. Unimplemented — `AeroraStoreRetention` is called from nothing |
+| ~~`D-DAT-01`~~ | Retention age and size caps for `Events` | **Product** | **SIGNED** 2026-11-05, `closures/DG-STO.retention.json`: operator-adjustable `SettingsFact`s defaulting to 365 days and 2 GB across `Events` and `EventValues`. **Split outcome.** The age cap is implementable and `pruneEventsOlderThan` is built and tested. The size cap is **not implementable on the shipped Qt**, whose SQLite is built without `SQLITE_ENABLE_DBSTAT_VTAB`, so no byte can be attributed to a table; `pruneEventsToFitBytes` refuses rather than approximating. See `D-DAT-08` and `R7-23` in [08](08-risk-register-and-open-decisions.md). Neither cap is wired to a setting yet, so nothing prunes at runtime |
 | ~~`D-DAT-02`~~ | Whether audit records may be deleted by an operator at all, or only exported | **Product + compliance** | **SIGNED** 2026-11-05, same record: no, export only. `SCR-SEC-03`'s flow is therefore an export flow and not a destructive one |
 | ~~`D-DAT-03`~~ | Fleet identity format | **Product** | **SIGNED AND BUILT**, `closures/DG-FLT.identity-format.json`. `AeroraVehicleStore` implements it |
 | ~~`D-DAT-04`~~ | `Events.category` enumeration | Tab 4 | **SIGNED** 2026-11-05, same record as `D-DAT-01`: nine categories, stored values 0–8 |

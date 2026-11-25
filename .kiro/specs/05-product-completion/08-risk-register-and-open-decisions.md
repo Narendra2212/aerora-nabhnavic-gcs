@@ -21,10 +21,50 @@ register reads as a history instead of only as a snapshot.
 
 | ID | Blocker | Owner | Stops | Status |
 | --- | --- | --- | --- | --- |
-| `D-006` | **Build host.** No `cmake`, `ninja`, `qmake`, `ctest`, `qmllint`, `clang-format`, `clang-tidy`, `pre-commit` or `just`. `C:\Qt` absent. Disk insufficient; no administrator elevation — two separate gates | **User** | Local compile, lint, launch and any claim needing a running application or hardware. **No longer every compile and test** — the Aerora CI legs build the overlay and run its suites | `NO-GO` on this host — unchanged. Narrowed in effect by CI, not resolved |
+| ~~`D-006`~~ | **Build host.** Was: no `cmake`, `ninja`, `qmake`, `ctest`, `qmllint`, `clang-format`, `clang-tidy`, `pre-commit` or `just`; `C:\Qt` absent; disk insufficient and no administrator elevation | **User** | Was local compile, lint, launch and any claim needing a running application | **LARGELY RESOLVED on one host.** A Windows host now carries MSVC 14.44, Windows SDK 10.0.26100 and Qt 6.11.1, and the overlay **builds, launches and passes its suites there** — see [§1.1](#11-what-a-real-build-host-established). What remains is **hardware**, which this never was: no autopilot, no radio, no flight |
 | `D-007` | **Product authorization.** External evidence required | **External** | Every product feature (`P7-PROF-003`) | `EXTERNAL EVIDENCE REQUIRED` |
 | ~~`D-005`~~ | **Aerora git origin.** `origin` stays `https://github.com/mavlink/qgroundcontrol.git` and has never been pushed to | **User** | — | **RESOLVED.** An `aerora` remote is configured and `aerora/phase7-product-completion` is published on it |
 | ~~`Q-029`~~ | **Operator role set** | **Product + operations** | — | **RESOLVED.** `DG-ROL` is `CLOSED`; the role set is settled and signed in `closures/DG-ROL.role-set.json`. See below |
+
+### 1.1 What a real build host established
+
+A Windows deployment host was provisioned and the overlay built on it. This is the first execution
+outside a hosted CI runner, and it produced facts rather than only a green tick.
+
+| Evidence | Detail |
+| --- | --- |
+| Build | 2557 targets, zero failed steps, `QGroundControl.exe` 128.2 MB Debug. Configure logs `Custom build directory detected: aerora`, so the overlay is active — `R7-02` checked locally, not just in CI |
+| Suites | **Aerora Unit 37/37 and Integration 6/6** pass on the host. The wider `-L Unit` label is 366 tests at 96%, and all 16 failures are upstream QGC (no Bluetooth adapter, NTRIP TLS, a resource-audit timeout, four `CMake.*` config meta-tests), none Aerora |
+| Runtime store | The running application creates its six-table schema at `<savePath>/aerora/aerora.db`, `user_version=1`, `journal_mode=wal`, and writes one `Sessions` row: `customBuild=1`, `authzEnforced=0`, `baseCommit`/`overlayCommit` both the built commit. **That row is `R7-02` and honesty risk 4 evidenced at runtime** rather than argued |
+| Teardown | A clean close sets `endedUtcMs` and checkpoints the WAL (4 KB → 64 KB), so `cleanup()` and `_teardownPersistence()` are exercised |
+| Startup self-report | The application logs, unprompted, `no platform key protector available: MAVLink signing keys remain stored WITHOUT protection at rest` and `command authorization is NOT being enforced` |
+| Interface | The Fly view renders and the toolbar shows **"Command authorization: not enforced"** — `SCR-SHL-03` observed, not inferred |
+| `clang-tidy` | **0 diagnostics** over all 57 overlay compilation units, with a positive control proving the harness reports: the same invocation returns 17 on upstream `NTRIPConnectionStats.cc`. Version 19.1.1 locally against the `analysis.llvm_version: 18` CI pins |
+| `qmllint` | First run ever: **205 warnings, all `unqualified`, all in `aerora/`**. Reduced to 83 — see `D-UI-08` |
+
+**What this does not establish.** Every number above is a Debug build against `MockLink` on one
+developer host. Nothing ran against an autopilot or a radio, nothing flew, and
+`isAuthorizationEnforced()` is still `false`. The ceiling moves from "compiled and CI-tested" to
+"built, launched and observed on a host" — a real rung, and still below anything that may be called
+verified.
+
+Two local deviations from the CI configuration, both recorded because a local green is not a CI
+green: `QGC_ENABLE_GST_VIDEOSTREAMING=OFF` (the SDK is an 880 MB download) and
+`QGC_USE_CACHE=OFF` (ccache 4.10.2 cannot handle MSVC `/Yc` precompiled headers, and
+`CMAKE_CXX_COMPILER_LAUNCHER` is cached so the flag alone does not clear it — a fresh binary
+directory is required).
+
+Practical notes for the next person provisioning a host, each of which cost time: **aqtinstall
+3.3.0 cannot install Qt 6.11.x** because Qt changed its repository layout (6.8.1 publishes
+`qt6_681/qt6_681/`, 6.11.1 publishes `qt6_6111/qt6_6111_msvc2022_64/`, and the released aqt
+requests the doubled path and 404s) — the upstream development build handles it. The Visual Studio
+installer **silently installs the compiler without a Windows SDK when not elevated**, reporting
+`iselevated: False` and exit 1603 or 5007. And with `QGC_ENABLE_GST_VIDEOSTREAMING=OFF`,
+`test/VideoManager/GStreamer/CMakeLists.txt` has no `QGC_ENABLE_GST_VIDEOSTREAMING` guard where
+`src/VideoManager/VideoReceiver/GStreamer/CMakeLists.txt` does, so `GStreamerTest`'s slots are
+moc'd while their bodies compile away and the application fails to link with ten `LNK2019`s. That
+last one is an upstream QGC defect; it is recorded here rather than patched, because no shipped or
+CI configuration builds with GStreamer off.
 
 ### Why `D-006` is listed first
 
@@ -109,6 +149,8 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Acceptance | `OPEN` |
 | `D-UI-05` | Aerora Qt Quick Test target timing | Tab 1 + Tab 7 | 16 QML tests | `OPEN` — recommend at first need |
 | `D-UI-07` | Should `AeroraUiSafetyTest::auditedTypes()` be **derived** rather than hand-listed? | Tab 7 | Nothing today; it is the durable fix for `R7-19` | `OPEN` — raised this pass. A hand-maintained audit list fails the same way as the surface it guards |
+| `D-UI-08` | How to clear the 76 `UnqualifiedAccess` warnings in the four `SetupPage`-rooted screens | Tab 7 + architecture | Nothing shipped; a clean `qmllint` run | `OPEN` — **raised by the first `qmllint` run.** `pragma ComponentBehavior: Bound` clears them and **must not be used here**: upstream `SetupPage` reads `vehicleComponent` from dynamic scope (`SetupPage.qml:16,17,40,42`), so binding the component context makes every setup page render empty. Proven, not predicted — it shipped in `f24d698fa` and the Linux leg failed `AeroraVehicleConfigUITest`; reverted in `738bd28d1`. The options are a change to upstream `SetupPage`, qualifying a name this side does not own, or accepting the warnings. All three need an owner |
+| `D-DAT-08` | How a size cap is measured, given the shipped SQLite cannot attribute bytes to a table | Tab 2 + architecture | `D-DAT-01`'s size half; nothing else | `OPEN` — **raised by the first local build.** See [`R7-23`](#4-risk-register). Either link a SQLite built with `SQLITE_ENABLE_DBSTAT_VTAB`, or accept the cap as advisory and surface it as unenforced. **No approximation may be substituted**: the whole-database measure would delete the entire event log to reclaim bytes held by `AuditRecords` |
 | `Q-040` | Visual distinguishability verification | Product | `DEMO` verification | `OPEN` |
 
 ### Resolved this pass
@@ -227,7 +269,7 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 | `R7-06` | **A source is added without a manifest entry.** It compiles into nothing, silently | Medium | Medium | The manifest is hand-maintained; the aggregation does not glob | Re-run `aerora-manifest-check.ps1` after **every** commit that adds a file. It has caught 0 problems so far across 109 entries | All tabs |
 | ~~`R7-07`~~ | **`AeroraUiSafetyTest` fails on first run due to a list error**, and the failure is read as a regression or, worse, the test is weakened to make it pass | — | — | Its reviewed-method lists were derived by reading headers, never by running | **DID NOT OCCUR.** The suite runs in the Aerora `Unit` label on both platforms and passes, so the hand-derived lists were correct. `D-UI-07` — deriving the audited set rather than listing it — stays open as the durable fix, because the list being right once is not the same as it staying right | Tab 7 |
 | `R7-08` | **The 19 `SPECIFIED-NOT-DESIGNED` screens get designed anyway**, by inventing the decisions that block them | Medium | High | 16 of 19 are decision-blocked. Schedule pressure acts on exactly these | [05 §4](05-implementation-dependency-graph.md#4-what-is-blocked-and-by-what) names the blocker per screen. A design that resolves its own blocker must be rejected in review | Tab 1 |
-| `R7-09` | **`D-006` is never resolved** and the programme accumulates source that has never run on real hardware | Medium | **High** | Was 109 files with zero executions; CI has since removed the compile-and-test half of this. What remains has had **zero executions on the deployment host, zero on hardware and zero in flight** | CI caps the compounding, which is why the impact is no longer Critical. It does not substitute for hardware: a Debug build against `MockLink` cannot establish a flight claim. **Still escalate** | User |
+| `R7-09` | **The programme accumulates source that has never run on real hardware** | Medium | **High** | Was 109 files with zero executions. CI removed the compile-and-test half; a provisioned host has since removed the deployment-host half, and the overlay has been **built, launched and observed** there ([§1.1](#11-what-a-real-build-host-established)). What remains is **zero executions on hardware and zero in flight**, which is the half that was always the point | Narrowed twice and not closed. A Debug build against `MockLink` on a developer host cannot establish a flight claim, and running the application is not validating it. **Still escalate** — the remaining gap needs an autopilot, a radio and a flight test, none of which any amount of local work substitutes for | User |
 | `R7-10` | **`geoMapVisualQML()` is omitted** on the Aerora complex item and the item is silently invisible under the GeoMap engine | Medium | Medium | `mapVisualQML()` is pure virtual and enforced; `geoMapVisualQML()` returns `QString()` by default | `SCR-MIS-04` is a **separate** inventory entry so the omission is visible in the screen count, not buried in an item's definition of done | Tab 5 |
 | `R7-11` | **An interface gets a mock implementation** to make a screen demonstrable | Low | **Critical** | 8 interfaces with no implementation, 6 of them decision-gated | `AeroraPayloadCommandSink` and `AeroraPlatformKeyProtector` are deliberately unimplemented for safety. Phase B rule: **identify missing functionality, do not create mock production behaviour** | All tabs; Tab 1 enforces |
 | `R7-12` | **`registerCustomSettingsGroup()` is called with a wrong accessor name** and the group is silently deleted | Medium | Low | The call **takes ownership** and deletes a rejected group. Accessor must be camelCase JSON stem + `Settings`, matching `^[a-z_][A-Za-z0-9_]*$`, no collision with a built-in | Record the exact expected accessor name in the settings specification. A startup assertion would be better | Tab 7 |
@@ -242,14 +284,24 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 | `R7-21` | **Two tabs commit into one shared working tree and one publishes the other's unfinished state.** Occurred three times this session | **Occurred** | Medium | `a7b317f89` published Tab 4's U3 mid-validation; `7e41a529e` absorbed Tab 1's staged reconciliation and Tab 9's doc 10. No work was lost in any case, but `7e41a529e`'s message asserts `HO-TAB1-02` is `PARTIALLY APPLIED` while the document it committed says `CLOSED` | [07 §6 Who commits what](07-phase-7-work-packages-and-ownership.md#who-commits-what): stage by explicit path, never `git add -A`, verify `git diff --cached` before committing, and let the owner confirm the published state | Tab 1 |
 | `R7-22` | **A Windows unit-test process hangs on exit and CTest reports a timeout**, so a green change reads as a regression and the reflex is to go looking in the diff | **Occurred twice** | Medium | Two runs, two *different* suites — `AeroraProfileRegistryTest` (`ab39605dc`) and `AeroraOperationGateEnforcementTest` (`f4bbb3cd1`). In both, every assertion passed in well under a second (13 passed / 14 ms in the second) and the process then sat until the 60 s CTest timeout. Windows only; neither suite is threaded, and the second ran alongside an unrelated change. 3 failures in 12 Windows runs, of which these are 2 | **Diagnose before re-running, then re-run**: the signature is assertions passing followed by a hang, which is teardown rather than logic, so the diff is the wrong place to look. A re-run of the identical commit cleared the first occurrence. The durable fix is to find what fails to release at exit on Windows — a static destructor order, or a thread or `QSqlDatabase` connection not closed — rather than to raise the timeout, which would hide it | Tab 8 |
 
+| `R7-23` | **A signed decision is unimplementable on the shipped toolchain, and the gap is invisible because the decision reads as closed.** Occurred | **Occurred** | High | `D-DAT-01` settles a 2 GB size cap across `Events` and `EventValues`. Attributing bytes to a table requires SQLite's `dbstat`, which exists only with `SQLITE_ENABLE_DBSTAT_VTAB`. **Qt 6.11.1 bundles SQLite 3.53.0 built without it** — verified by inspecting `qsqlite.dll` and `qsqlited.dll`, and Python's 3.49.1 lacks it too, so this is not a Qt quirk. The age half of the same decision is enforceable; the size half is not | `pruneEventsToFitBytes()` **refuses and deletes nothing** when attribution is unavailable, rather than substituting the whole-database size, which would delete the entire event log to reclaim bytes `AuditRecords` holds and must never give up. The refusal is asserted by `AeroraStoreRetentionTest` at a cap of zero, the most aggressive request the interface can make. `D-DAT-08` carries the decision. **The register must not read `D-DAT-01` as done**: it is signed, half-built, and half-unbuildable | Tab 2 |
+| `R7-24` | **A platform-asymmetric test set makes a local run look complete when it is not**, so a change is cleared locally and fails in CI | **Occurred** | Medium | `AeroraVehicleConfigUITest` is deliberately unregistered on Windows — `aerora/CMakeLists.txt` records that registering it there "reports a harness defect as an overlay failure on every push". So a Windows `ctest -L Integration -R Aerora` reports **6 of 9** and reads as a pass. `f24d698fa` was cleared that way and broke all four setup pages on Linux | State the denominator, not the ratio: "6/6 on Windows" is not "Integration passes". For any change touching `SetupPage`-rooted QML, the Linux leg is the only coverage that exists, so push and wait rather than reading a local green. The same asymmetry will hide the next one | Tab 8 |
+
 ### Exposure summary
 
 | Impact | Count | IDs |
 | --- | --- | --- |
 | **Critical** | 3 | `R7-02`, `R7-03`, `R7-11` |
-| High | 6 | `R7-04`, `R7-05`, `R7-08`, `R7-09`, `R7-14`, `R7-15` |
-| Medium | 6 | `R7-06`, `R7-10`, `R7-16`, `R7-17`, `R7-22`, plus `R7-12` at low impact |
+| High | 7 | `R7-04`, `R7-05`, `R7-08`, `R7-09`, `R7-14`, `R7-15`, `R7-23` |
+| Medium | 7 | `R7-06`, `R7-10`, `R7-16`, `R7-17`, `R7-22`, `R7-24`, plus `R7-12` at low impact |
 | Retired by the first build | 2 | `R7-01` largely realised and absorbed, `R7-07` did not occur |
+
+`R7-23` and `R7-24` were both raised by the first local build, and both are the same shape as the
+three critical risks: **a way for the programme to look finished while something load-bearing is
+absent.** `R7-23` is a signed decision whose status column reads closed while half of it cannot be
+built on the shipped toolchain. `R7-24` is a local test run that reports a pass over a denominator
+nobody checked. Neither was predicted; both were measured, which is the argument for provisioning
+the host.
 
 The three critical risks share a shape: **each is a way for the programme to look finished while
 something load-bearing is absent**. `R7-02` is an invisible build misconfiguration, `R7-03` an
