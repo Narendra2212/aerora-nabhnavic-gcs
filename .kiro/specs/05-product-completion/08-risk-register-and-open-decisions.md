@@ -38,7 +38,7 @@ outside a hosted CI runner, and it produced facts rather than only a green tick.
 | Runtime store | The running application creates its six-table schema at `<savePath>/aerora/aerora.db`, `user_version=1`, `journal_mode=wal`, and writes one `Sessions` row: `customBuild=1`, `authzEnforced=0`, `baseCommit`/`overlayCommit` both the built commit. **That row is `R7-02` and honesty risk 4 evidenced at runtime** rather than argued |
 | Teardown | A clean close sets `endedUtcMs` and checkpoints the WAL (4 KB → 64 KB), so `cleanup()` and `_teardownPersistence()` are exercised |
 | Startup self-report | The application logs, unprompted, `no platform key protector available: MAVLink signing keys remain stored WITHOUT protection at rest` and `command authorization is NOT being enforced` |
-| Interface | The Fly view renders and the toolbar shows **"Command authorization: not enforced"** — `SCR-SHL-03` observed, not inferred |
+| Interface | The Fly view renders and the toolbar shows **"Command authorization: not enforced"** — `SCR-SHL-03` observed, not inferred. **Disconnected only**: no vehicle was attached, because the recommended simulator does not run on this platform (see the note below), so no vehicle-dependent screen has been seen populated |
 | `clang-tidy` | **0 diagnostics** over all 57 overlay compilation units, with a positive control proving the harness reports: the same invocation returns 17 on upstream `NTRIPConnectionStats.cc`. Version 19.1.1 locally against the `analysis.llvm_version: 18` CI pins |
 | `cppcheck` | **36 findings, none at `error` or `warning` severity** — 14 `returnByReference`, 11 `useStlAlgorithm`, 3 `shadowFunction`, 3 `ignoredReturnErrorCode`, 3 `CastIntegerToAddressAtReturn`, 1 `knownEmptyContainer`, and style or performance throughout. The three classes that could have been real were each run down and none is a defect — see [§1.2](#12-what-cppcheck-found-and-what-it-did-not) |
 | `qmllint` | First run ever: **205 warnings, all `unqualified`, all in `aerora/`**. Reduced to 83 — see `D-UI-08` |
@@ -68,6 +68,18 @@ installer **silently installs the compiler without a Windows SDK when not elevat
 moc'd while their bodies compile away and the application fails to link with ten `LNK2019`s. That
 last one is an upstream QGC defect; it is recorded here rather than patched, because no shipped or
 CI configuration builds with GStreamer off.
+
+**`tools/simulation/mock_vehicle.py` does not run on Windows**, which matters because it is the
+recommended way to populate the vehicle-dependent screens. It opens its link as
+`udpout:{host}:{port}` (line 123), and a pymavlink `udpout` socket connects to the destination
+without binding a local address. Sending works — the script prints its position and reports itself
+running — and then the first `handle_commands()` call dies in `recvfrom()` with
+`OSError: [WinError 10022]`, `WSAEINVAL` for a receive on an unbound socket, which Linux permits and
+Windows does not. It fails on every loop iteration, so the mode cannot work rather than being
+flaky. A `udpin` link or an explicit bind would fix it; that is an upstream tool defect and is
+recorded rather than patched. The consequence for this register is that **the ten screens have still
+not been driven with vehicle data**, and the `§1.1` interface evidence is limited to what a
+disconnected station renders.
 
 ### 1.2 What `cppcheck` found, and what it did not
 
