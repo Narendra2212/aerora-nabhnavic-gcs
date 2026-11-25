@@ -148,7 +148,7 @@ Carried from Phase 6 plus Phase 7 additions. 23 entries.
 | `D-UI-01` | QML-safe enforcement read path | Tab 2 + Tab 7 | — | **CLOSED** — `AeroraSecurityStatus` (WP2-B). A read-only projection that holds no security state and reaches no security type; audited by `AeroraUiSafetyTest` with no writable property, no `Q_INVOKABLE` and no slot. Found still marked `OPEN` at this reconciliation after the code had landed |
 | `D-UI-02` | `UI-A11Y-03` contrast target value | Tab 7 + product | Acceptance | `OPEN` |
 | `D-UI-05` | Aerora Qt Quick Test target timing | Tab 1 + Tab 7 | 16 QML tests | `OPEN` — recommend at first need |
-| `D-UI-07` | Should `AeroraUiSafetyTest::auditedTypes()` be **derived** rather than hand-listed? | Tab 7 | Nothing today; it is the durable fix for `R7-19` | `OPEN` — raised this pass. A hand-maintained audit list fails the same way as the surface it guards |
+| `D-UI-07` | Should `AeroraUiSafetyTest::auditedTypes()` be **derived** rather than hand-listed? | Tab 7 | Nothing today; it is the durable fix for `R7-19` | `OPEN`, and **narrowed from two options to one** by measurement — see [§4.1](#41-d-ui-07-the-derived-set-is-obtainable-and-the-hand-list-is-currently-exact). The hand-list is also now **mechanically confirmed correct for the first time**, which `R7-07` noted it never had been |
 | `D-UI-08` | How to clear the 76 `UnqualifiedAccess` warnings in the four `SetupPage`-rooted screens | Tab 7 + architecture | Nothing shipped; a clean `qmllint` run | `OPEN` — **raised by the first `qmllint` run.** `pragma ComponentBehavior: Bound` clears them and **must not be used here**: upstream `SetupPage` reads `vehicleComponent` from dynamic scope (`SetupPage.qml:16,17,40,42`), so binding the component context makes every setup page render empty. Proven, not predicted — it shipped in `f24d698fa` and the Linux leg failed `AeroraVehicleConfigUITest`; reverted in `738bd28d1`. The options are a change to upstream `SetupPage`, qualifying a name this side does not own, or accepting the warnings. All three need an owner |
 | `D-DAT-08` | How a size cap is measured, given the shipped SQLite cannot attribute bytes to a table | Tab 2 + architecture | `D-DAT-01`'s size half; nothing else | `OPEN` — **raised by the first local build.** See [`R7-23`](#4-risk-register). Either link a SQLite built with `SQLITE_ENABLE_DBSTAT_VTAB`, or accept the cap as advisory and surface it as unenforced. **No approximation may be substituted**: the whole-database measure would delete the entire event log to reclaim bytes held by `AuditRecords` |
 | `Q-040` | Visual distinguishability verification | Product | `DEMO` verification | `OPEN` |
@@ -279,7 +279,7 @@ Ranked by exposure. Probability and impact are judgements; the evidence column i
 | `R7-16` | **Accessibility and WCAG get claimed** on the strength of the design rules rather than testing | Low | Medium | `P7-SET-005` already says conformance is not claimed | Keep `P7-SET-005` in every deployment document. Conformance needs assistive-technology testing and expert review | Tab 7 |
 | `R7-17` | **The hub becomes a dashboard of green tiles** that are green because nothing was checked | Medium | Medium | It is the default shape for a hub screen | `SCR-SHL-01`'s anti-requirement is explicit: it must be the overlay's honest self-report, including what did **not** attach | Tab 7 |
 | `R7-18` | **A latent type error blocks a whole test binary at first build.** Confirmed, not hypothetical | **Confirmed** | Medium | `AeroraMissionTest.cc` passes `QString` to `expectLogMessage(const char *)` at 11 sites. One declaration, no overload, no conversion | `HO-TAB1-01` to Tab 5. The scan that found it also cleared the other 47 call sites and verified every category string, so the class is closed rather than sampled | Tab 5 |
-| `R7-19` | **A new QML-reachable type is added without being added to the safety audit**, so `P7-AUTH-004`'s ratchet silently stops covering the whole surface | **Occurred** | High | 12 QML-registered overlay types, 10 in `auditedTypes()`. `AeroraSecurityStatus` arrived with Tab 2's WP2-B; `AeroraFreshness` has been uncovered since Phase 6 | `HO-TAB1-03` to Tab 7. **The durable fix is a test that derives the audited set rather than listing it** — an audit whose membership is hand-maintained has the same failure mode as the thing it audits. Recorded as `D-UI-07` | Tab 7 |
+| `R7-19` | **A new QML-reachable type is added without being added to the safety audit**, so `P7-AUTH-004`'s ratchet silently stops covering the whole surface | **Occurred** | High | Was 12 QML-registered overlay types with 10 in `auditedTypes()`: `AeroraSecurityStatus` arrived with Tab 2's WP2-B and `AeroraFreshness` had been uncovered since Phase 6. **The count is now 13 registered and 13 audited, confirmed against `moc`'s metatypes output rather than by reading headers** ([§4.1](#41-d-ui-07-the-derived-set-is-obtainable-and-the-hand-list-is-currently-exact)) | `HO-TAB1-03` to Tab 7, applied. The gap is closed *today*, and the risk stays open because nothing prevents the next type arriving unaudited — the list is still hand-maintained, and being right once is not staying right. **The durable fix is a test that derives the audited set**, which `D-UI-07` has now narrowed to a choice between three known costs | Tab 7 |
 | `R7-20` | **A status row is closed while the prose still describes the defect as live.** Observed, not hypothetical | **Observed** | Medium | `HO-TAB4-03`'s first pass closed `D-UI-03`, HO-TAB7-01 and `R7-13` but left five passages in the same six documents calling the writable property a live defect | A documentation handoff closes when a grep for the old claim comes back empty, not when the status column flips. [07 §7](07-phase-7-work-packages-and-ownership.md#7-handoff-protocol) records the rule | Tab 1 |
 | `R7-21` | **Two tabs commit into one shared working tree and one publishes the other's unfinished state.** Occurred three times this session | **Occurred** | Medium | `a7b317f89` published Tab 4's U3 mid-validation; `7e41a529e` absorbed Tab 1's staged reconciliation and Tab 9's doc 10. No work was lost in any case, but `7e41a529e`'s message asserts `HO-TAB1-02` is `PARTIALLY APPLIED` while the document it committed says `CLOSED` | [07 §6 Who commits what](07-phase-7-work-packages-and-ownership.md#who-commits-what): stage by explicit path, never `git add -A`, verify `git diff --cached` before committing, and let the owner confirm the published state | Tab 1 |
 | `R7-22` | **A Windows unit-test process hangs on exit and CTest reports a timeout**, so a green change reads as a regression and the reflex is to go looking in the diff | **Occurred twice** | Medium | Two runs, two *different* suites — `AeroraProfileRegistryTest` (`ab39605dc`) and `AeroraOperationGateEnforcementTest` (`f4bbb3cd1`). In both, every assertion passed in well under a second (13 passed / 14 ms in the second) and the process then sat until the 60 s CTest timeout. Windows only; neither suite is threaded, and the second ran alongside an unrelated change. 3 failures in 12 Windows runs, of which these are 2 | **Diagnose before re-running, then re-run**: the signature is assertions passing followed by a hang, which is teardown rather than logic, so the diff is the wrong place to look. A re-run of the identical commit cleared the first occurrence. The durable fix is to find what fails to release at exit on Windows — a static destructor order, or a thread or `QSqlDatabase` connection not closed — rather than to raise the timeout, which would hide it | Tab 8 |
@@ -314,6 +314,48 @@ The half it did not remove is that nothing has run on the deployment host or on 
 `R7-02` is the reason that still matters — the Aerora legs and `aerora-package.yml` each assert
 `QGC_CUSTOM_DIR` is `aerora` before trusting a build, because without that assertion a green run
 could be stock QGroundControl.
+
+### 4.1 `D-UI-07`: the derived set is obtainable, and the hand-list is currently exact
+
+`D-UI-07` was recorded as a choice between two costs — `QQmlMetaType`, which is private Qt API, and
+a generated list, which is a build-system dependency. The first local build settles it: **the
+generated list exists already**, so the private-API option can be dropped and the remaining cost is
+smaller than "a build-system dependency" suggests.
+
+`moc` writes the `QML.Element` class info that `qmltyperegistrar` itself reads into
+`meta_types/qt6qgroundcontrol_metatypes.json` — 4.5 MB, 813 entries, carrying 80 Aerora classes of
+which **13 declare `QML.Element`**. The Aerora QML module's own metatypes file is 4 bytes and its
+`.qmltypes` is empty, because `AeroraControlsModule` registers no C++ type: the overlay's QML-visible
+types register into the main target, which is why the derivation has to read that file and not the
+module's.
+
+The derived 13 are, with their registration form:
+
+| Type | `QML.Element` | Form |
+| --- | --- | --- |
+| `AeroraVehicleUiContext` | `AeroraUi` | singleton |
+| `AeroraSecurityStatus` | `AeroraSecurity` | singleton |
+| `AeroraProvenance` | `AeroraProvenance` | singleton |
+| `AeroraTelemetryState` | `auto` | singleton |
+| `AeroraVehicleServices`, `AeroraVehicleIdentity`, `AeroraVehicleCapabilities`, `AeroraPayloadModel`, `AeroraPowerModel`, `AeroraMissionObserver`, `AeroraReportedValue`, `AeroraStateValue`, `AeroraFreshness` | `auto` | uncreatable |
+
+**That is exactly `auditedTypes()`, one for one, with nothing missing and nothing extra.** So the
+hand-maintained list is correct today. `R7-07` observed that its lists "were derived by reading
+headers, never by running", and `R7-19` recorded that two types had been missing until
+`HO-TAB1-03`; this is the first mechanical confirmation that the set is now complete, and it is a
+result rather than an absence of errors.
+
+Reproducible without a running application, from any configured build directory: read
+`meta_types/qt6qgroundcontrol_metatypes.json`, take every `classes[]` entry whose `className`
+starts with `Aerora`, and keep those with a `QML.Element` entry in `classInfos[]`.
+
+What `D-UI-07` still has to decide is **where the comparison lives**, and the options differ in what
+they cost rather than in whether they work: a checker under `tools/` would be a seventh file outside
+`aerora/` naming an overlay identifier, so it needs an `overlayEdits` entry and CI wiring; one
+inside `aerora/` avoids both but needs something to invoke it; and a C++ assertion inside
+`AeroraUiSafetyTest` needs the JSON path as a compile definition. None of these is a `Contract_Value`
+and none is blocked — the choice is Tab 7's, and it is now a choice between three known costs
+instead of a question about feasibility.
 
 ## 5. Risks the overlay already mitigates
 
