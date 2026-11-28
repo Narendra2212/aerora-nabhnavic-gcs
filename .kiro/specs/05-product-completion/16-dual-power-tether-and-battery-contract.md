@@ -91,33 +91,73 @@ has no slot in the model today.
 
 Each needs an owner. None is mine to resolve.
 
-### 4.1 The tether is a low-voltage pack input, not a 480 V domain
+### 4.1 RESOLVED — the high-voltage domain is upstream of the flight controller
 
-`AeroraPowerModel.h` documents, from baseline 49:
+Settled by the programme owner on 2026-11-27: the supply is **800 V** DC from the ground, through
+the tether, into an **onboard DC-DC converter** that outputs 48 V, with the battery carried for
+**safe landing**. Baseline 49's "480 V" is a stale figure and should read 800 V.
+
+This removes the apparent contradiction rather than choosing a side. The 800 V never reaches the
+flight controller:
 
 ```text
-TETHER CONFIGURATION
-  480 V DC from the ground → tether → onboard DC-DC stage → 48 V aircraft domain
+ground 800 V DC ──tether──► onboard DC-DC converter ──48 V──► J10  "pack input B (tether)"
+                                                                    │ F2 ─ D4 ─┐
+battery (safe-landing reserve) ─────────────────────────────────────► J9       ├─► VIN_RAW
+                                                                    │ F1 ─ D3 ─┘
 ```
 
-`FC_Connectors.md:332` states the actual input:
+`FC_Connectors.md:332` describes the converter's **output**, not the tether: `J10 | 1 GND, 2 → F2 →
+D4 → VIN_RAW | pack input B (tether)`. Both sources arrive as ~48 V pack inputs. So the board is
+consistent with the 800 V architecture, and the correction needed is to baseline 49's number.
 
-| J10 | 1 GND, 2 → F2 → D4 → VIN_RAW | **pack input B (tether)** | F2 1206, rating not specified (D25) |
+**The consequence is the finding.** The flight controller has **no sensing whatsoever on the 800 V
+domain** — no voltage, no current, no converter state, no tether continuity. `IF-PWR-006`'s
+high-voltage scalars and `IF-PWR-010`'s converter state therefore have no producer *in principle*
+on this aircraft, not merely *in practice*. `Q3-007` — whether the high-voltage domain is reported
+to the ground station — is answerable for this airframe: **not through the flight controller.** It
+could only come from the DC-DC converter's own telemetry or from ground-side equipment, neither of
+which has an evidenced path to the station today.
 
-That is a fused, diode-isolated **pack input onto the same `VIN_RAW` rail** as pack input A — not a
-high-voltage domain with a converter stage. Either baseline 49 describes a different airframe
-revision, or the 480 V/48 V topology is superseded on Rev B. This also bears on `Q3-007`, recorded
-as the open conflict over whether the high-voltage domain is reported to the ground station at all:
-on this board there may be no high-voltage domain to report.
+### 4.2 The sources are diode-OR'd, so failover is passive, automatic and silent
 
-### 4.2 The hardware appears to diode-OR the two sources
+Two pack inputs, each fused and diode-isolated onto one rail, is a diode-OR. `AeroraPowerModel`'s
+seven refusals include "no diode-OR behaviour" and `kPowerArbitrationImplemented = false`. Those
+refusals stay **correct** — arbitration is an electrical function and the station must not model it
+— but the justification changes, and so does what the station can expect to observe.
 
-Two pack inputs, each through a diode, onto one rail is a diode-OR. `AeroraPowerModel`'s seven
-refusals include "no diode-OR behaviour" and `kPowerArbitrationImplemented = false`. Those refusals
-remain **correct** — arbitration is an electrical function and the station must not model it — but
-the reason changes. It is not that the topology is unproven; it is that the topology is passive and
-has no reporting path. Worth restating in the model's own words, because a refusal justified by
-absent evidence reads differently once the evidence arrives.
+Failover needs no logic: if the tether or converter stops supplying, the battery takes the rail
+through its diode, with no firmware involvement. That is the right design for a safe-landing
+reserve. It is also **silent**. Nothing reports a transition (`IF-PWR-004` has no producer, §3), so
+the station cannot tell that the tether has failed and the aircraft is now flying on its reserve.
+
+The one quantity that moves is the `VIN_RAW` bus voltage the INA228 measures after the diodes. It
+is **not** a reliable discriminator: a 48 V converter output sits inside a 14S pack's own
+46.2–58.8 V range, so the two sources are not separable by rail voltage alone. This is very likely
+why `BAT_TETHERED` is a manually set parameter rather than something the firmware detects. The
+station must not attempt the inference either.
+
+### 4.4 The safe-landing reserve is unmonitored exactly when it is the reserve
+
+This follows from §4.1 and §2 together, and it is the most consequential item in this document.
+
+The battery exists to land the aircraft safely if the tether fails. But `BAT_TETHERED = 1` tells the
+firmware "tether power: no battery sensor needed, **no battery failsafe**, SoC unknown"
+(`PCB_COMPATIBILITY_20261114.md:18`). So during tethered flight — the whole time the battery is
+serving as a reserve rather than as the supply — its state of charge is **not** being tracked and
+no energy failsafe is armed.
+
+Combined with §4.2, the failure sequence is:
+
+1. Tether or converter stops supplying. Nothing is reported.
+2. The battery silently takes the rail through its diode.
+3. The aircraft is now flying on a reserve whose charge nobody has been monitoring.
+
+The station cannot detect step 1, cannot report step 2, and cannot say in step 3 how much reserve
+remains. Whether that is acceptable is a product and safety-engineering judgement, not a ground
+station one — but the station's obligation is clear either way: **while `BAT_TETHERED = 1` it must
+state that reserve capacity is unknown**, rather than showing a stale, zero or last-known SoC that
+would read as a live reserve figure. That is §6 item 4, and this section is why it is not cosmetic.
 
 ### 4.3 Two firmware documents disagree on whether battery sensing works
 
@@ -181,19 +221,25 @@ Implementable, with no value authored by the station:
 Not implementable, and must stay never-observed:
 
 - Tether attachment (`IF-PWR-001`) and tether supply (`IF-PWR-013`) — no producer, §3.
-- Source transition (`IF-PWR-004`) — nothing reports one.
-- Converter state (`IF-PWR-010`), degraded mode (`IF-PWR-009`), remaining energy (`IF-PWR-008`),
-  high-voltage scalars (`IF-PWR-006`) — unchanged, and §4.1 casts doubt on whether the last exists
-  on this board at all.
+- Source transition (`IF-PWR-004`) — nothing reports one, and §4.2 explains why: failover is a
+  passive diode hand-off with no firmware involvement to report.
+- High-voltage scalars (`IF-PWR-006`) and converter state (`IF-PWR-010`) — §4.1 establishes these
+  are beyond the flight controller's sensing *in principle*, not merely unreported.
+- Degraded mode (`IF-PWR-009`) and remaining energy (`IF-PWR-008`) — unchanged; the station
+  computes no energy estimate, and under §4.4 it has no reserve figure to estimate from.
 
 ## 7. Owners
 
 | Item | Needs | Owner |
 | --- | --- | --- |
-| §4.1 topology — 480 V baseline vs `VIN_RAW` pack input B | Which describes the flying airframe | Architecture + firmware |
+| ~~§4.1 topology~~ | **RESOLVED 2026-11-27**: 800 V ground supply, onboard DC-DC to 48 V, battery for safe landing. Baseline 49's "480 V" needs correcting to 800 V | Architecture |
+| **§4.4 unmonitored reserve** | Whether tethered flight may proceed with the safe-landing reserve's charge untracked and its failsafe disarmed. The station will report the unknown either way | **Product + safety** |
 | §4.3 battery sensing — which document governs | Whether a battery failsafe may be presented as live | Firmware |
 | §2.1 interlock — report only, or also refuse to arm | Product behaviour; the station has no arming authority anyway (`COMMAND_LONG` 400 `param1=1` → ACK 2 DENIED) | Product |
 | `FENCE_TETHER_RADIUS_M`, `PLACEHOLDER_OVERCURRENT_A`, `PLACEHOLDER_PACK_MAH`, `BATTERY_STATUS.type` | Confirmation; all four are the firmware's own placeholders | Firmware + product |
+| 800 V domain telemetry | Whether the DC-DC converter or ground equipment reports anything, given §4.1 puts it beyond the flight controller's sensing | Architecture + firmware |
 
-None of the four blocks §6's implementable list, because every item there reports a parameter the
-aircraft already publishes or states a consequence the firmware already documents.
+None of these blocks §6's implementable list, because every item there reports a parameter the
+aircraft already publishes or states a consequence the firmware already documents. §4.4 in
+particular is **more** buildable for being unresolved: reporting that reserve capacity is unknown is
+correct under either product answer.
