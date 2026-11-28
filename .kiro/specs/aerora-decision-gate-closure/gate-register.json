@@ -2467,6 +2467,60 @@
       "reason": "an enumerator of the overlay's own state model, which is Verified_Infrastructure rather than a value a Gate settles"
     },
     {
+      "symbol": "AeroraDualPowerConfiguration::kTetheredPowerParameter",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a flight-controller parameter name this module matches against a MAVLink param_id. Unlike the service keys recorded here it does go on the wire, and the overlay does not author it: the name is the firmware's own, read from fw_lib/param_defs.m, which is the source of truth for anything compared with a param_id. No Gate settles it because no Gate owns the flight controller's parameter table"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kTetherFenceModeParameter",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a flight-controller parameter name this module matches against a MAVLink param_id. Unlike the service keys recorded here it does go on the wire, and the overlay does not author it: the name is the firmware's own, read from fw_lib/param_defs.m, which is the source of truth for anything compared with a param_id. No Gate settles it because no Gate owns the flight controller's parameter table"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kTetherFenceRadiusParameter",
+      "kind": "registryKey",
+      "gate": "none",
+      "reason": "a flight-controller parameter name this module matches against a MAVLink param_id, and the one where the wire name and the dictionary name differ: PARAM_TABLE.md calls parameter 204 FENCE_TETHER_RADIUS_M, which is 21 characters and cannot be a param_id, while param_defs.m sends FENCE_TETH_R_M. Recorded against the wire name because that is what the overlay compares. No Gate settles it because no Gate owns the flight controller's parameter table"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kMaxParameterNameLength",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "the MAVLink param_id field width, fixed by the protocol rather than chosen by the overlay. Pinned so a name this module sends is checked against it instead of trusted"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kDefinedThresholdCount",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kStationInitiatedPowerActionImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kLivePowerSourceInferenceImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "AeroraDualPowerConfiguration::kReserveCapacityEstimationImplemented",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "a declared constant of the overlay's own implementation; the guards among these are recorded in the guard registry and the rest carry no contract"
+    },
+    {
+      "symbol": "kDefaultComponentId",
+      "kind": "constant",
+      "gate": "none",
+      "reason": "QGroundControl's default-component selector for a parameter lookup, a value of the core API this module calls rather than one the overlay defines"
+    },
+    {
       "symbol": "AeroraEventCategory::AuthorizationOutcome",
       "kind": "enumerator",
       "gate": "none",

@@ -125,7 +125,15 @@ set(AERORA_PAYLOAD_POWER_SOURCES
     ${AERORA_PAYLOAD_POWER_DIR}/Payload/AeroraPayloadModel.h
     ${AERORA_PAYLOAD_POWER_DIR}/Power/AeroraPowerModel.cc
     ${AERORA_PAYLOAD_POWER_DIR}/Power/AeroraPowerModel.h
+    ${AERORA_PAYLOAD_POWER_DIR}/Power/AeroraDualPowerConfiguration.cc
+    ${AERORA_PAYLOAD_POWER_DIR}/Power/AeroraDualPowerConfiguration.h
 )
+
+# AeroraDualPowerConfiguration is the overlay's first reader of src/FactSystem. It reads three
+# flight-controller parameters and writes none, so it adds no authorization surface - R7-15 and
+# P7-AUTH-003 are about the PARAM_SET write path, which this does not touch. The dependency is on
+# ParameterManager.h, Fact.h and Vehicle.h, all of which the application target already carries;
+# no new entry in AERORA_PAYLOAD_POWER_LIBRARIES is needed.
 
 # AeroraPayloadCommandSink.h is listed deliberately even though it has no translation unit: it
 # declares AeroraPayloadRequest, which is a Q_GADGET, so AUTOMOC has to see the header.
@@ -167,6 +175,8 @@ set(AERORA_PAYLOAD_POWER_TEST_SOURCES
     ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power/AeroraPowerMock.h
     ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power/AeroraPowerModelTest.cc
     ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power/AeroraPowerModelTest.h
+    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power/AeroraDualPowerConfigurationTest.cc
+    ${AERORA_PAYLOAD_POWER_TEST_DIR}/Power/AeroraDualPowerConfigurationTest.h
 )
 
 set(AERORA_PAYLOAD_POWER_TEST_INCLUDE_DIRECTORIES
@@ -185,4 +195,6 @@ set(AERORA_PAYLOAD_POWER_TEST_INCLUDE_DIRECTORIES
 # alongside the two existing entries. Nothing else in the aggregation changes: the test sources and
 # the new Supervisory test include directory arrive through the variables above, which
 # aerora/CMakeLists.txt already appends wholesale.
-set(AERORA_PAYLOAD_POWER_TEST_NAMES AeroraReportedValueTest AeroraPayloadModelTest AeroraPowerModelTest)
+set(AERORA_PAYLOAD_POWER_TEST_NAMES AeroraReportedValueTest AeroraPayloadModelTest AeroraPowerModelTest
+                                    AeroraDualPowerConfigurationTest
+)
