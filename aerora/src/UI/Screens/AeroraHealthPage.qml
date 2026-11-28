@@ -106,6 +106,12 @@ SetupPage {
     readonly property bool _allHealthy: root._anyReported && !!root._vehicle && root._vehicle.allSensorsHealthy
 
     Component {
+        // qmllint disable unqualified
+        // Not fixable by qualifying: the reads below are already `root.`- or `qgcPal.`-qualified,
+        // and qmllint cannot resolve them across the Component boundary without
+        // `pragma ComponentBehavior: Bound`, which the file header explains this page cannot have.
+        // Scoped to the delegate and re-enabled at its end, so the rest of the document stays
+        // checked. `D-UI-08`.
         id: pageComponent
 
         // A plain ColumnLayout, not a Flickable: SetupPage already wraps the loaded page in a
@@ -211,5 +217,6 @@ SetupPage {
                 wrapMode: Text.WordWrap
             }
         }
+        // qmllint enable unqualified
     }
 }

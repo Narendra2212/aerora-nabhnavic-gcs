@@ -373,7 +373,10 @@ AnalyzePage {
                     // thing P7-FLY-004 argues against, so it is disabled with the reason stated
                     // below rather than offered and useless.
                     enabled: root._servicesAvailable
-                    onClicked: mainWindow.showVehicleConfig()
+                    // `mainWindow` is an id inside MainWindow.qml reached through dynamic scope,
+                    // not a type this side owns, so there is nothing to qualify it with - the same
+                    // class of name as `vehicleComponent` on the setup pages. `D-UI-08`.
+                    onClicked: mainWindow.showVehicleConfig() // qmllint disable unqualified
                 }
 
                 QGCLabel {
@@ -416,7 +419,7 @@ AnalyzePage {
 
                 QGCPalette {
                     id: qgcPal
-                    colorGroupEnabled: enabled
+                    colorGroupEnabled: root.enabled
                 }
             }
         }
