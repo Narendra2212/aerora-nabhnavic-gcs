@@ -1,0 +1,199 @@
+# 16. Dual power: the tether and battery contract, as the firmware actually states it
+
+**Status:** evidence record, raised 2026-11-27. Nothing here is a decision. Every value is quoted
+from the flight-controller project with a file and line, and every value the **firmware itself**
+marks `PLACEHOLDER` is carried through as a placeholder rather than promoted.
+
+**Why this document exists.** [08 §2](08-risk-register-and-open-decisions.md#2-open-decisions)
+records the battery-reserve and `Tether_Interlock` set as *orphaned* — "recorded as held by
+`DG-PAY`, never actually its Decision_Content, and that gate has closed", needing "a fresh decision
+thread, not a gate". The reason it could not be opened was that no evidence source existed. One
+exists: the `Aerora_FC_RevB_H743` project, whose `PARAM_TABLE.md` is **generated** from the model by
+`harness_scripts/gen_param_table_md.m`, which makes it the aircraft's own statement rather than a
+description of it.
+
+**Scope.** Power only. The paint/spray payload is deliberately excluded.
+
+## 1. Source of evidence
+
+| Artifact | Role |
+| --- | --- |
+| `PARAM_TABLE.md` | Generated parameter table — names, defaults, units, min, max, owning subsystem |
+| `PCB_COMPATIBILITY_20261114.md` | The Rev B battery-sensing rework (INA228), newest power document |
+| `FC_Connectors.md` | Physical power inputs |
+| `BUILD_READINESS.md` | Flight preconditions and what cannot be done in software |
+| `CONTROL_ARCHITECTURE.md` | Failsafe table |
+| `REQUEST5_REPORT.md`, `VALIDATION_REPORT.md` | What has been exercised in SIL |
+| `MAVLINK_TELEMETRY.md` | What actually reaches a ground station |
+
+The model file of record is **`motor_test_1__CURRENT.slx.BACKUP_BATTINA228_20261114`**, not
+`motor_test_1__CURRENT.slx`. The latter is byte-identical to `motor_test_1__CURRENT.slx.r2026a`
+(SHA-256 `58F142DD…`), is an R2026a downgrade export, and contains **none** of
+`MAVLink_Telemetry`, `mav_link`, `Flash_Manager`, `aerora_param`, `Event_Encoder` or
+`Vertical_Controller`. Any reading taken from the file named `CURRENT` would be a reading of a
+gutted model.
+
+## 2. The two tether parameters, and why there are two
+
+There is no single "tethered" setting. There are two independent flash parameters with unrelated
+effects, each set by hand over MAVLink while disarmed.
+
+| Parameter | Default | Range | Owner | Stated effect |
+| --- | --- | --- | --- | --- |
+| `BAT_TETHERED` | — (params 273-277 batch) | bool | `Battery_Pack_Monitor` | "1 = tether power: no battery sensor needed, **no battery failsafe**, SoC unknown" (`PCB_COMPATIBILITY_20261114.md:18`) |
+| `TETHER_MODE` (205) | `false` | 0..1 | `Offboard_Gateway` | "tethered operation: fence radius = `FENCE_TETHER_RADIUS_M`" (`PARAM_TABLE.md:203`) |
+| `FENCE_TETHER_RADIUS_M` (204) | `30` m | 2..200 | `Offboard_Gateway` | "tethered-mode fence radius = tether length **(PLACEHOLDER)**" (`PARAM_TABLE.md:202`) |
+
+`BAT_TETHERED` is a **power** statement. `TETHER_MODE` is a **navigation** statement. Nothing in the
+firmware or the hardware ties them together.
+
+### 2.1 This is the `Tether_Interlock` the register was missing
+
+The interlock is not a threshold and not a transition. It is a **consistency requirement between two
+operator-set parameters that no component enforces**:
+
+- `BAT_TETHERED = 1` with `TETHER_MODE = 0` — the aircraft is on tether power with **no battery
+  failsafe**, while the fence still uses the untethered radius. Flight beyond tether length is not
+  prevented by the fence, and the energy failsafe that would otherwise end the flight is disabled.
+- `BAT_TETHERED = 0` with `TETHER_MODE = 1` — the fence is clamped to tether length while the
+  battery failsafe is live and SoC is being estimated. Less dangerous, and still a misconfiguration.
+
+Both states are reachable, neither is rejected, and **both are invisible today** because no ground
+station reads either parameter. This is the first dual-power item that is a real safety surface
+rather than a display.
+
+## 3. What the aircraft can and cannot tell a ground station
+
+This is the constraint that shapes the whole feature, and it is the opposite of what a dual-power
+display would assume.
+
+`MAVLINK_TELEMETRY.md`'s outbound set is `HEARTBEAT`, `SYS_STATUS`, `ATTITUDE`,
+`GLOBAL_POSITION_INT`, `GPS_RAW_INT`, `BATTERY_STATUS`, `VFR_HUD`, `STATUSTEXT`, `PARAM_VALUE` and
+`COMMAND_ACK`. **There is no tether message, and no tether field in any of them.**
+
+| Question | Answerable? | How |
+| --- | --- | --- |
+| Is the aircraft *configured* for tether power? | **Yes** | `BAT_TETHERED` via `PARAM_VALUE` |
+| Is the aircraft *configured* for a tether fence? | **Yes** | `TETHER_MODE`, `FENCE_TETHER_RADIUS_M` |
+| Is a tether physically attached? | **No** | No telemetry, and no sense channel — see §4 |
+| Is an attached tether supplying power? | **No** | Same |
+| Has the aircraft switched source in flight? | **No** | Nothing reports a transition |
+
+So `AeroraPowerModel::tetherConfiguration()` (`IF-PWR-001`, attachment) and `tetherSupply()`
+(`IF-PWR-013`) have **no producer on this aircraft** and must stay never-observed. Their existing
+documentation already forbids inferring them from a voltage reading or from traffic stopping, which
+is exactly right and is now load-bearing rather than cautionary.
+
+What *is* newly answerable is **configuration**, which is a different item from either of those and
+has no slot in the model today.
+
+## 4. Three discrepancies between the GCS baseline and Rev B
+
+Each needs an owner. None is mine to resolve.
+
+### 4.1 The tether is a low-voltage pack input, not a 480 V domain
+
+`AeroraPowerModel.h` documents, from baseline 49:
+
+```text
+TETHER CONFIGURATION
+  480 V DC from the ground → tether → onboard DC-DC stage → 48 V aircraft domain
+```
+
+`FC_Connectors.md:332` states the actual input:
+
+| J10 | 1 GND, 2 → F2 → D4 → VIN_RAW | **pack input B (tether)** | F2 1206, rating not specified (D25) |
+
+That is a fused, diode-isolated **pack input onto the same `VIN_RAW` rail** as pack input A — not a
+high-voltage domain with a converter stage. Either baseline 49 describes a different airframe
+revision, or the 480 V/48 V topology is superseded on Rev B. This also bears on `Q3-007`, recorded
+as the open conflict over whether the high-voltage domain is reported to the ground station at all:
+on this board there may be no high-voltage domain to report.
+
+### 4.2 The hardware appears to diode-OR the two sources
+
+Two pack inputs, each through a diode, onto one rail is a diode-OR. `AeroraPowerModel`'s seven
+refusals include "no diode-OR behaviour" and `kPowerArbitrationImplemented = false`. Those refusals
+remain **correct** — arbitration is an electrical function and the station must not model it — but
+the reason changes. It is not that the topology is unproven; it is that the topology is passive and
+has no reporting path. Worth restating in the model's own words, because a refusal justified by
+absent evidence reads differently once the evidence arrives.
+
+### 4.3 Two firmware documents disagree on whether battery sensing works
+
+- `BUILD_READINESS.md:103`: battery sensing "**cannot be done in software**" — Rev B has no
+  pack-voltage or pack-current ADC channel — and therefore "`BENCH_MODE` must stay 1 and **there is
+  no battery failsafe**: do not fly untethered without an external battery alarm".
+- `PCB_COMPATIBILITY_20261114.md:18` (later): the board has an INA228 at `0x40`,
+  `FC_Power_Monitor` now reads it, `Battery_Pack_Monitor` derives SoC and remaining mAh, and the
+  capacity failsafe is live at SoC ≤ 20 %.
+
+The later document appears to supersede the earlier one, but `BUILD_READINESS.md` is the flight
+preconditions document and still carries the prohibition. **A ground station must not present a
+battery failsafe as live while the aircraft's own readiness document says it is not.** Which
+document governs is a firmware-side call.
+
+## 5. Battery values, as stated
+
+Carried for traceability. The station defines none of these and enforces none of them.
+
+| Quantity | Value | Source |
+| --- | --- | --- |
+| Pack | 14S, 58.8 V max | `PCB_COMPATIBILITY_20261114.md:18` |
+| Critical voltage | ≤ 3.30 V/cell (46.2 V) for 3 s → `Bat_Crit` → **LAND**, held until disarm | `CONTROL_ARCHITECTURE.md:231`, `:77` |
+| Overcurrent | > `PLACEHOLDER_OVERCURRENT_A` **250 A** for 1 s | `CONTROL_ARCHITECTURE.md:232` |
+| Capacity failsafe | used mAh ≥ 0.8 × `PLACEHOLDER_PACK_MAH` (**30 000 mAh, to be confirmed**) | `CONTROL_ARCHITECTURE.md:233` |
+| Capacity failsafe (restated) | SoC ≤ 100 × (1 − `BAT_CAPACITY_FS_FRAC`) = 20 % | `PCB_COMPATIBILITY_20261114.md:18` |
+| `BAT_DIODE_DROP_V` | 0.4 V | same |
+| `BAT_I_FULL_A` | 250 A | same |
+| `BAT_I_EXP` | 2.5 | same |
+| `BAT_SOC_GAIN` | 0.002 /s | same |
+| `BATTERY_STATUS.type` | 1 LIPO **(PLACEHOLDER)** | `MAVLINK_TELEMETRY.md` |
+
+### 5.1 Pack current is estimated, not measured
+
+`Battery_Pack_Monitor` "uses the INA228 bus voltage + `BAT_DIODE_DROP_V` and **ESTIMATES** pack
+current from the six motor commands (R8 carries only the FC electronics, about 0.6 A, not the
+motors)" (`PCB_COMPATIBILITY_20261114.md:18`).
+
+So `BATTERY_STATUS.current_battery`, `current_consumed` and `battery_remaining` on this aircraft are
+**derived from commanded motor output**, not from a current sensor. QGroundControl's
+`BatteryFactGroupListModel` will present them as measurements, because that is what the message
+means everywhere else. The distinction is exactly what `AeroraReportedValue`'s `basis` field exists
+for, and it is the honest-reporting item of this whole document: a number that looks measured and is
+modelled.
+
+## 6. What is implementable now, and what is not
+
+Implementable, with no value authored by the station:
+
+1. **Configured power source** — read `BAT_TETHERED` through the Fact System and report it as
+   configuration, not as attachment or supply.
+2. **Configured fence mode** — read `TETHER_MODE` and `FENCE_TETHER_RADIUS_M`, carrying the
+   firmware's own `PLACEHOLDER` annotation on the radius.
+3. **The §2.1 interlock** — report when `BAT_TETHERED` and `TETHER_MODE` disagree. Report only; the
+   station commands nothing.
+4. **The battery-failsafe consequence** — when `BAT_TETHERED = 1`, state that SoC is unknown and no
+   battery failsafe is armed, rather than showing a stale or zero SoC.
+5. **Basis text for battery values** — record that current and SoC are estimated from motor
+   commands, per §5.1.
+
+Not implementable, and must stay never-observed:
+
+- Tether attachment (`IF-PWR-001`) and tether supply (`IF-PWR-013`) — no producer, §3.
+- Source transition (`IF-PWR-004`) — nothing reports one.
+- Converter state (`IF-PWR-010`), degraded mode (`IF-PWR-009`), remaining energy (`IF-PWR-008`),
+  high-voltage scalars (`IF-PWR-006`) — unchanged, and §4.1 casts doubt on whether the last exists
+  on this board at all.
+
+## 7. Owners
+
+| Item | Needs | Owner |
+| --- | --- | --- |
+| §4.1 topology — 480 V baseline vs `VIN_RAW` pack input B | Which describes the flying airframe | Architecture + firmware |
+| §4.3 battery sensing — which document governs | Whether a battery failsafe may be presented as live | Firmware |
+| §2.1 interlock — report only, or also refuse to arm | Product behaviour; the station has no arming authority anyway (`COMMAND_LONG` 400 `param1=1` → ACK 2 DENIED) | Product |
+| `FENCE_TETHER_RADIUS_M`, `PLACEHOLDER_OVERCURRENT_A`, `PLACEHOLDER_PACK_MAH`, `BATTERY_STATUS.type` | Confirmation; all four are the firmware's own placeholders | Firmware + product |
+
+None of the four blocks §6's implementable list, because every item there reports a parameter the
+aircraft already publishes or states a consequence the firmware already documents.
